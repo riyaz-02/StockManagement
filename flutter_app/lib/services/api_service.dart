@@ -266,4 +266,67 @@ class ApiService {
   String getTallyExcelUrl(String tallyId) {
     return '${AppConstants.baseUrl}/reports/tally/$tallyId/excel';
   }
+
+  // Settings APIs
+  Future<Map<String, dynamic>> getSettings(String category) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/settings/$category'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getSetting(String category, String type) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/settings/$category/$type'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateSetting(
+    String category,
+    String type,
+    List<String> values,
+  ) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/settings/$category/$type'),
+      headers: await _getHeaders(),
+      body: json.encode({'values': values}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> addSettingValue(
+    String category,
+    String type,
+    String value,
+  ) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/settings/$category/$type/add'),
+      headers: await _getHeaders(),
+      body: json.encode({'value': value}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> deleteSettingValue(
+    String category,
+    String type,
+    String value,
+  ) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/settings/$category/$type/$value'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> initializeSettings() async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/settings/initialize'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
 }

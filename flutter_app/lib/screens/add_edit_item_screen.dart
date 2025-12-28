@@ -6,6 +6,7 @@ import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import '../providers/item_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/container_provider.dart';
+import '../providers/settings_provider.dart';
 import '../utils/app_constants.dart';
 import '../utils/app_colors.dart';
 import '../services/api_service.dart';
@@ -26,9 +27,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _weightController = TextEditingController();
   final _huidController = TextEditingController();
   
-  String _selectedItemType = 'ring';
-  String _selectedMetalType = 'gold';
-  String _selectedPurity = '916';
+  String _selectedItemType = '';
+  String _selectedMetalType = '';
+  String _selectedPurity = '';
   String? _selectedContainerId;
   int? _selectedSlotNumber;
   bool _isHallmarked = false;
@@ -41,6 +42,26 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     super.initState();
     _generateBarcode();
     _weightController.addListener(_onSpecsChanged);
+    // Fetch settings on init and set default values
+    Future.microtask(() async {
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      await settingsProvider.fetchItemSettings();
+      
+      // Set default values after settings are loaded
+      if (mounted) {
+        setState(() {
+          _selectedItemType = settingsProvider.itemTypes.isNotEmpty 
+              ? settingsProvider.itemTypes.first 
+              : 'ring';
+          _selectedMetalType = settingsProvider.metalTypes.isNotEmpty 
+              ? settingsProvider.metalTypes.first 
+              : 'gold';
+          _selectedPurity = settingsProvider.purityOptions.isNotEmpty 
+              ? settingsProvider.purityOptions.first 
+              : '916';
+        });
+      }
+    });
   }
 
   @override
@@ -279,7 +300,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-      body: Form(
+      body: _selectedItemType.isEmpty || _selectedMetalType.isEmpty || _selectedPurity.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(12),
@@ -303,7 +326,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         value: _selectedItemType,
                         label: 'Type',
                         icon: Icons.category_outlined,
-                        items: AppConstants.itemTypes,
+                        items: Provider.of<SettingsProvider>(context).itemTypes.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).itemTypes
+                            : ['ring'],
                         onChanged: (value) {
                           setState(() => _selectedItemType = value!);
                           _onSpecsChanged();
@@ -316,7 +341,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         value: _selectedMetalType,
                         label: 'Metal',
                         icon: Icons.diamond_outlined,
-                        items: AppConstants.metalTypes,
+                        items: Provider.of<SettingsProvider>(context).metalTypes.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).metalTypes
+                            : ['gold'],
                         onChanged: (value) {
                           setState(() => _selectedMetalType = value!);
                           _onSpecsChanged();
@@ -333,7 +360,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         value: _selectedPurity,
                         label: 'Purity',
                         icon: Icons.verified_outlined,
-                        items: AppConstants.purityOptions,
+                        items: Provider.of<SettingsProvider>(context).purityOptions.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).purityOptions
+                            : ['916'],
                         onChanged: (value) {
                           setState(() => _selectedPurity = value!);
                           _onSpecsChanged();
@@ -570,6 +599,22 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     );
   }
 
+  // Helper function to format text for display
+  String _formatText(String text) {
+    // Handle special cases for purity (keep as-is if it's a number or contains numbers)
+    if (RegExp(r'^\d').hasMatch(text)) {
+      return text.toUpperCase(); // 916, 22k, etc.
+    }
+    
+    // Replace hyphens and underscores with spaces, then capitalize each word
+    return text
+        .replaceAll('-', ' ')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   Widget _buildDropdown({
     required String value,
     required String label,
@@ -603,7 +648,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       items: items.map((item) {
         return DropdownMenuItem(
           value: item,
-          child: Text(translate ? languageProvider.translate(item) : item),
+          child: Text(
+            translate 
+                ? languageProvider.translate(item) 
+                : _formatText(item),
+          ),
         );
       }).toList(),
       onChanged: onChanged,

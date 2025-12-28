@@ -24,12 +24,10 @@ const containerSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['ring_box', 'necklace_tray', 'earring_tray', 'hand_model', 'custom'],
         required: true
     },
     allowedItemTypes: [{
-        type: String,
-        enum: ['ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'bangle']
+        type: String
     }],
     capacity: {
         type: Number,
@@ -38,12 +36,10 @@ const containerSchema = new mongoose.Schema({
     },
     weightCategory: {
         type: String,
-        enum: ['light', 'medium', 'heavy', 'mixed'],
         default: 'mixed'
     },
     layoutType: {
         type: String,
-        enum: ['grid', 'linear', 'hand_model'],
         default: 'grid'
     },
     slots: [slotSchema],
@@ -78,16 +74,19 @@ containerSchema.pre('save', function (next) {
 
 // Virtual for occupied slots count
 containerSchema.virtual('occupiedSlots').get(function () {
+    if (!this.slots || !Array.isArray(this.slots)) return 0;
     return this.slots.filter(slot => slot.itemId !== null).length;
 });
 
 // Virtual for available slots count
 containerSchema.virtual('availableSlots').get(function () {
+    if (!this.slots || !Array.isArray(this.slots)) return 0;
     return this.slots.filter(slot => slot.itemId === null && !slot.reserved).length;
 });
 
 // Virtual for reserved slots count
 containerSchema.virtual('reservedSlots').get(function () {
+    if (!this.slots || !Array.isArray(this.slots)) return 0;
     return this.slots.filter(slot => slot.reserved).length;
 });
 

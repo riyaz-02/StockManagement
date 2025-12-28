@@ -20,17 +20,14 @@ const itemSchema = new mongoose.Schema({
     },
     itemType: {
         type: String,
-        enum: ['ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'bangle'],
         required: [true, 'Item type is required']
     },
     metalType: {
         type: String,
-        enum: ['gold', 'silver', 'mixed', 'gold-coated', 'platinum'],
         required: [true, 'Metal type is required']
     },
     purity: {
         type: String,
-        enum: ['916', '22k', '18k', '14k', 'silver925', 'silver999', 'platinum950'],
         required: [true, 'Purity is required']
     },
     netWeight: {

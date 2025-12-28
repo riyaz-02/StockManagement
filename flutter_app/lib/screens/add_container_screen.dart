@@ -1,8 +1,13 @@
 import 'dart:ui';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import '../providers/container_provider.dart';
+import '../providers/settings_provider.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 
@@ -17,17 +22,109 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _capacityController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
   
   String _selectedType = 'drawer';
   String _selectedWeightCategory = 'light';
   String _selectedLayoutType = 'grid';
   List<String> _selectedItemTypes = [];
+  
+  // Image picker state
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
+  
+  // Barcode state
+  String _generatedBarcode = '';
+  int _barcodeSerial = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch settings and set defaults
+    Future.microtask(() async {
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      await Future.wait([
+        settingsProvider.fetchContainerSettings(),
+        settingsProvider.fetchItemSettings(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _selectedType = settingsProvider.containerTypes.isNotEmpty 
+              ? settingsProvider.containerTypes.first 
+              : 'drawer';
+          _selectedWeightCategory = settingsProvider.weightCategories.isNotEmpty 
+              ? settingsProvider.weightCategories.first 
+              : 'light';
+          _selectedLayoutType = settingsProvider.layoutTypes.isNotEmpty 
+              ? settingsProvider.layoutTypes.first 
+              : 'grid';
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _capacityController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _selectedImageBytes = bytes;
+          _selectedImageName = image.name;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageName = null;
+    });
+  }
+
+  void _generateBarcode() {
+    if (_selectedItemTypes.isEmpty) {
+      setState(() {
+        _generatedBarcode = '';
+      });
+      return;
+    }
+
+    String prefix;
+    if (_selectedItemTypes.length == 1) {
+      final type = _selectedItemTypes.first.toUpperCase();
+      prefix = type.substring(0, 1);
+    } else {
+      prefix = 'M';
+    }
+
+    setState(() {
+      _generatedBarcode = '$prefix$_barcodeSerial';
+    });
   }
 
   Future<void> _saveContainer() async {
@@ -108,10 +205,10 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
-            // Basic Information
+            // All fields in single section (no title/icon)
             _buildSectionCard(
-              title: 'Basic Info',
-              icon: Icons.inventory_2_outlined,
+              title: '',
+              icon: Icons.abc,
               children: [
                 _buildTextField(
                   controller: _nameController,
@@ -128,7 +225,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                         value: _selectedType,
                         label: 'Type',
                         icon: Icons.category_outlined,
-                        items: const ['drawer', 'shelf', 'box', 'tray', 'custom'],
+                        items: Provider.of<SettingsProvider>(context).containerTypes.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).containerTypes
+                            : ['drawer'],
                         onChanged: (value) => setState(() => _selectedType = value!),
                       ),
                     ),
@@ -152,15 +251,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Configuration
-            _buildSectionCard(
-              title: 'Configuration',
-              icon: Icons.settings_outlined,
-              children: [
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -168,7 +259,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                         value: _selectedWeightCategory,
                         label: 'Weight Category',
                         icon: Icons.scale_outlined,
-                        items: const ['light', 'medium', 'heavy', 'mixed'],
+                        items: Provider.of<SettingsProvider>(context).weightCategories.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).weightCategories
+                            : ['light'],
                         onChanged: (value) => setState(() => _selectedWeightCategory = value!),
                       ),
                     ),
@@ -176,37 +269,42 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                     Expanded(
                       child: _buildDropdown(
                         value: _selectedLayoutType,
-                        label: 'Layout',
+                        label: 'Layout Type',
                         icon: Icons.view_module_outlined,
-                        items: const ['grid', 'linear', 'custom'],
+                        items: Provider.of<SettingsProvider>(context).layoutTypes.isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).layoutTypes
+                            : ['grid'],
                         onChanged: (value) => setState(() => _selectedLayoutType = value!),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Allowed Item Types
-            _buildSectionCard(
-              title: 'Allowed Item Types',
-              icon: Icons.check_circle_outline,
-              children: [
+                const SizedBox(height: 16),
+                const Text(
+                  'Allowed Item Types',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: AppConstants.itemTypes.map((type) {
+                  children: (Provider.of<SettingsProvider>(context).itemTypes.isNotEmpty
+                      ? Provider.of<SettingsProvider>(context).itemTypes
+                      : ['ring']).map((type) {
                     final isSelected = _selectedItemTypes.contains(type);
                     return FilterChip(
                       label: Text(
-                        type[0].toUpperCase() + type.substring(1),
+                        _formatText(type),
                         style: TextStyle(
                           color: isSelected ? Colors.white : Colors.grey[700],
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       selected: isSelected,
+                      showCheckmark: false,
                       onSelected: (selected) {
                         setState(() {
                           if (selected) {
@@ -214,6 +312,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                           } else {
                             _selectedItemTypes.remove(type);
                           }
+                          _generateBarcode();
                         });
                       },
                       selectedColor: AppColors.primary,
@@ -229,13 +328,16 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Select item types that can be stored in this container',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
               ],
             ),
+            const SizedBox(height: 16),
+
+            // Image Upload Section
+            _buildImagePickerSection(),
+            const SizedBox(height: 12),
+            
+            // Barcode Display Section
+            if (_generatedBarcode.isNotEmpty) _buildBarcodeSection(),
             const SizedBox(height: 16),
 
             // Save Button
@@ -310,21 +412,23 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
+              if (title.isNotEmpty) ...[
+                Row(
+                  children: [
+                    Icon(icon, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               ...children,
             ],
           ),
@@ -410,5 +514,102 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       }).toList(),
       onChanged: onChanged,
     );
+  }
+
+  Widget _buildImagePickerSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: _selectedImageBytes != null
+          ? Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.memory(
+                    _selectedImageBytes!,
+                    height: 60,
+                    width: 60,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedImageName ?? 'Image',
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: _removeImage,
+                  color: Colors.red,
+                  tooltip: 'Remove',
+                ),
+              ],
+            )
+          : InkWell(
+              onTap: _pickImage,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add Image',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildBarcodeSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        children: [
+          BarcodeWidget(
+            barcode: Barcode.code128(),
+            data: _generatedBarcode,
+            width: 200,
+            height: 60,
+            drawText: false,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _generatedBarcode,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+              letterSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatText(String text) {
+    return text[0].toUpperCase() + text.substring(1);
   }
 }

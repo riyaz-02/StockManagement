@@ -10,9 +10,20 @@ class ContainerSlot {
   });
 
   factory ContainerSlot.fromJson(Map<String, dynamic> json) {
+    // Handle MongoDB ObjectId which might be an object
+    String? getItemId() {
+      final idValue = json['itemId'];
+      if (idValue == null) return null;
+      if (idValue is String) return idValue;
+      if (idValue is Map && idValue.containsKey('\$oid')) {
+        return idValue['\$oid'] as String;
+      }
+      return idValue.toString();
+    }
+
     return ContainerSlot(
       slotNumber: json['slotNumber'] ?? 0,
-      itemId: json['itemId'],
+      itemId: getItemId(),
       reserved: json['reserved'] ?? false,
     );
   }

@@ -11,7 +11,7 @@ import 'tally_screen.dart';
 import 'repair_screen.dart';
 import 'booking_list_screen.dart';
 import 'reports_screen.dart';
-import 'settings_screen.dart';
+import 'settings_menu_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -179,7 +179,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  MaterialPageRoute(builder: (_) => const SettingsMenuScreen()),
                 ),
               ),
             ),
