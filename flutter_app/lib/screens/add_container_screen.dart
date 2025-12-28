@@ -41,7 +41,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   void initState() {
     super.initState();
     // Fetch settings and set defaults
-    Future.microtask(() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
       await Future.wait([
         settingsProvider.fetchContainerSettings(),
@@ -50,15 +50,16 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       
       if (mounted) {
         setState(() {
-          _selectedType = settingsProvider.containerTypes.isNotEmpty 
-              ? settingsProvider.containerTypes.first 
-              : 'drawer';
-          _selectedWeightCategory = settingsProvider.weightCategories.isNotEmpty 
-              ? settingsProvider.weightCategories.first 
-              : 'light';
-          _selectedLayoutType = settingsProvider.layoutTypes.isNotEmpty 
-              ? settingsProvider.layoutTypes.first 
-              : 'grid';
+          // Update selected values to match loaded settings
+          if (settingsProvider.containerTypes.isNotEmpty) {
+            _selectedType = settingsProvider.containerTypes.first;
+          }
+          if (settingsProvider.weightCategories.isNotEmpty) {
+            _selectedWeightCategory = settingsProvider.weightCategories.first;
+          }
+          if (settingsProvider.layoutTypes.isNotEmpty) {
+            _selectedLayoutType = settingsProvider.layoutTypes.first;
+          }
         });
       }
     });
@@ -175,36 +176,41 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settingsProvider = Provider.of<SettingsProvider>(context);
+    
+    // Wait for settings to load before showing form
+    if (settingsProvider.containerTypes.isEmpty || 
+        settingsProvider.weightCategories.isEmpty || 
+        settingsProvider.layoutTypes.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Add Container')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.6),
-                  ],
-                ),
-              ),
-            ),
+        title: const Text('Add Container'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.background,
+              Colors.white,
+            ],
           ),
         ),
-        title: const Text(
-          'Add New Container',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
             // All fields in single section (no title/icon)
             _buildSectionCard(
               title: '',
@@ -221,14 +227,21 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildDropdown(
-                        value: _selectedType,
-                        label: 'Type',
-                        icon: Icons.category_outlined,
-                        items: Provider.of<SettingsProvider>(context).containerTypes.isNotEmpty
-                            ? Provider.of<SettingsProvider>(context).containerTypes
-                            : ['drawer'],
-                        onChanged: (value) => setState(() => _selectedType = value!),
+                      child: Builder(
+                        builder: (context) {
+                          final items = Provider.of<SettingsProvider>(context).containerTypes.isNotEmpty
+                              ? Provider.of<SettingsProvider>(context).containerTypes
+                              : ['drawer'];
+                          // Ensure value exists in items
+                          final value = items.contains(_selectedType) ? _selectedType : items.first;
+                          return _buildDropdown(
+                            value: value,
+                            label: 'Type',
+                            icon: Icons.category_outlined,
+                            items: items,
+                            onChanged: (val) => setState(() => _selectedType = val!),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -255,26 +268,38 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildDropdown(
-                        value: _selectedWeightCategory,
-                        label: 'Weight Category',
-                        icon: Icons.scale_outlined,
-                        items: Provider.of<SettingsProvider>(context).weightCategories.isNotEmpty
-                            ? Provider.of<SettingsProvider>(context).weightCategories
-                            : ['light'],
-                        onChanged: (value) => setState(() => _selectedWeightCategory = value!),
+                      child: Builder(
+                        builder: (context) {
+                          final items = Provider.of<SettingsProvider>(context).weightCategories.isNotEmpty
+                              ? Provider.of<SettingsProvider>(context).weightCategories
+                              : ['light'];
+                          final value = items.contains(_selectedWeightCategory) ? _selectedWeightCategory : items.first;
+                          return _buildDropdown(
+                            value: value,
+                            label: 'Weight Category',
+                            icon: Icons.scale_outlined,
+                            items: items,
+                            onChanged: (val) => setState(() => _selectedWeightCategory = val!),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildDropdown(
-                        value: _selectedLayoutType,
-                        label: 'Layout Type',
-                        icon: Icons.view_module_outlined,
-                        items: Provider.of<SettingsProvider>(context).layoutTypes.isNotEmpty
-                            ? Provider.of<SettingsProvider>(context).layoutTypes
-                            : ['grid'],
-                        onChanged: (value) => setState(() => _selectedLayoutType = value!),
+                      child: Builder(
+                        builder: (context) {
+                          final items = Provider.of<SettingsProvider>(context).layoutTypes.isNotEmpty
+                              ? Provider.of<SettingsProvider>(context).layoutTypes
+                              : ['grid'];
+                          final value = items.contains(_selectedLayoutType) ? _selectedLayoutType : items.first;
+                          return _buildDropdown(
+                            value: value,
+                            label: 'Layout Type',
+                            icon: Icons.view_module_outlined,
+                            items: items,
+                            onChanged: (val) => setState(() => _selectedLayoutType = val!),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -373,6 +398,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
