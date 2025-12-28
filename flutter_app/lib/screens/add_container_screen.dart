@@ -191,26 +191,24 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Add Container'),
+        elevation: 0,
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.background,
-              Colors.white,
-            ],
+        title: const Text(
+          'Add Container',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
+      ),
+      body: Container(
+        color: Colors.grey[50],
+        child: SafeArea(
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
             // All fields in single section (no title/icon)
             _buildSectionCard(
               title: '',
@@ -380,16 +378,27 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                       ),
                     ),
                     child: provider.isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          )
-                        : const Text(
-                            'Create Container',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
                             ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_circle_outline, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Create Container',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                   ),
                 );
@@ -398,7 +407,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           ],
         ),
       ),
-    ),
+        ),
+      ),
     );
   }
 
@@ -407,57 +417,43 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     required IconData icon,
     required List<Widget> children,
   }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.7),
-                Colors.white.withOpacity(0.3),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (title.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Icon(icon, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(icon, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
-              ...children,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
             ],
-          ),
+            ...children,
+          ],
         ),
       ),
     );
@@ -604,33 +600,58 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   }
 
   Widget _buildBarcodeSection() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        children: [
-          BarcodeWidget(
-            barcode: Barcode.code128(),
-            data: _generatedBarcode,
-            width: 200,
-            height: 60,
-            drawText: false,
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: AnimatedOpacity(
+        opacity: _generatedBarcode.isNotEmpty ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _generatedBarcode,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'monospace',
-              letterSpacing: 2,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey[200]!,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: BarcodeWidget(
+                    barcode: Barcode.code128(),
+                    data: _generatedBarcode,
+                    width: 180,
+                    height: 60,
+                    drawText: false,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _generatedBarcode,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                    letterSpacing: 3,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
