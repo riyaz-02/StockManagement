@@ -13,8 +13,15 @@ import '../services/api_service.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final String? itemId;
+  final String? initialContainerId;
+  final int? initialSlotNumber;
   
-  const AddEditItemScreen({super.key, this.itemId});
+  const AddEditItemScreen({
+    super.key, 
+    this.itemId, 
+    this.initialContainerId, 
+    this.initialSlotNumber,
+  });
 
   @override
   State<AddEditItemScreen> createState() => _AddEditItemScreenState();
@@ -42,24 +49,39 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     super.initState();
     _generateBarcode();
     _weightController.addListener(_onSpecsChanged);
+    
+    // Set initial values from widget arguments
+    if (widget.initialContainerId != null) {
+      _selectedContainerId = widget.initialContainerId;
+    }
+    if (widget.initialSlotNumber != null) {
+      _selectedSlotNumber = widget.initialSlotNumber;
+    }
+
     // Fetch settings on init and set default values
     Future.microtask(() async {
       final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
       await settingsProvider.fetchItemSettings();
       
+      // Always fetch containers to ensure dropdown is populated
+      await Provider.of<ContainerProvider>(context, listen: false).fetchContainers();
+      
       // Set default values after settings are loaded
       if (mounted) {
         setState(() {
           _selectedItemType = settingsProvider.itemTypes.isNotEmpty 
-              ? settingsProvider.itemTypes.first 
+              ? settingsProvider.itemTypes.first.toLowerCase() 
               : 'ring';
           _selectedMetalType = settingsProvider.metalTypes.isNotEmpty 
-              ? settingsProvider.metalTypes.first 
+              ? settingsProvider.metalTypes.first.toLowerCase() 
               : 'gold';
           _selectedPurity = settingsProvider.purityOptions.isNotEmpty 
               ? settingsProvider.purityOptions.first 
               : '916';
         });
+
+        // Trigger analysis to populate recommendations initially
+        _analyzeContainer();
       }
     });
   }
@@ -90,37 +112,63 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   }
 
   Future<void> _analyzeContainer() async {
-    if (_weightController.text.isEmpty) return;
-    
+    // Determine Weight Category
+    double weight = double.tryParse(_weightController.text) ?? 0.0;
+    String weightCategory = 'Light';
+    if (weight > 100) {
+      weightCategory = 'Heavy';
+    } else if (weight > 10) {
+      weightCategory = 'Medium';
+    }
+
     setState(() => _isLoadingContainers = true);
     
     try {
       final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-      await containerProvider.fetchContainers();
+      // Ensure we have latest data
+      if (containerProvider.containers.isEmpty) {
+        await containerProvider.fetchContainers();
+      }
       
-      // Simple recommendation: find containers with available slots
       final containers = containerProvider.containers;
       final recommended = containers.map((container) {
-        final availableSlots = container.availableSlots; // Using getter from model
+        // Validation Logic
+        bool typeMatch = container.allowedItemTypes.map((e) => e.toLowerCase()).contains(_selectedItemType.toLowerCase());
+        bool weightMatch = container.weightCategory.toLowerCase() == weightCategory.toLowerCase();
+        bool hasSpace = container.availableSlots > 0;
+        
+        // Score: 3 = Perfect, 2 = Type+Space, 1 = Space only, 0 = No space
+        int score = 0;
+        if (hasSpace) {
+            score += 1;
+            if (typeMatch) score += 2; // Prioritize type matching
+            if (weightMatch) score += 1;
+        }
+
         return {
           'id': container.id,
           'name': container.name,
-          'available': availableSlots > 0,
-          'availableSlots': availableSlots,
+          'available': hasSpace,
+          'availableSlots': container.availableSlots,
+          'score': score,
+          'matchReason': typeMatch ? 'Matches Type' : (hasSpace ? 'Has Space' : 'Full'),
         };
       }).toList();
       
-      // Sort: available first
-      recommended.sort((a, b) {
-        final aAvailable = a['available'] as bool;
-        final bAvailable = b['available'] as bool;
-        if (aAvailable == bAvailable) return 0;
-        return aAvailable ? -1 : 1;
-      });
+      // Sort: Highest score first
+      recommended.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
       
       setState(() {
         _recommendedContainers = recommended;
         _isLoadingContainers = false;
+        
+        // Auto-select best match if none selected
+        if (_selectedContainerId == null && recommended.isNotEmpty) {
+           final best = recommended.first;
+           if ((best['score'] as int) > 1) { // Only auto-select if it's at least a decent match
+             _selectedContainerId = best['id'] as String;
+           }
+        }
       });
     } catch (e) {
       setState(() => _isLoadingContainers = false);
@@ -679,6 +727,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         return DropdownMenuItem(
           value: container['id'] as String,
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 isAvailable ? Icons.check_circle : Icons.cancel,
@@ -686,9 +735,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 size: 18,
               ),
               const SizedBox(width: 8),
-              Expanded(
+              Flexible(
                 child: Text(
                   '${container['name']} - ${isAvailable ? "$availableSlots slots" : "Full"}',
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isAvailable ? Colors.black : Colors.grey,
                   ),

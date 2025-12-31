@@ -26,6 +26,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   
   String _selectedType = 'drawer';
   String _selectedWeightCategory = 'light';
+
+  List<String> _selectedMetalTypes = [];
+  List<String> _selectedPurity = [];
   String _selectedLayoutType = 'grid';
   List<String> _selectedItemTypes = [];
   
@@ -60,6 +63,10 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           if (settingsProvider.layoutTypes.isNotEmpty) {
             _selectedLayoutType = settingsProvider.layoutTypes.first;
           }
+          if (settingsProvider.metalTypes.isNotEmpty) {
+            _selectedMetalTypes = [settingsProvider.metalTypes.first];
+          }
+          _selectedPurity = ['all'];
         });
       }
     });
@@ -85,7 +92,14 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         final bytes = await image.readAsBytes();
         setState(() {
           _selectedImageBytes = bytes;
-          _selectedImageName = image.name;
+          String name = image.name;
+          if (!name.toLowerCase().endsWith('.jpg') && 
+              !name.toLowerCase().endsWith('.jpeg') && 
+              !name.toLowerCase().endsWith('.png') && 
+              !name.toLowerCase().endsWith('.webp')) {
+            name = '$name.jpg';
+          }
+          _selectedImageName = name;
         });
       }
     } catch (e) {
@@ -123,6 +137,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       prefix = 'M';
     }
 
+    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    _barcodeSerial = containerProvider.getNextSerial(prefix);
+
     setState(() {
       _generatedBarcode = '$prefix$_barcodeSerial';
     });
@@ -142,13 +159,23 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
 
       final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
       
+      String? imageUrl;
+      if (_selectedImageBytes != null && _selectedImageName != null) {
+        imageUrl = await containerProvider.uploadImage(_selectedImageBytes!, _selectedImageName!);
+      }
+
       final containerData = {
         'name': _nameController.text,
         'type': _selectedType,
         'capacity': int.parse(_capacityController.text),
         'allowedItemTypes': _selectedItemTypes,
         'weightCategory': _selectedWeightCategory,
+        'weightCategory': _selectedWeightCategory,
+        'metalType': _selectedMetalTypes,
+        'purity': _selectedPurity,
         'layoutType': _selectedLayoutType,
+        'qrCode': _generatedBarcode,
+        if (imageUrl != null) 'image': imageUrl,
       };
 
       final success = await containerProvider.createContainer(containerData);
@@ -261,6 +288,99 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                // Metal and Purity Row
+                const SizedBox(height: 12),
+                
+                // Metal Type Section
+                const Text('Metal Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: (Provider.of<SettingsProvider>(context).metalTypes.isEmpty 
+                      ? ['gold'] 
+                      : Provider.of<SettingsProvider>(context).metalTypes).map((type) {
+                    final isSelected = _selectedMetalTypes.contains(type);
+                    return FilterChip(
+                      label: Text(
+                        type[0].toUpperCase() + type.substring(1),
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      selected: isSelected,
+                      showCheckmark: false,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedMetalTypes.add(type);
+                          } else {
+                            if (_selectedMetalTypes.length > 1) { // Prevent empty selection
+                              _selectedMetalTypes.remove(type);
+                            }
+                          }
+                        });
+                      },
+                      selectedColor: AppColors.primary,
+                      checkmarkColor: Colors.white,
+                      backgroundColor: Colors.white.withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                          width: 1.5,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Purity Section
+                const Text('Purity (Optional)', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: (['all', ...Provider.of<SettingsProvider>(context).purityOptions.isEmpty 
+                      ? ['916'] 
+                      : Provider.of<SettingsProvider>(context).purityOptions]).map((type) {
+                    final isSelected = _selectedPurity.contains(type);
+                    return FilterChip(
+                      label: Text(
+                        type == 'all' ? 'All' : type,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      selected: isSelected,
+                      showCheckmark: false,
+                      onSelected: (selected) {
+                        setState(() {
+                           if (selected) {
+                            _selectedPurity.add(type);
+                          } else {
+                            if (_selectedPurity.length > 1) { // Prevent empty selection
+                              _selectedPurity.remove(type);
+                            }
+                          }
+                        });
+                      },
+                      selectedColor: AppColors.primary,
+                      checkmarkColor: Colors.white,
+                      backgroundColor: Colors.white.withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                          width: 1.5,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -506,6 +626,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     required IconData icon,
     required List<String> items,
     required void Function(String?) onChanged,
+    bool translate = true,
   }) {
     return DropdownButtonFormField<String>(
       value: value,
@@ -531,7 +652,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       items: items.map((item) {
         return DropdownMenuItem(
           value: item,
-          child: Text(item[0].toUpperCase() + item.substring(1)),
+          child: Text(
+            translate ? item[0].toUpperCase() + item.substring(1) : item.toUpperCase(), 
+          ),
         );
       }).toList(),
       onChanged: onChanged,
@@ -612,7 +735,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -624,7 +747,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.grey[50],
                     borderRadius: BorderRadius.circular(8),
@@ -632,19 +755,19 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                   child: BarcodeWidget(
                     barcode: Barcode.code128(),
                     data: _generatedBarcode,
-                    width: 180,
-                    height: 60,
+                    width: 150,
+                    height: 50,
                     drawText: false,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
                 Text(
                   _generatedBarcode,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey[800],
-                    letterSpacing: 3,
+                    letterSpacing: 2,
                     fontFamily: 'monospace',
                   ),
                 ),

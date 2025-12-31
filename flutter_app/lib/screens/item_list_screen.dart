@@ -88,13 +88,19 @@ class _ItemListScreenState extends State<ItemListScreen> {
                             Icon(Icons.inventory, size: 64, color: Colors.grey),
                             const SizedBox(height: 16),
                             Text(
-                              languageProvider.translate('no_data'),
+                              languageProvider.translate('no_data') == 'no_data' 
+                                  ? 'No items found' 
+                                  : languageProvider.translate('no_data'),
                               style: TextStyle(fontSize: 18, color: Colors.grey),
                             ),
                             const SizedBox(height: 24),
                             ElevatedButton.icon(
                               icon: const Icon(Icons.add),
-                              label: Text(languageProvider.translate('add_item')),
+                              label: Text(
+                                languageProvider.translate('add_item') == 'add_item'
+                                    ? 'Add Item'
+                                    : languageProvider.translate('add_item')
+                              ),
                               onPressed: () {
                                 Navigator.push(
                                   context,

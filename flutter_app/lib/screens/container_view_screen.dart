@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:barcode_widget/barcode_widget.dart';
+import '../providers/container_provider.dart';
 import '../models/container_model.dart' as models;
 import '../models/item_model.dart';
 import '../providers/language_provider.dart';
@@ -9,6 +10,9 @@ import '../providers/item_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'item_details_screen.dart';
+import 'edit_container_screen.dart';
+import 'add_edit_item_screen.dart';
+import '../utils/app_constants.dart';
 
 class ContainerViewScreen extends StatefulWidget {
   final models.ItemContainer container;
@@ -34,11 +38,68 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
         .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join(' ');
   }
+  Color _getCapacityColor(double percent) {
+    if (percent >= 0.9) return Colors.red;
+    if (percent >= 0.7) return Colors.orange;
+    return AppColors.statusActive; // Or green
+  }
+
+  Widget _buildDetailItem(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[50], // Very subtle bg
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 20, color: Colors.grey[700]),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _formatText(value),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
-    final images = ['https://via.placeholder.com/400x300?text=Container+Image']; // Placeholder
+    // Use container from provider if available (updated version), otherwise widget.container
+    final containerProvider = Provider.of<ContainerProvider>(context);
+    final container = (containerProvider.selectedContainer != null && 
+                       containerProvider.selectedContainer!.id == widget.container.id)
+        ? containerProvider.selectedContainer!
+        : widget.container;
+        
+    final List<String> images = (container.image != null && container.image!.isNotEmpty)
+        ? ['${AppConstants.baseUrl}${container.image}']
+        : [];
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -49,37 +110,111 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.6),
-                  ],
-                ),
-              ),
+            child: Container(
+                decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        container.isDeleted ? Colors.grey[800]! : AppColors.primary.withOpacity(0.8),
+                        container.isDeleted ? Colors.grey[700]! : AppColors.primary.withOpacity(0.6),
+                      ],
+                    ),
+                  ),
+            ),
             ),
           ),
         ),
-        title: Text(widget.container.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(container.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Navigate to edit container
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit container - Coming soon!')),
-              );
-            },
-          ),
+          if (!container.isDeleted)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditContainerScreen(container: container),
+                  ),
+                );
+                // Refresh container data on return
+                if (mounted) {
+                  Provider.of<ContainerProvider>(context, listen: false).fetchContainer(widget.container.id);
+                }
+              },
+            ),
         ],
       ),
+      bottomNavigationBar: container.isDeleted 
+          ? Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5)),
+                ],
+              ),
+              child: Row(
+                children: [
+                   Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      icon: const Icon(Icons.restore),
+                      label: const Text('RESTORE'),
+                      onPressed: () async {
+                        final provider = Provider.of<ContainerProvider>(context, listen: false);
+                        final success = await provider.restoreContainer(container.id);
+                        if (success && mounted) {
+                           Navigator.pop(context); // Go back to Recycle Bin list
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             SnackBar(content: Text('Restored ${container.name}')),
+                           );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('DELETE'),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Delete Forever?'),
+                              content: Text('Permanently delete "${container.name}"? This cannot be undone.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(ctx, true), style: TextButton.styleFrom(foregroundColor: Colors.red), child: const Text('Delete')),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            final provider = Provider.of<ContainerProvider>(context, listen: false);
+                            await provider.deleteContainerPermanently(container.id);
+                            if (mounted) Navigator.pop(context);
+                          }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Compact Image and Barcode Section
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -126,15 +261,15 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      AppColors.statusActive.withOpacity(0.9),
-                                      AppColors.statusActive.withOpacity(0.7),
+                                      (container.isDeleted ? Colors.red : (container.isActive ? AppColors.statusActive : Colors.grey)).withOpacity(0.9),
+                                      (container.isDeleted ? Colors.red : (container.isActive ? AppColors.statusActive : Colors.grey)).withOpacity(0.7),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: Colors.white.withOpacity(0.3)),
                                 ),
                                 child: Text(
-                                  widget.container.isActive ? 'ACTIVE' : 'INACTIVE',
+                                  container.isDeleted ? 'DELETED' : (container.isActive ? 'ACTIVE' : 'INACTIVE'),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -180,8 +315,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                         child: Container(
-                          height: 180,
-                          padding: const EdgeInsets.all(8),
+                          height: 160,
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -201,9 +336,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                               RotatedBox(
                                 quarterTurns: 3,
                                 child: Text(
-                                  widget.container.id.length > 8 
-                                      ? widget.container.id.substring(widget.container.id.length - 8)
-                                      : widget.container.id,
+                                  container.qrCode?.isNotEmpty == true 
+                                      ? container.qrCode!
+                                      : (container.id.length > 8 
+                                          ? container.id.substring(container.id.length - 8)
+                                          : container.id),
                                   style: const TextStyle(
                                     fontSize: 9,
                                     fontFamily: 'monospace',
@@ -219,7 +356,9 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                                   quarterTurns: 3,
                                   child: BarcodeWidget(
                                     barcode: Barcode.code128(),
-                                    data: widget.container.id,
+                                    data: container.qrCode?.isNotEmpty == true
+                                        ? container.qrCode!
+                                        : container.id,
                                     width: 130,
                                     height: 45,
                                     drawText: false,
@@ -236,141 +375,152 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
               ),
             ),
 
-            // Compact Info Card
+            // Deleted Notice Bar
+            if (container.isDeleted)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.info_outline, color: Colors.red),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'This container is in the Recycle Bin. Restore it to edit or view full details.',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Info and Stats Card
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.7),
-                          Colors.white.withOpacity(0.3),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey[200]!),
+                ),
+                color: Colors.white,
+                child: Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    initiallyExpanded: true,
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Container Name
-                        Text(
-                          widget.container.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Stats Row (Compact)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildCompactStatChip('Occupied', widget.container.occupiedSlots.toString(), AppColors.slotOccupied),
-                            _buildCompactStatChip('Available', widget.container.availableSlots.toString(), AppColors.slotEmpty),
-                            _buildCompactStatChip('Reserved', widget.container.reservedSlots.toString(), AppColors.slotReserved),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Details (Compact)
-                        _buildCompactDetailRow(Icons.category_outlined, 'Type', _formatText(widget.container.type)),
-                        _buildCompactDetailRow(Icons.grid_3x3, 'Capacity', '${widget.container.capacity} slots'),
-                        _buildCompactDetailRow(Icons.scale_outlined, 'Weight', _formatText(widget.container.weightCategory)),
-                        _buildCompactDetailRow(Icons.view_module_outlined, 'Layout', _formatText(widget.container.layoutType)),
-                        
-                        // Allowed Item Types (Compact)
-                        const SizedBox(height: 8),
-                        Row(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.check_circle_outline, color: AppColors.primary, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Allowed Items',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Wrap(
-                                    spacing: 4,
-                                    runSpacing: 4,
-                                    children: widget.container.allowedItemTypes.map((type) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                        ),
-                                        child: Text(
-                                          _formatText(type),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
+                            Text(
+                              'Container Details',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
+                        // Compact percentage chip in title
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _getCapacityColor(container.occupiedSlots / container.capacity).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${container.occupiedSlots}/${container.capacity}  (${((container.occupiedSlots / container.capacity) * 100).toInt()}%)',
+                            style: TextStyle(
+                              color: _getCapacityColor(container.occupiedSlots / container.capacity),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
+                    childrenPadding: const EdgeInsets.all(12),
+                    children: [
+                       // Progress Bar
+                       ClipRRect(
+                         borderRadius: BorderRadius.circular(8),
+                         child: LinearProgressIndicator(
+                           value: container.occupiedSlots / container.capacity,
+                           backgroundColor: Colors.grey[100],
+                           color: _getCapacityColor(container.occupiedSlots / container.capacity),
+                           minHeight: 8,
+                         ),
+                       ),
+                       const SizedBox(height: 16),
+                       // Details Grid
+                       GridView.count(
+                         shrinkWrap: true,
+                         physics: const NeverScrollableScrollPhysics(),
+                         crossAxisCount: 2,
+                         childAspectRatio: 3,
+                         mainAxisSpacing: 8,
+                         crossAxisSpacing: 8,
+                         children: [
+                           _buildDetailItem(Icons.category_outlined, 'Type', container.type),
+                           _buildDetailItem(Icons.scale_outlined, 'Weight', container.weightCategory),
+                           _buildDetailItem(Icons.diamond_outlined, 'Metal', container.metalType.join(', ')),
+                           _buildDetailItem(Icons.verified_outlined, 'Purity', container.purity.join(', ')),
+                           _buildDetailItem(Icons.grid_view, 'Layout', container.layoutType),
+                           _buildDetailItem(Icons.check_circle_outline, 'Allowed', container.allowedItemTypes.join(', ')),
+                         ],
+                       ),
+                    ],
                   ),
                 ),
               ),
             ),
-
-            // Slots Section (Compact)
+            // Slots Section
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const Text(
+                    'Slots Layout',
+                    style: TextStyle(
+                        fontSize: 14, 
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Legend
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
                     children: [
-                      const Text(
-                        'Slots Layout',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      // Compact Legend
-                      Row(
-                        children: [
-                          _buildCompactLegendItem('Empty', AppColors.slotEmpty),
-                          const SizedBox(width: 8),
-                          _buildCompactLegendItem('Occupied', AppColors.slotOccupied),
-                          const SizedBox(width: 8),
-                          _buildCompactLegendItem('Reserved', AppColors.slotReserved),
-                        ],
-                      ),
+                      _buildLegendItem('Empty', AppColors.slotEmpty),
+                      _buildLegendItem('Occupied', AppColors.slotOccupied),
+                      _buildLegendItem('Reserved', AppColors.slotReserved),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildSlotsGrid(),
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[200]!)
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: _buildSlotsGrid(container)
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -380,101 +530,45 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     );
   }
 
-  Widget _buildCompactStatChip(String label, String value, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-          ),
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCompactDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactLegendItem(String label, Color color) {
+  Widget _buildLegendItem(String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 12,
-          height: 12,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: color.withOpacity(0.5), width: 1),
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10)),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.grey)),
       ],
     );
   }
 
-  Widget _buildSlotsGrid() {
-    final columns = widget.container.layoutType == 'linear' ? 5 : 6;
+  Widget _buildSlotsGrid(models.ItemContainer container) {
+    final columns = container.layoutType == 'linear' ? 5 : 6;
     
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
         childAspectRatio: 1,
       ),
-      itemCount: widget.container.slots.length,
+      itemCount: container.slots.length,
       itemBuilder: (context, index) {
-        final slot = widget.container.slots[index];
-        return _buildSlotItem(slot);
+        final slot = container.slots[index];
+        return _buildSlotItem(slot, container);
       },
     );
   }
 
-  Widget _buildSlotItem(models.ContainerSlot slot) {
+  Widget _buildSlotItem(models.ContainerSlot slot, models.ItemContainer container) {
     Color slotColor;
     IconData? icon;
     
@@ -490,121 +584,62 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     }
 
     return GestureDetector(
-      onTap: slot.isOccupied
-          ? () async {
+      onTap: () async {
+        if (slot.isOccupied) {
               // Fetch item details and navigate
               try {
-                // Extract item ID (handle both string and object cases)
                 String? itemId;
-                
-                print('DEBUG: slot.itemId type: ${slot.itemId.runtimeType}');
-                print('DEBUG: slot.itemId value: ${slot.itemId}');
-                
-                if (slot.itemId == null) {
-                  throw Exception('Item ID is null');
-                }
-                
-                // Handle different types - cast to dynamic to avoid type issues
                 final dynamic rawItemId = slot.itemId;
+                if (rawItemId == null) return;
                 
                 if (rawItemId is String) {
-                  // Check if it's a stringified object (starts with '{')
-                  if (rawItemId.startsWith('{')) {
-                    print('DEBUG: itemId is a stringified object, parsing...');
-                    // Extract _id or id from the string
-                    // Format: {_id: 6950c8e68e491143101cd9f5, barcode: ..., id: 6950c8e68e491143101cd9f5}
-                    final idMatch = RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
-                    if (idMatch != null) {
-                      itemId = idMatch.group(1);
-                      print('DEBUG: Extracted ID from stringified object: $itemId');
-                    } else {
-                      // Try to extract 'id' field
-                      final idMatch2 = RegExp(r'id:\s*([a-f0-9]+)').firstMatch(rawItemId);
-                      if (idMatch2 != null) {
-                        itemId = idMatch2.group(1);
-                        print('DEBUG: Extracted ID from id field: $itemId');
-                      }
-                    }
-                  } else {
-                    itemId = rawItemId;
-                    print('DEBUG: itemId is plain String: $itemId');
-                  }
+                   if (rawItemId.startsWith('{')) {
+                     final idMatch = RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
+                     itemId = idMatch?.group(1);
+                   } else {
+                     itemId = rawItemId;
+                   }
                 } else if (rawItemId is Map) {
-                  // Try to extract ID from Map
-                  final Map itemMap = rawItemId as Map;
-                  print('DEBUG: itemId is Map with keys: ${itemMap.keys}');
-                  
-                  // Try different ID field names
-                  if (itemMap.containsKey('_id')) {
-                    final idValue = itemMap['_id'];
-                    if (idValue is String) {
-                      itemId = idValue;
-                    } else if (idValue is Map && idValue.containsKey('\$oid')) {
-                      itemId = idValue['\$oid'].toString();
-                    } else {
-                      itemId = idValue.toString();
+                   if (rawItemId.containsKey('_id')) itemId = rawItemId['_id'].toString();
+                   else if (rawItemId.containsKey('id')) itemId = rawItemId['id'].toString();
+                }
+
+                if (itemId != null && itemId.isNotEmpty && itemId != 'null') {
+                    final apiService = ApiService();
+                    final response = await apiService.getItem(itemId);
+                    if (mounted && response['success'] == true) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: Item.fromJson(response['data']['item']))));
                     }
-                  } else if (itemMap.containsKey('id')) {
-                    itemId = itemMap['id'].toString();
-                  }
-                  
-                  print('DEBUG: Extracted itemId from Map: $itemId');
-                  
-                  // If we have the full item data, use it directly
-                  if (itemId != null && itemMap.containsKey('barcode') && itemMap.containsKey('name')) {
-                    print('DEBUG: Using full item data from slot');
-                    final item = Item.fromJson(Map<String, dynamic>.from(itemMap));
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ItemDetailsScreen(item: item),
-                      ),
-                    );
-                    return;
-                  }
-                } else {
-                  itemId = rawItemId.toString();
-                  print('DEBUG: itemId converted to string: $itemId');
                 }
-                
-                if (itemId == null || itemId.isEmpty || itemId == 'null') {
-                  throw Exception('Could not extract valid item ID');
-                }
-                
-                print('DEBUG: Fetching item with ID: $itemId');
-                
-                final apiService = ApiService();
-                final response = await apiService.getItem(itemId);
-                
-                print('DEBUG: API response: ${response['success']}');
-                
-                if (mounted && response['success'] == true) {
-                  final itemData = response['data']['item'];
-                  final item = Item.fromJson(itemData);
-                  
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ItemDetailsScreen(item: item),
-                    ),
-                  );
-                } else {
-                  throw Exception(response['message'] ?? 'Failed to fetch item');
-                }
-              } catch (e) {
-                print('DEBUG: Error in slot tap: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                }
-              }
-            }
-          : null,
+              } catch (e) { print(e); }
+        } else {
+          // Empty Slot Tap
+          if (container.isLocked) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Container is LOCKED. unlock to add items.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else {
+            // Navigate to Add Item
+             await Navigator.push(
+               context,
+               MaterialPageRoute(
+                 builder: (_) => AddEditItemScreen(
+                   initialContainerId: container.id,
+                   initialSlotNumber: slot.slotNumber,
+                 ),
+               ),
+             );
+             // Refresh container on return
+             if (mounted) {
+               Provider.of<ContainerProvider>(context, listen: false).fetchContainer(container.id);
+             }
+          }
+        }
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: BackdropFilter(

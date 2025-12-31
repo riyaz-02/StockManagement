@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/container_provider.dart';
 import '../providers/language_provider.dart';
+import '../models/container_model.dart' as models;
 import 'container_view_screen.dart';
 import 'add_container_screen.dart';
+import 'item_details_screen.dart';
+import '../utils/app_constants.dart';
+import 'recycle_bin_screen.dart';
+
+import 'edit_container_screen.dart';
 
 class ContainerListScreen extends StatefulWidget {
   const ContainerListScreen({super.key});
@@ -13,11 +19,17 @@ class ContainerListScreen extends StatefulWidget {
 }
 
 class _ContainerListScreenState extends State<ContainerListScreen> {
+  String _statusFilter = 'all';
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        Provider.of<ContainerProvider>(context, listen: false).fetchContainers());
+    Future.microtask(() => _refreshContainers());
+  }
+
+  void _refreshContainers() {
+    if (mounted) {
+      Provider.of<ContainerProvider>(context, listen: false).fetchContainers();
+    }
   }
 
   @override
@@ -27,6 +39,13 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(languageProvider.translate('containers')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Recycle Bin',
+            onPressed: () => _showRecycleBin(context),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -35,19 +54,36 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
             MaterialPageRoute(builder: (_) => const AddContainerScreen()),
           );
           // Refresh list after adding
-          if (mounted) {
-            Provider.of<ContainerProvider>(context, listen: false).fetchContainers();
-          }
+          _refreshContainers();
         },
         child: const Icon(Icons.add),
       ),
-      body: Consumer<ContainerProvider>(
+      body: Column(
+        children: [
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                _buildFilterChip('All', 'all'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Active', 'active'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Inactive', 'inactive'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Locked', 'locked'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Consumer<ContainerProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (provider.error != null) {
+          if (provider.error != null && provider.containers.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -73,7 +109,7 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
                   const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   Text(
-                    languageProvider.translate('no_data'),
+                    'No containers found',
                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
@@ -88,32 +124,328 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: provider.containers.length,
+            itemCount: _filterContainers(provider.containers).length,
             itemBuilder: (context, index) {
-              final container = provider.containers[index];
+              final container = _filterContainers(provider.containers)[index];
+              // Use specific colors for status
+              Color statusColor = Colors.grey;
+              String statusText = 'INACTIVE';
+              
+              if (container.isActive) {
+                if (container.isLocked) {
+                  statusColor = Colors.orange;
+                  statusText = 'LOCKED';
+                } else {
+                  statusColor = Colors.green;
+                  statusText = 'ACTIVE';
+                }
+              }
+
               return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const Icon(Icons.inventory_2, size: 40),
-                  title: Text(container.name),
-                  subtitle: Text(
-                    '${container.occupiedSlots}/${container.capacity} slots occupied',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () {
-                    Navigator.push(
+                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ContainerViewScreen(container: container),
+                        builder: (context) => ContainerViewScreen(container: container),
                       ),
-                    );
+                    ).then((_) => _refreshContainers());
                   },
+                  onLongPress: () {
+                    _showContainerOptions(context, container);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Container Image (Placeholder)
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: statusColor.withOpacity(0.3)),
+                            image: (container.image != null && container.image!.isNotEmpty)
+                                ? DecorationImage(
+                                    image: NetworkImage('${AppConstants.baseUrl}${container.image}'),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                              child: (container.image == null || container.image!.isEmpty)
+                              ? Icon(
+                                  container.isLocked ? Icons.lock : Icons.inventory_2,
+                                  size: 30,
+                                  color: statusColor,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        
+                        // 2. Details Column
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Name and Type Row
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          container.name,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          container.qrCode ?? container.id.substring(0, 8),
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      container.type.toUpperCase(),
+                                      style: const TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Stats Row
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Slots Info
+                                  Row(
+                                    children: [
+                                      Icon(Icons.grid_view, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${container.availableSlots}/${container.capacity} Avl',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                  // Status Badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: statusColor.withOpacity(0.5)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          container.isLocked ? Icons.lock : (container.isActive ? Icons.check_circle : Icons.cancel),
+                                          size: 12,
+                                          color: statusColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          statusText,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },
           );
         },
       ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _statusFilter == value;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _statusFilter = value;
+        });
+      },
+      selectedColor: Colors.blue.withOpacity(0.2),
+      checkmarkColor: Colors.blue,
+    );
+  }
+
+  List<models.ItemContainer> _filterContainers(List<models.ItemContainer> containers) {
+    if (_statusFilter == 'all') return containers;
+    
+    return containers.where((container) {
+      switch (_statusFilter) {
+        case 'active':
+          return container.isActive;
+        case 'inactive':
+          return !container.isActive;
+        case 'locked':
+          return container.isLocked;
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  void _showContainerOptions(BuildContext context, models.ItemContainer container) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                container.name,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.open_in_new, color: Colors.blue),
+                title: const Text('Open'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ContainerViewScreen(container: container),
+                    ),
+                  ).then((_) => _refreshContainers());
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  container.isLocked ? Icons.lock_open : Icons.lock_outline,
+                  color: Colors.orange,
+                ),
+                title: Text(container.isLocked ? 'Unlock' : 'Lock'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await Provider.of<ContainerProvider>(context, listen: false)
+                      .toggleContainerLock(container.id, !container.isLocked);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.black87),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditContainerScreen(container: container),
+                    ),
+                  ).then((_) => _refreshContainers());
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Delete'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Move to Trash?'),
+                      content: const Text('Delete this container?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        TextButton(
+                           onPressed: () => Navigator.pop(ctx, true), 
+                           style: TextButton.styleFrom(foregroundColor: Colors.red),
+                           child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true && mounted) {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final provider = Provider.of<ContainerProvider>(context, listen: false);
+                    final success = await provider.deleteContainer(container.id);
+                    
+                    if (success) {
+                       _refreshContainers(); // Refresh after successful delete
+                    } else {
+                       if (mounted && provider.error != null) {
+                         messenger.showSnackBar(
+                           SnackBar(
+                             content: Text(provider.error!),
+                             backgroundColor: Colors.red,
+                           ),
+                         );
+                       }
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showRecycleBin(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
+    ).then((_) {
+      // Refresh list when returning from recycle bin
+      _refreshContainers();
+    });
   }
 }

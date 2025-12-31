@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../utils/app_constants.dart';
 import 'storage_service.dart';
@@ -54,9 +55,14 @@ class ApiService {
   }
 
   // Containers
-  Future<Map<String, dynamic>> getContainers() async {
+  Future<Map<String, dynamic>> getContainers({Map<String, String>? queryParams}) async {
+    var uri = Uri.parse('${AppConstants.baseUrl}/containers');
+    if (queryParams != null) {
+      uri = uri.replace(queryParameters: queryParams);
+    }
+    
     final response = await http.get(
-      Uri.parse('${AppConstants.baseUrl}/containers'),
+      uri,
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
@@ -77,6 +83,53 @@ class ApiService {
       body: json.encode(data),
     );
     return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateContainer(String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/containers/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> deleteContainer(String id, {bool force = false}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/containers/$id').replace(
+      queryParameters: force ? {'force': 'true'} : null,
+    );
+    
+    final response = await http.delete(
+      uri,
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<String?> uploadContainerImage(Uint8List bytes, String filename) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/containers/upload');
+    final request = http.MultipartRequest('POST', uri);
+    
+    // Auth header only (MultipartRequest sets Content-Type automatically)
+    final token = await _storage.getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    request.files.add(http.MultipartFile.fromBytes(
+      'image',
+      bytes,
+      filename: filename,
+    ));
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final body = _handleResponse(response);
+    
+    if (body['success'] == true) {
+      return body['url'];
+    }
+    return null;
   }
 
   // Items

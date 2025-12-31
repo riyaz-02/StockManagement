@@ -38,14 +38,38 @@ const containerSchema = new mongoose.Schema({
         type: String,
         default: 'mixed'
     },
+    metalType: [{
+        type: String,
+        default: 'gold'
+    }],
+    purity: [{
+        type: String,
+        default: 'all'
+    }],
     layoutType: {
         type: String,
         default: 'grid'
+    },
+    qrCode: {
+        type: String,
+        trim: true
+    },
+    image: {
+        type: String,
+        default: null
     },
     slots: [slotSchema],
     isActive: {
         type: Boolean,
         default: true
+    },
+    isLocked: {
+        type: Boolean,
+        default: false
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
     },
     createdAt: {
         type: Date,

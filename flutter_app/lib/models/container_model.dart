@@ -48,9 +48,15 @@ class ItemContainer {
   final List<String> allowedItemTypes;
   final int capacity;
   final String weightCategory;
+  final List<String> metalType;
+  final List<String> purity;
   final String layoutType;
+  final String? qrCode;
+  final String? image;
   final List<ContainerSlot> slots;
   final bool isActive;
+  final bool isDeleted;
+  final bool isLocked;
   final DateTime createdAt;
 
   ItemContainer({
@@ -60,9 +66,15 @@ class ItemContainer {
     required this.allowedItemTypes,
     required this.capacity,
     required this.weightCategory,
+    required this.metalType,
+    required this.purity,
     required this.layoutType,
+    this.qrCode,
+    this.image,
     required this.slots,
     this.isActive = true,
+    this.isDeleted = false,
+    this.isLocked = false,
     required this.createdAt,
   });
 
@@ -85,12 +97,22 @@ class ItemContainer {
       allowedItemTypes: List<String>.from(json['allowedItemTypes'] ?? []),
       capacity: json['capacity'] ?? 0,
       weightCategory: json['weightCategory'] ?? 'mixed',
+      metalType: json['metalType'] is List 
+          ? List<String>.from(json['metalType']) 
+          : [json['metalType']?.toString() ?? 'gold'],
+      purity: json['purity'] is List 
+          ? List<String>.from(json['purity']) 
+          : [json['purity']?.toString() ?? 'all'],
       layoutType: json['layoutType'] ?? 'grid',
+      qrCode: json['qrCode'],
+      image: json['image'],
       slots: (json['slots'] as List?)
               ?.map((slot) => ContainerSlot.fromJson(slot))
               .toList() ??
           [],
       isActive: json['isActive'] ?? true,
+      isDeleted: json['isDeleted'] ?? false,
+      isLocked: json['isLocked'] ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -106,8 +128,12 @@ class ItemContainer {
       'capacity': capacity,
       'weightCategory': weightCategory,
       'layoutType': layoutType,
+      'qrCode': qrCode,
+      'image': image,
       'slots': slots.map((slot) => slot.toJson()).toList(),
       'isActive': isActive,
+      'isDeleted': isDeleted,
+      'isLocked': isLocked,
       'createdAt': createdAt.toIso8601String(),
     };
   }
