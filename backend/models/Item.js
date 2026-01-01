@@ -35,6 +35,11 @@ const itemSchema = new mongoose.Schema({
         required: [true, 'Net weight is required'],
         min: 0
     },
+    weightCategory: {
+        type: String,
+        enum: ['Light', 'Medium', 'Heavy'],
+        default: 'Light'
+    },
     huid: {
         type: String,
         trim: true,

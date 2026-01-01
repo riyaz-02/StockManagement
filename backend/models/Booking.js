@@ -6,6 +6,10 @@ const bookingSchema = new mongoose.Schema({
         ref: 'Item',
         required: [true, 'Item ID is required']
     },
+    customerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Customer'
+    },
     customerName: {
         type: String,
         required: [true, 'Customer name is required'],
@@ -37,7 +41,7 @@ const bookingSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['active', 'completed', 'cancelled'],
+        enum: ['active', 'completed', 'cancelled', 'manufacturing'],
         default: 'active'
     },
     createdAt: {

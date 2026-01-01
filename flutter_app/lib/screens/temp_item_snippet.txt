@@ -1,0 +1,182 @@
+            // Image Carousel + Barcode Row
+            SizedBox(
+              height: 160,
+              child: Row(
+                children: [
+                   // Image Carousel Section (70%)
+                   Expanded(
+                    flex: 7,
+                    child: Stack(
+                      children: [
+                        // Image PageView for multiple images
+                        GestureDetector(
+                          onTap: () {
+                            if (_item.images.isNotEmpty) {
+                              _showFullScreenImage(context, _item.images);
+                            }
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [AppColors.primary.withOpacity(0.1), Colors.grey[50]!],
+                              ),
+                            ),
+                            child: _item.images.isNotEmpty
+                                ? Stack(
+                                  children: [
+                                    PageView.builder(
+                                      controller: _pageController,
+                                      onPageChanged: (index) {
+                                        setState(() {
+                                          _currentImageIndex = index;
+                                        });
+                                      },
+                                      itemCount: _item.images.length,
+                                      itemBuilder: (context, index) {
+                                        String path = _item.images[index];
+                                        String imageUrl;
+                                        if (path.startsWith('http')) {
+                                          imageUrl = path;
+                                        } else {
+                                          imageUrl = '${AppConstants.baseUrl}/${path.replaceAll('\\', '/')}';
+                                        }
+
+                                        return Center(
+                                          child: Image.network(
+                                            imageUrl,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    // Arrows for Web/Desktop
+                                    if (_item.images.length > 1) ...[
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.arrow_back_ios, size: 16, color: Colors.black54),
+                                          onPressed: () {
+                                            _pageController.previousPage(
+                                              duration: const Duration(milliseconds: 300),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
+                                          onPressed: () {
+                                            _pageController.nextPage(
+                                              duration: const Duration(milliseconds: 300),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                )
+                                : _buildImagePlaceholder(),
+                          ),
+                        ),
+                        // Status Badge Overlay
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(_item.status).withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(_getStatusIcon(_item.status), color: Colors.white, size: 12),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _formatText(_item.status),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // [WEIGHT OVERLAY REMOVED]
+
+                        // Dots
+                        if (_item.images.length > 1)
+                          Positioned(
+                            bottom: 8,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                _item.images.length,
+                                (index) => AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  width: _currentImageIndex == index ? 12 : 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(3),
+                                    color: _currentImageIndex == index ? AppColors.primary : Colors.white.withOpacity(0.7),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Barcode Section (30%)
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: 3,
+                          child: BarcodeWidget(
+                            barcode: Barcode.code128(),
+                            data: _item.barcode,
+                            width: 80, 
+                            height: 80,
+                            drawText: true,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),

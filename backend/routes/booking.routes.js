@@ -4,20 +4,22 @@ const {
     createBooking,
     getBookings,
     getBooking,
+    updateBooking,
     cancelBooking,
     completeBooking
 } = require('../controllers/bookingController');
 const { protect, authorize } = require('../middleware/auth');
 
-// All routes require authentication
 router.use(protect);
 
-// Public (authenticated) routes
-router.get('/', getBookings);
-router.get('/:id', getBooking);
+router.route('/')
+    .get(getBookings)
+    .post(authorize('admin', 'staff'), createBooking);
 
-// Staff and Admin routes
-router.post('/', authorize('admin', 'staff'), createBooking);
+router.route('/:id')
+    .get(getBooking)
+    .put(authorize('admin', 'staff'), updateBooking);
+
 router.put('/:id/cancel', authorize('admin', 'staff'), cancelBooking);
 router.put('/:id/complete', authorize('admin', 'staff'), completeBooking);
 

@@ -4,9 +4,13 @@ const Item = require('../models/Item');
 // @desc    Create new booking
 // @route   POST /api/bookings
 // @access  Private
+// @desc    Create new booking
+// @route   POST /api/bookings
+// @access  Private
 exports.createBooking = async (req, res) => {
     try {
-        const { itemId, customerName, mobile, expiryDate, advanceAmount, remarks } = req.body;
+        const { itemId, customerName, mobile, address, expiryDate, advanceAmount, remarks } = req.body;
+        const Customer = require('../models/Customer');
 
         // Validate required fields
         if (!itemId || !customerName || !mobile) {
@@ -40,9 +44,24 @@ exports.createBooking = async (req, res) => {
             });
         }
 
+        // Find or Create Customer
+        let customer = await Customer.findOne({ mobile });
+        if (!customer) {
+            customer = await Customer.create({
+                mobile,
+                name: customerName,
+                address
+            });
+        } else {
+            // Update address if provided
+            if (address) customer.address = address;
+            await customer.save();
+        }
+
         // Create booking
         const booking = await Booking.create({
             itemId,
+            customerId: customer._id,
             customerName,
             mobile,
             expiryDate: expiryDate ? new Date(expiryDate) : null,
@@ -50,6 +69,10 @@ exports.createBooking = async (req, res) => {
             remarks: remarks || '',
             status: 'active'
         });
+
+        // Link booking to customer
+        customer.bookings.push(booking._id);
+        await customer.save();
 
         // Update item status
         item.status = 'booked';
@@ -122,6 +145,82 @@ exports.getBooking = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while fetching booking'
+        });
+    }
+};
+
+
+
+// @desc    Update booking details
+// @route   PUT /api/bookings/:id
+// @access  Private
+exports.updateBooking = async (req, res) => {
+    try {
+        const { customerName, mobile, address, expiryDate, advanceAmount, remarks, status } = req.body;
+        const Booking = require('../models/Booking');
+        const Item = require('../models/Item');
+        const Customer = require('../models/Customer');
+
+        let booking = await Booking.findById(req.params.id);
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        // Update fields if provided
+        if (customerName) booking.customerName = customerName;
+        if (mobile) booking.mobile = mobile;
+        if (expiryDate) booking.expiryDate = new Date(expiryDate);
+        if (advanceAmount !== undefined) booking.advanceAmount = advanceAmount;
+        if (remarks) booking.remarks = remarks;
+
+        // Handle Status Change
+        if (status) {
+            // Logic for specific statuses
+            if (status === 'manufacturing') {
+                // If moving to manufacturing, release the item
+                if (booking.status !== 'manufacturing') {
+                    const item = await Item.findById(booking.itemId);
+                    if (item && item.status === 'booked') {
+                        item.status = 'active';
+                        await item.save();
+                    }
+                }
+            } else if (status === 'cancelled') {
+                // Reuse cancel logic? Or just handle here.
+                const item = await Item.findById(booking.itemId);
+                if (item && item.status === 'booked') {
+                    item.status = 'active';
+                    await item.save();
+                }
+            }
+            booking.status = status;
+        }
+
+        await booking.save();
+
+        // Update Customer Address/Name if changed
+        if (booking.customerId) {
+            const customer = await Customer.findById(booking.customerId);
+            if (customer) {
+                if (customerName) customer.name = customerName;
+                if (address) customer.address = address;
+                await customer.save();
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { booking }
+        });
+    } catch (error) {
+        console.error('Update booking error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while updating booking'
         });
     }
 };

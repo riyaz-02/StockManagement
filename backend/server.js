@@ -18,6 +18,7 @@ const tallyRoutes = require('./routes/tally.routes');
 const reportRoutes = require('./routes/report.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const settingsRoutes = require('./routes/settings');
+const customerRoutes = require('./routes/customer.routes');
 
 // Initialize express app
 const app = express();
@@ -64,6 +65,7 @@ app.use('/api/tally', tallyRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/customers', customerRoutes);
 
 // 404 handler
 app.use((req, res) => {

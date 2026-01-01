@@ -41,6 +41,18 @@ exports.createItem = async (req, res) => {
             slotNumber
         } = req.body;
 
+        // Helper to extract images
+        let imagePaths = [];
+        if (req.files && req.files.length > 0) {
+            imagePaths = req.files.map(file => file.path); // Save relative path or full path
+        }
+
+        // Also handle if images are passed as text (e.g. existing URLs)
+        if (images) {
+            const existingImages = Array.isArray(images) ? images : [images];
+            imagePaths = [...imagePaths, ...existingImages];
+        }
+
         // Validate required fields
         if (!name || !itemType || !metalType || !purity || !netWeight) {
             return res.status(400).json({
@@ -120,7 +132,8 @@ exports.createItem = async (req, res) => {
             purity,
             netWeight,
             huid,
-            images: images || [],
+            huid,
+            images: imagePaths,
             containerId: assignedContainerId,
             slotNumber: assignedSlotNumber,
             status: 'active'
@@ -162,7 +175,7 @@ exports.getItems = async (req, res) => {
         const items = await Item.find(filter)
             .populate({
                 path: 'containerId',
-                select: 'name type',
+                select: 'name type qrCode',
                 strictPopulate: false
             })
             .sort({ createdAt: -1 })
@@ -189,7 +202,7 @@ exports.getItems = async (req, res) => {
 exports.getItemByBarcode = async (req, res) => {
     try {
         const item = await Item.findOne({ barcode: req.params.code })
-            .populate('containerId', 'name type layoutType');
+            .populate('containerId', 'name type layoutType qrCode');
 
         if (!item) {
             return res.status(404).json({
@@ -217,7 +230,7 @@ exports.getItemByBarcode = async (req, res) => {
 exports.getItem = async (req, res) => {
     try {
         const item = await Item.findById(req.params.id)
-            .populate('containerId', 'name type layoutType');
+            .populate('containerId', 'name type layoutType qrCode');
 
         if (!item) {
             return res.status(404).json({
@@ -262,8 +275,82 @@ exports.updateItem = async (req, res) => {
             netWeight,
             huid,
             images,
-            status
+            status,
+            barcode,
+            keptImages
         } = req.body;
+
+
+
+        console.log('Update Item Request Body:', req.body);
+        console.log('Update Item Files:', req.files);
+        console.log('Kept Images Type:', typeof keptImages);
+        console.log('Kept Images Value:', keptImages);
+
+        // Check barcode uniqueness if changed
+        if (barcode && barcode !== item.barcode) {
+            const existingItem = await Item.findOne({ barcode });
+            if (existingItem) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Barcode already exists'
+                });
+            }
+            item.barcode = barcode;
+        }
+
+        // Handle Images: Merge kept existing images + new uploaded images
+        // We only update the images array if specialized params (keptImages or req.files) are present.
+        // If neither are present, we fall back to standard 'images' array if provided, or leave as is.
+        if (keptImages !== undefined || (req.files && req.files.length > 0)) {
+            let finalImages = [];
+
+            // 1. Process kept images
+            if (keptImages) {
+                try {
+                    let parsed;
+                    if (typeof keptImages === 'string') {
+                        // Attempt JSON parse first
+                        try {
+                            parsed = JSON.parse(keptImages);
+                        } catch (e) {
+                            // If parse fails, treat as single URL string
+                            parsed = [keptImages];
+                        }
+                    } else if (Array.isArray(keptImages)) {
+                        parsed = keptImages;
+                    } else {
+                        parsed = [];
+                    }
+
+                    // Ensure flattened array
+                    if (Array.isArray(parsed)) {
+                        finalImages.push(...parsed);
+                    } else if (typeof parsed === 'string') {
+                        finalImages.push(parsed);
+                    }
+                    console.log('Parsed Kept Images:', finalImages);
+                } catch (e) {
+                    console.warn('Error processing keptImages:', e);
+                }
+            } else if (keptImages === '') {
+                // Explicitly empty string means clear kept images
+                console.log('keptImages is empty string, clearing.');
+            }
+
+            // 2. Process new uploaded images
+            if (req.files && req.files.length > 0) {
+                const newImagePaths = req.files.map(file => file.path);
+                finalImages.push(...newImagePaths);
+                console.log('Added New Images:', newImagePaths);
+            }
+
+            console.log('Final Images to Save:', finalImages);
+            item.images = finalImages;
+        } else if (images) {
+            // Fallback for simple updates without file logic
+            item.images = images;
+        }
 
         // Update fields
         if (name) item.name = name;
@@ -273,7 +360,6 @@ exports.updateItem = async (req, res) => {
         if (purity) item.purity = purity;
         if (netWeight) item.netWeight = netWeight;
         if (huid !== undefined) item.huid = huid;
-        if (images) item.images = images;
         if (status) item.status = status;
 
         await item.save();
@@ -292,7 +378,7 @@ exports.updateItem = async (req, res) => {
     }
 };
 
-// @desc    Delete item (admin only)
+// @desc    Delete item (Soft Delete)
 // @route   DELETE /api/items/:id
 // @access  Private/Admin
 exports.deleteItem = async (req, res) => {
@@ -319,11 +405,15 @@ exports.deleteItem = async (req, res) => {
             }
         }
 
-        await item.deleteOne();
+        // Soft delete: Set status to deleted and remove location
+        item.status = 'deleted';
+        item.containerId = null;
+        item.slotNumber = null;
+        await item.save();
 
         res.status(200).json({
             success: true,
-            message: 'Item deleted successfully'
+            message: 'Item moved to recycle bin'
         });
     } catch (error) {
         console.error('Delete item error:', error);
@@ -339,7 +429,10 @@ exports.deleteItem = async (req, res) => {
 // @access  Private
 exports.sellItem = async (req, res) => {
     try {
+        const { mobile, customerName, address, amount } = req.body;
         const item = await Item.findById(req.params.id);
+        const Customer = require('../models/Customer');
+        const Sale = require('../models/Sale');
 
         if (!item) {
             return res.status(404).json({
@@ -347,6 +440,27 @@ exports.sellItem = async (req, res) => {
                 message: 'Item not found'
             });
         }
+
+        // Find or Create Customer
+        let customer = await Customer.findOne({ mobile });
+        if (!customer && mobile && customerName) {
+            customer = await Customer.create({
+                mobile,
+                name: customerName,
+                address
+            });
+        }
+
+        // Create Sale Record
+        const sale = await Sale.create({
+            itemId: item._id,
+            customerId: customer ? customer._id : null,
+            customerName: customerName || (customer ? customer.name : 'Unknown'),
+            mobile: mobile || (customer ? customer.mobile : 'Unknown'),
+            address: address || (customer ? customer.address : ''),
+            amount: amount || 0,
+            saleDate: Date.now()
+        });
 
         // Update status to sold
         item.status = 'sold';
@@ -372,7 +486,7 @@ exports.sellItem = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Item marked as sold',
-            data: { item }
+            data: { item, sale }
         });
     } catch (error) {
         console.error('Sell item error:', error);

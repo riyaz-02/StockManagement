@@ -7,9 +7,12 @@ class Item {
   final String metalType;
   final String purity;
   final double netWeight;
+  final String weightCategory;
   final String huid;
   final List<String> images;
   final String status;
+  final String? containerName; 
+  final String? containerCode; // Add containerCode
   final String? containerId;
   final int? slotNumber;
   final bool slotReserved;
@@ -25,10 +28,13 @@ class Item {
     required this.metalType,
     required this.purity,
     required this.netWeight,
+    this.weightCategory = 'Light',
     this.huid = '',
     this.images = const [],
     this.status = 'active',
     this.containerId,
+    this.containerName,
+    this.containerCode, // Add to constructor
     this.slotNumber,
     this.slotReserved = false,
     required this.createdAt,
@@ -45,12 +51,19 @@ class Item {
       metalType: json['metalType'] ?? '',
       purity: json['purity'] ?? '',
       netWeight: (json['netWeight'] ?? 0).toDouble(),
+      weightCategory: json['weightCategory'] ?? 'Light',
       huid: json['huid'] ?? '',
       images: List<String>.from(json['images'] ?? []),
       status: json['status'] ?? 'active',
       containerId: json['containerId'] is String 
           ? json['containerId'] 
           : json['containerId']?['_id'],
+      containerName: json['containerId'] is Map 
+          ? json['containerId']['name'] 
+          : null,
+      containerCode: json['containerId'] is Map 
+          ? json['containerId']['qrCode'] 
+          : null, // Parse qrCode
       slotNumber: json['slotNumber'],
       slotReserved: json['slotReserved'] ?? false,
       createdAt: json['createdAt'] != null
@@ -72,6 +85,7 @@ class Item {
       'metalType': metalType,
       'purity': purity,
       'netWeight': netWeight,
+      'weightCategory': weightCategory,
       'huid': huid,
       'images': images,
       'status': status,
@@ -100,6 +114,7 @@ class Item {
     String? metalType,
     String? purity,
     double? netWeight,
+    String? weightCategory,
     String? huid,
     List<String>? images,
     String? status,
@@ -118,6 +133,7 @@ class Item {
       metalType: metalType ?? this.metalType,
       purity: purity ?? this.purity,
       netWeight: netWeight ?? this.netWeight,
+      weightCategory: weightCategory ?? this.weightCategory,
       huid: huid ?? this.huid,
       images: images ?? this.images,
       status: status ?? this.status,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
 
@@ -78,13 +79,28 @@ class ItemProvider with ChangeNotifier {
   }
 
   // Create item
-  Future<bool> createItem(Map<String, dynamic> itemData) async {
+  Future<bool> createItem(Map<String, dynamic> itemData, [List<XFile>? images]) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.createItem(itemData);
+      Map<String, dynamic> response;
+      
+      if (images != null && images.isNotEmpty) {
+        // Prepare string fields for multipart
+        Map<String, String> stringFields = {};
+        itemData.forEach((key, value) {
+          if (value != null) {
+            stringFields[key] = value.toString();
+          }
+        });
+        
+        response = await _apiService.createItemWithImages(stringFields, images);
+      } else {
+        response = await _apiService.createItem(itemData);
+      }
+
       if (response['success'] == true) {
         final newItem = Item.fromJson(response['data']['item']);
         _items.insert(0, newItem);
@@ -102,13 +118,28 @@ class ItemProvider with ChangeNotifier {
   }
 
   // Update item
-  Future<bool> updateItem(String id, Map<String, dynamic> itemData) async {
+  Future<bool> updateItem(String id, Map<String, dynamic> itemData, [List<XFile>? images]) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.updateItem(id, itemData);
+      Map<String, dynamic> response;
+      
+      if (images != null && images.isNotEmpty) {
+        // Prepare string fields
+        Map<String, String> stringFields = {};
+        itemData.forEach((key, value) {
+          if (value != null) {
+            stringFields[key] = value.toString();
+          }
+        });
+        
+        response = await _apiService.updateItemWithImages(id, stringFields, images);
+      } else {
+        response = await _apiService.updateItem(id, itemData);
+      }
+
       if (response['success'] == true) {
         final updatedItem = Item.fromJson(response['data']['item']);
         final index = _items.indexWhere((item) => item.id == id);

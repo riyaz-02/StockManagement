@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import '../utils/app_constants.dart';
 import 'storage_service.dart';
 
@@ -278,6 +280,36 @@ class ApiService {
     return _handleResponse(response);
   }
 
+
+  
+  Future<Map<String, dynamic>> updateBooking(String id, Map<String, dynamic> data) async {
+      final response = await http.put(
+        Uri.parse('${AppConstants.baseUrl}/bookings/$id'),
+        headers: await _getHeaders(),
+        body: json.encode(data),
+      );
+      return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> sellItem(String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/items/$id/sell'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+
+
+  Future<Map<String, dynamic>> getDeletedItems() async {
+     final response = await http.get(
+       Uri.parse('${AppConstants.baseUrl}/items?status=deleted'),
+       headers: await _getHeaders(),
+     );
+     return _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> getBookings({String? status}) async {
     var uri = Uri.parse('${AppConstants.baseUrl}/bookings');
     if (status != null) {
@@ -298,6 +330,33 @@ class ApiService {
   Future<Map<String, dynamic>> completeBooking(String id) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/bookings/$id/complete'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Customers & Wishlist
+  Future<Map<String, dynamic>> addToWishlist(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/customers/wishlist'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> removeFromWishlist(String mobile, String itemId) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/customers/wishlist/remove'),
+      headers: await _getHeaders(),
+      body: json.encode({'mobile': mobile, 'itemId': itemId}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getItemInteractions(String itemId) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/customers/item/$itemId'),
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
@@ -380,6 +439,66 @@ class ApiService {
       Uri.parse('${AppConstants.baseUrl}/settings/initialize'),
       headers: await _getHeaders(),
     );
+    return _handleResponse(response);
+  }
+
+  // Create item with images (Multipart)
+  Future<Map<String, dynamic>> createItemWithImages(Map<String, String> fields, List<XFile> images) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/items');
+    final request = http.MultipartRequest('POST', uri);
+    return _sendMultipartRequest(request, fields, images);
+  }
+
+  // Update item with images (Multipart)
+  Future<Map<String, dynamic>> updateItemWithImages(String id, Map<String, String> fields, List<XFile> images) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/items/$id');
+    final request = http.MultipartRequest('PUT', uri);
+    return _sendMultipartRequest(request, fields, images);
+  }
+
+  // Helper for multipart requests
+  Future<Map<String, dynamic>> _sendMultipartRequest(http.MultipartRequest request, Map<String, String> fields, List<XFile> images) async {
+    // Add headers
+    final headers = await _getHeaders();
+    request.headers.addAll(headers);
+    // Remove content-type as MultipartRequest sets it automatically
+    request.headers.remove('Content-Type');
+
+    // Add text fields
+    fields.forEach((key, value) {
+      if (value.isNotEmpty) {
+        request.fields[key] = value;
+      }
+    });
+
+    print('Sending API Request: ${request.method} ${request.url}');
+    print('Fields: ${request.fields}');
+
+
+    // Add images
+    for (var image in images) {
+       final bytes = await image.readAsBytes();
+       
+       String? mimeType;
+       if (image.name.toLowerCase().endsWith('.jpg') || image.name.toLowerCase().endsWith('.jpeg')) {
+         mimeType = 'image/jpeg';
+       } else if (image.name.toLowerCase().endsWith('.png')) {
+         mimeType = 'image/png';
+       } else if (image.name.toLowerCase().endsWith('.webp')) {
+         mimeType = 'image/webp';
+       }
+       
+       request.files.add(http.MultipartFile.fromBytes(
+         'images', 
+         bytes,
+         filename: image.name,
+         contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+       ));
+    }
+
+    // Send request
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
     return _handleResponse(response);
   }
 }
