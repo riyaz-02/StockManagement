@@ -150,29 +150,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   }
 
   void _onWeightChanged() {
-     // Auto-calculate category based on weight
-     final text = _weightController.text;
-     if (text.isNotEmpty) {
-       double weight = double.tryParse(text) ?? 0.0;
-       String newCategory = 'Light';
-       if (weight > 100) {
-         newCategory = 'Heavy';
-       } else if (weight > 10) {
-         newCategory = 'Medium';
-       }
-       
-       if (_selectedWeightCategory != newCategory) {
-         // Avoid setState during build if listener fires unexpectedly
-         if (mounted) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-               setState(() {
-                 _selectedWeightCategory = newCategory;
-               });
-            });
-         }
-       }
-     }
-     
+     // Weight category is now manually selected by user, not auto-calculated
+     // Only trigger container analysis when weight changes
      _analyzeContainer();
   }
 
@@ -442,7 +421,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               backgroundColor: Colors.green
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true); // Return true to signal refresh
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

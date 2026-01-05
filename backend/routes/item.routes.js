@@ -8,7 +8,9 @@ const {
     updateItem,
     deleteItem,
     sellItem,
-    removeTemporarily
+    removeTemporarily,
+    restoreItem,
+    permanentDeleteItem
 } = require('../controllers/itemController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -29,5 +31,7 @@ router.put('/:id/remove-temporarily', authorize('admin', 'staff'), removeTempora
 
 // Admin only routes
 router.delete('/:id', authorize('admin'), deleteItem);
+router.put('/:id/restore', authorize('admin'), restoreItem);
+router.delete('/:id/permanent', authorize('admin'), permanentDeleteItem);
 
 module.exports = router;

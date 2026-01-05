@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:barcode_widget/barcode_widget.dart';
@@ -8,6 +8,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'create_booking_screen.dart';
 import 'send_to_repair_screen.dart';
+import 'add_edit_item_screen.dart';
 
 import '../services/api_service.dart';
 
@@ -107,14 +108,16 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
             icon: const Icon(Icons.edit_outlined),
             onPressed: () async {
               // Navigate to edit screen
-              final shouldRefresh = await Navigator.pushNamed(
+              final shouldRefresh = await Navigator.push(
                 context,
-                '/add_item',
-                arguments: _item,
+                MaterialPageRoute(
+                  builder: (_) => AddEditItemScreen(item: _item),
+                ),
               );
               
               if (shouldRefresh == true && mounted) {
-                Navigator.pop(context, true);
+                // Refresh item data to show updated values
+                _refreshData();
               }
             },
           ),
@@ -342,7 +345,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.category_outlined,
                                   'Type',
-                                  _formatText(widget.item.itemType),
+                                  _formatText(_item.itemType),
                                   Colors.blue,
                                 ),
                               ),
@@ -351,7 +354,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.diamond_outlined,
                                   'Metal',
-                                  _formatText(widget.item.metalType),
+                                  _formatText(_item.metalType),
                                   Colors.amber,
                                 ),
                               ),
@@ -366,7 +369,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.verified_outlined,
                                   'Purity',
-                                  widget.item.purity,
+                                  _item.purity,
                                   Colors.green,
                                 ),
                               ),
@@ -375,7 +378,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.scale_outlined,
                                   'Weight',
-                                  '${widget.item.netWeight.toStringAsFixed(3)}g',
+                                  '${_item.netWeight.toStringAsFixed(3)}g',
                                   Colors.purple,
                                 ),
                               ),
@@ -391,7 +394,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.fitness_center, 
                                   'Weight Category', 
-                                  widget.item.weightCategory.isNotEmpty ? widget.item.weightCategory : 'N/A', 
+                                  _item.weightCategory.isNotEmpty ? _item.weightCategory : 'N/A', 
                                   Colors.teal
                                 ),
                               ),
@@ -485,10 +488,10 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           () => _showSellBottomSheet(),
                         ),
                         _buildIconButton(
-                          Icons.build_outlined,
-                          'Repair',
+                          Icons.output_outlined,
+                          'Move Out',
                           Colors.orange,
-                          () => _showRepairBottomSheet(),
+                          () => _showMoveOutBottomSheet(),
                         ),
                         _buildIconButton(
                           Icons.delete_outline,
@@ -497,6 +500,186 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           () => _showDeleteConfirmation(context),
                         ),
                       ],
+                    ),
+
+                  // Restore/Permanent Delete buttons for deleted items
+                  if (_item.status == 'deleted')
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showRestoreConfirmation(context),
+                              icon: const Icon(Icons.restore_from_trash),
+                              label: const Text('Restore'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showPermanentDeleteConfirmation(context),
+                              icon: const Icon(Icons.delete_forever),
+                              label: const Text('Delete Forever'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Movement Details Box for moved-out items
+                  if (['UNDER_REPAIR', 'WITH_CUSTOMER', 'WITH_AGENT'].contains(_item.status))
+                    FutureBuilder(
+                      future: _apiService.getItemMovements(_item.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        
+                        if (snapshot.hasData && snapshot.data!['success'] == true) {
+                          final movements = snapshot.data!['data']['movements'] as List;
+                          final activeMovement = movements.firstWhere(
+                            (m) => m['status'] == 'OUT',
+                            orElse: () => null,
+                          );
+                          
+                          if (activeMovement != null) {
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      activeMovement['movementType'] == 'REPAIR' ? Colors.orange.shade50 :
+                                      activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? Colors.blue.shade50 :
+                                      Colors.purple.shade50,
+                                      Colors.white,
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: activeMovement['movementType'] == 'REPAIR' ? Colors.orange :
+                                           activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? Colors.blue :
+                                           Colors.purple,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            activeMovement['movementType'] == 'REPAIR' ? Icons.build :
+                                            activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? Icons.person :
+                                            Icons.store,
+                                            color: activeMovement['movementType'] == 'REPAIR' ? Colors.orange :
+                                                   activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? Colors.blue :
+                                                   Colors.purple,
+                                            size: 24,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              activeMovement['movementType'] == 'REPAIR' ? 'Under Repair/Maintenance' :
+                                              activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? 'With Customer (Trial)' :
+                                              'With Agent/Shop',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Divider(height: 24),
+                                      
+                                      // Movement details
+                                      _buildMovementDetailRow('Out Date', activeMovement['outDate']?.toString().split('T')[0] ?? 'N/A'),
+                                      
+                                      // Repair-specific
+                                      if (activeMovement['givenTo'] != null)
+                                        _buildMovementDetailRow('Given To', activeMovement['givenTo']),
+                                      if (activeMovement['repairType'] != null && activeMovement['repairType'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('Repair Type', activeMovement['repairType']),
+                                      if (activeMovement['jobCardNumber'] != null && activeMovement['jobCardNumber'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('Job Card', activeMovement['jobCardNumber']),
+                                      
+                                      // Customer trial specific
+                                      if (activeMovement['customerName'] != null)
+                                        _buildMovementDetailRow('Customer', activeMovement['customerName']),
+                                      if (activeMovement['customerMobile'] != null)
+                                        _buildMovementDetailRow('Mobile', activeMovement['customerMobile']),
+                                      if (activeMovement['idProofType'] != null && activeMovement['idProofType'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('ID Proof', activeMovement['idProofType']),
+                                      
+                                      // Agent consignment specific
+                                      if (activeMovement['partyName'] != null)
+                                        _buildMovementDetailRow('Party', activeMovement['partyName']),
+                                      if (activeMovement['partyType'] != null)
+                                        _buildMovementDetailRow('Party Type', activeMovement['partyType']),
+                                      if (activeMovement['gstin'] != null && activeMovement['gstin'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('GSTIN', activeMovement['gstin']),
+                                      if (activeMovement['challanNumber'] != null && activeMovement['challanNumber'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('Challan', activeMovement['challanNumber']),
+                                      
+                                      // Common fields
+                                      if (activeMovement['expectedReturnDate'] != null)
+                                        _buildMovementDetailRow('Expected Return', activeMovement['expectedReturnDate']?.toString().split('T')[0] ?? 'N/A'),
+                                      if (activeMovement['remarks'] != null && activeMovement['remarks'].toString().isNotEmpty)
+                                        _buildMovementDetailRow('Remarks', activeMovement['remarks'], isRemark: true),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                        
+                        return const SizedBox.shrink();
+                      },
+                    ),
+
+                  // Return to Stock button for moved-out items
+                  if (['UNDER_REPAIR', 'WITH_CUSTOMER', 'WITH_AGENT'].contains(_item.status))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showReturnToStockConfirmation(context),
+                        icon: const Icon(Icons.inventory),
+                        label: const Text('Return'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
                   
                   const SizedBox(height: 16),
@@ -839,6 +1022,343 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
         ],
       ),
     );
+  }
+
+  void _showRestoreConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.restore_from_trash, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Restore Item?'),
+          ],
+        ),
+        content: const Text('This item will be restored to active status.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              try {
+                await _apiService.restoreItem(_item.id);
+                Navigator.pop(context); // Close dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item restored successfully')),
+                );
+                Navigator.pop(context, true); // Go back to recycle bin
+              } catch (e) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPermanentDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Permanent Delete?'),
+          ],
+        ),
+        content: const Text('This action cannot be undone. The item will be permanently deleted from the database.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              try {
+                await _apiService.permanentDeleteItem(_item.id);
+                Navigator.pop(context); // Close dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item permanently deleted')),
+                );
+                Navigator.pop(context, true); // Go back to recycle bin
+              } catch (e) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  void _showReturnToStockConfirmation(BuildContext context) async {
+    // First, get the movement record for this item
+    try {
+      final movementsResponse = await _apiService.getItemMovements(_item.id);
+      
+      if (movementsResponse['success'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not fetch movement records')),
+        );
+        return;
+      }
+
+      final movements = movementsResponse['data']['movements'] as List;
+      
+      // Find the active OUT movement
+      final activeMovement = movements.firstWhere(
+        (m) => m['status'] == 'OUT',
+        orElse: () => null,
+      );
+
+      if (activeMovement == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No active movement found')),
+        );
+        return;
+      }
+
+      // Initialize controllers with current values
+      final netWeightController = TextEditingController(text: _item.netWeight.toString());
+      final purityController = TextEditingController(text: _item.purity);
+      final remarksController = TextEditingController();
+      final originalWeight = _item.netWeight;
+
+      // Show bottom sheet with editable fields
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (context) => StatefulBuilder(
+          builder: (context, setSheetState) {
+            final currentWeight = double.tryParse(netWeightController.text) ?? originalWeight;
+            final weightChange = currentWeight - originalWeight;
+            
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory, color: Colors.blue, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Return to Stock', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              Text('Update item details if changed', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Movement Info
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                activeMovement['movementType'] == 'REPAIR' ? Icons.build :
+                                activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? Icons.person :
+                                Icons.store,
+                                size: 16,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                activeMovement['movementType'] == 'REPAIR' ? 'Repair/Maintenance' :
+                                activeMovement['movementType'] == 'CUSTOMER_TRIAL' ? 'Customer Trial' :
+                                'Agent Consignment',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Out Date: ${activeMovement['outDate']?.toString().split('T')[0] ?? 'N/A'}', style: const TextStyle(fontSize: 12)),
+                          
+                          // Repair-specific details
+                          if (activeMovement['givenTo'] != null)
+                            Text('Given To: ${activeMovement['givenTo']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['repairType'] != null && activeMovement['repairType'].toString().isNotEmpty)
+                            Text('Repair Type: ${activeMovement['repairType']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['jobCardNumber'] != null && activeMovement['jobCardNumber'].toString().isNotEmpty)
+                            Text('Job Card: ${activeMovement['jobCardNumber']}', style: const TextStyle(fontSize: 12)),
+                          
+                          // Customer trial details
+                          if (activeMovement['customerName'] != null)
+                            Text('Customer: ${activeMovement['customerName']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['customerMobile'] != null)
+                            Text('Mobile: ${activeMovement['customerMobile']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['idProofType'] != null && activeMovement['idProofType'].toString().isNotEmpty)
+                            Text('ID Proof: ${activeMovement['idProofType']}', style: const TextStyle(fontSize: 12)),
+                          
+                          // Agent consignment details
+                          if (activeMovement['partyName'] != null)
+                            Text('Party: ${activeMovement['partyName']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['partyType'] != null)
+                            Text('Party Type: ${activeMovement['partyType']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['gstin'] != null && activeMovement['gstin'].toString().isNotEmpty)
+                            Text('GSTIN: ${activeMovement['gstin']}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['challanNumber'] != null && activeMovement['challanNumber'].toString().isNotEmpty)
+                            Text('Challan: ${activeMovement['challanNumber']}', style: const TextStyle(fontSize: 12)),
+                          
+                          // Common fields
+                          if (activeMovement['expectedReturnDate'] != null)
+                            Text('Expected Return: ${activeMovement['expectedReturnDate']?.toString().split('T')[0] ?? 'N/A'}', style: const TextStyle(fontSize: 12)),
+                          if (activeMovement['remarks'] != null && activeMovement['remarks'].toString().isNotEmpty)
+                            Text('Remarks: ${activeMovement['remarks']}', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    const Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 12),
+                    
+                    // Net Weight with change indicator
+                    TextField(
+                      controller: netWeightController,
+                      decoration: InputDecoration(
+                        labelText: 'Net Weight (g) *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.scale),
+                        suffixIcon: weightChange != 0 ? Tooltip(
+                          message: weightChange > 0 ? 'Weight increased' : 'Weight decreased',
+                          child: Icon(
+                            weightChange > 0 ? Icons.trending_up : Icons.trending_down,
+                            color: weightChange > 0 ? Colors.green : Colors.orange,
+                          ),
+                        ) : null,
+                        helperText: weightChange != 0 
+                            ? 'Change: ${weightChange > 0 ? '+' : ''}${weightChange.toStringAsFixed(3)}g'
+                            : null,
+                        helperStyle: TextStyle(
+                          color: weightChange > 0 ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) => setSheetState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Purity
+                    TextField(
+                      controller: purityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Purity *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.diamond),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Return Remarks
+                    TextField(
+                      controller: remarksController,
+                      decoration: const InputDecoration(
+                        labelText: 'Return Remarks (Optional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.note),
+                        hintText: 'e.g., Weight loss due to polishing',
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Return Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        // Validation
+                        if (netWeightController.text.isEmpty || double.tryParse(netWeightController.text) == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter valid net weight')),
+                          );
+                          return;
+                        }
+                        
+                        if (double.parse(netWeightController.text) <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Net weight must be greater than 0')),
+                          );
+                          return;
+                        }
+
+                        try {
+                          // Prepare update data
+                          final updateData = {
+                            'netWeight': double.parse(netWeightController.text),
+                            'purity': purityController.text,
+                            if (remarksController.text.isNotEmpty)
+                              'returnRemarks': remarksController.text,
+                          };
+                          
+                          // Call return API with updates
+                          final response = await _apiService.returnItem(activeMovement['_id']);
+                          
+                          // Update item details if weight or purity changed
+                          if (weightChange != 0 || purityController.text != _item.purity) {
+                            await _apiService.updateItem(_item.id, updateData);
+                          }
+                          
+                          Navigator.pop(context); // Close bottom sheet
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                weightChange != 0 
+                                    ? 'Item returned. Weight ${weightChange > 0 ? 'increased' : 'decreased'} by ${weightChange.abs().toStringAsFixed(3)}g'
+                                    : 'Item returned to stock successfully'
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          _refreshData(); // Refresh item details
+                        } catch (e) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                      child: const Text('Return', style: TextStyle(fontSize: 16)),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   // Wishlist Bottom Sheet
@@ -1234,6 +1754,401 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
           ),
           child: child,
         ),
+      ),
+    );
+  }
+
+  // Move Out Bottom Sheet - Smart Multi-Type Outward Movement
+  void _showMoveOutBottomSheet() {
+    String? selectedMovementType;
+    final givenToController = TextEditingController();
+    final repairTypeController = TextEditingController();
+    final weightLossController = TextEditingController();
+    final jobCardController = TextEditingController();
+    final customerNameController = TextEditingController();
+    final customerMobileController = TextEditingController();
+    final idProofTypeController = TextEditingController();
+    final partyNameController = TextEditingController();
+    String? selectedPartyType;
+    final gstinController = TextEditingController();
+    final consignmentTypeController = TextEditingController();
+    final challanController = TextEditingController();
+    final remarksController = TextEditingController();
+    final grossWeightController = TextEditingController(text: _item.netWeight.toString());
+    final purityController = TextEditingController(text: _item.purity);
+    DateTime? expectedReturnDate;
+    DateTime outDate = DateTime.now();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Move Out of Stock', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 16),
+                
+                // Item Preview
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_item.images.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            _item.images.first.startsWith('http')
+                                ? _item.images.first
+                                : '${AppConstants.baseUrl}/${_item.images.first.replaceAll('\\', '/')}',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.diamond, size: 50),
+                          ),
+                        ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('Barcode: ${_item.barcode}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Warning Banner
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Item will not be counted in saleable stock until returned',
+                          style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Movement Type Dropdown
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Movement Type *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  value: selectedMovementType,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'REPAIR',
+                      child: Row(
+                        children: [
+                          Icon(Icons.build, size: 18),
+                          SizedBox(width: 8),
+                          Text('Repair / Maintenance'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'CUSTOMER_TRIAL',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person, size: 18),
+                          SizedBox(width: 8),
+                          Text('Given to Customer (Trial)'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'AGENT_CONSIGNMENT',
+                      child: Row(
+                        children: [
+                          Icon(Icons.store, size: 18),
+                          SizedBox(width: 8),
+                          Text('Given to Shop / Agent'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setSheetState(() {
+                      selectedMovementType = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // Common Fields
+                TextField(
+                  controller: grossWeightController,
+                  decoration: const InputDecoration(labelText: 'Gross Weight (g) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.scale)),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: purityController,
+                  decoration: const InputDecoration(labelText: 'Purity *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.diamond)),
+                ),
+                const SizedBox(height: 12),
+                
+                // Conditional Fields
+                if (selectedMovementType == 'REPAIR') ...[
+                  TextField(
+                    controller: givenToController,
+                    decoration: const InputDecoration(labelText: 'Given To (Karigar/Workshop) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: repairTypeController,
+                    decoration: const InputDecoration(labelText: 'Repair Type (Optional)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.build_circle_outlined)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                
+                if (selectedMovementType == 'CUSTOMER_TRIAL') ...[
+                  TextField(
+                    controller: customerNameController,
+                    decoration: const InputDecoration(labelText: 'Customer Name *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: customerMobileController,
+                    decoration: const InputDecoration(labelText: 'Mobile Number *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                
+                if (selectedMovementType == 'AGENT_CONSIGNMENT') ...[
+                  TextField(
+                    controller: partyNameController,
+                    decoration: const InputDecoration(labelText: 'Party Name *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business)),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Party Type *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.category)),
+                    value: selectedPartyType,
+                    items: const [
+                      DropdownMenuItem(value: 'SHOP', child: Text('Shop')),
+                      DropdownMenuItem(value: 'AGENT', child: Text('Agent')),
+                      DropdownMenuItem(value: 'WHOLESALER', child: Text('Wholesaler')),
+                    ],
+                    onChanged: (value) {
+                      setSheetState(() {
+                        selectedPartyType = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                
+                // Expected Return Date
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: expectedReturnDate ?? DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) setSheetState(() => expectedReturnDate = date);
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Expected Return Date', border: OutlineInputBorder(), prefixIcon: Icon(Icons.calendar_today)),
+                    child: Text(expectedReturnDate != null ? expectedReturnDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Remarks
+                TextField(
+                  controller: remarksController,
+                  decoration: const InputDecoration(labelText: 'Remarks (Optional)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.note)),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 20),
+                
+                // Submit Button
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: () async {
+                    // Validation
+                    if (selectedMovementType == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select movement type')));
+                      return;
+                    }
+                    
+                    if (grossWeightController.text.isEmpty || double.tryParse(grossWeightController.text) == null || double.parse(grossWeightController.text) <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gross weight must be greater than 0')));
+                      return;
+                    }
+                    
+                    if (selectedMovementType == 'REPAIR' && givenToController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Given To is required for repair')));
+                      return;
+                    }
+                    
+                    if (selectedMovementType == 'CUSTOMER_TRIAL') {
+                      if (customerNameController.text.isEmpty || customerMobileController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer name and mobile are required')));
+                        return;
+                      }
+                      if (customerMobileController.text.length != 10) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mobile number must be 10 digits')));
+                        return;
+                      }
+                    }
+                    
+                    if (selectedMovementType == 'AGENT_CONSIGNMENT') {
+                      if (partyNameController.text.isEmpty || selectedPartyType == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Party name and type are required')));
+                        return;
+                      }
+                    }
+                    
+                    try {
+                      final data = {
+                        'itemId': _item.id,
+                        'movementType': selectedMovementType,
+                        'grossWeight': double.parse(grossWeightController.text),
+                        'purity': purityController.text,
+                        'outDate': outDate.toIso8601String(),
+                        'expectedReturnDate': expectedReturnDate?.toIso8601String(),
+                        'remarks': remarksController.text,
+                        if (selectedMovementType == 'REPAIR') ...{
+                          'givenTo': givenToController.text,
+                          'repairType': repairTypeController.text,
+                        },
+                        if (selectedMovementType == 'CUSTOMER_TRIAL') ...{
+                          'customerName': customerNameController.text,
+                          'customerMobile': customerMobileController.text,
+                        },
+                        if (selectedMovementType == 'AGENT_CONSIGNMENT') ...{
+                          'partyName': partyNameController.text,
+                          'partyType': selectedPartyType,
+                        },
+                      };
+                      
+                      final response = await _apiService.createOutwardMovement(data);
+                      
+                      if (response['success'] == true) {
+                        Navigator.pop(context);
+                        _showMoveOutSuccessDialog(response['data']['movement']);
+                        _refreshData();
+                      } else {
+                        throw response['message'] ?? 'Failed';
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    }
+                  },
+                  child: const Text('Move Out', style: TextStyle(fontSize: 16)),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMoveOutSuccessDialog(Map<String, dynamic> movement) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 8),
+            Text('Item Moved Out Successfully'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Movement ID: #${movement['_id']?.substring(0, 8) ?? 'N/A'}'),
+            const SizedBox(height: 8),
+            Text('Status: ${movement['status'] ?? 'OUT'}'),
+            const SizedBox(height: 8),
+            Text('Type: ${movement['movementType'] ?? 'N/A'}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Challan generation coming soon')),
+              );
+            },
+            child: const Text('Generate Challan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMovementDetailRow(String label, String value, {bool isRemark = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.black87,
+                fontStyle: isRemark ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

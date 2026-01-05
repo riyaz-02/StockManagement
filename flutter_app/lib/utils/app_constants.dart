@@ -65,10 +65,10 @@ class AppConstants {
   
   // Weight Categories
   static const List<String> weightCategories = [
-    'light',
-    'medium',
-    'heavy',
-    'mixed',
+    'Light',
+    'Medium',
+    'Heavy',
+    'Mixed',
   ];
   
   // Layout Types

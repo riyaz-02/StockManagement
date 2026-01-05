@@ -37,7 +37,7 @@ const itemSchema = new mongoose.Schema({
     },
     weightCategory: {
         type: String,
-        enum: ['Light', 'Medium', 'Heavy'],
+        enum: ['Light', 'Medium', 'Heavy', 'Mixed'],
         default: 'Light'
     },
     huid: {
@@ -50,7 +50,7 @@ const itemSchema = new mongoose.Schema({
     }],
     status: {
         type: String,
-        enum: ['active', 'booked', 'repair', 'in_repair', 'temporarily_removed', 'sold'],
+        enum: ['active', 'booked', 'repair', 'in_repair', 'temporarily_removed', 'sold', 'deleted', 'UNDER_REPAIR', 'WITH_CUSTOMER', 'WITH_AGENT'],
         default: 'active',
         index: true
     },

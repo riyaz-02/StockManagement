@@ -186,6 +186,22 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> restoreItem(String id) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/items/$id/restore'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> permanentDeleteItem(String id) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/items/$id/permanent'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
   // Scan
   Future<Map<String, dynamic>> scanBarcode(String barcode) async {
     final response = await http.post(
@@ -203,6 +219,43 @@ class ApiService {
       headers: await _getHeaders(),
       body: json.encode(data),
     );
+    return _handleResponse(response);
+  }
+
+  // Outward Movements
+  Future<Map<String, dynamic>> createOutwardMovement(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/outward-movements'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> returnItem(String movementId) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/outward-movements/$movementId/return'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getItemMovements(String itemId) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/outward-movements/item/$itemId'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getOutwardMovements({String? status, String? movementType}) async {
+    String url = '${AppConstants.baseUrl}/outward-movements';
+    final params = <String, String>{};
+    if (status != null) params['status'] = status;
+    if (movementType != null) params['movementType'] = movementType;
+    
+    final uri = Uri.parse(url).replace(queryParameters: params.isNotEmpty ? params : null);
+    final response = await http.get(uri, headers: await _getHeaders());
     return _handleResponse(response);
   }
 

@@ -6,6 +6,8 @@ import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'item_details_screen.dart';
 import 'add_edit_item_screen.dart';
+import 'recycle_bin_screen.dart';
+import 'moved_out_items_screen.dart';
 
 class ItemListScreen extends StatefulWidget {
   const ItemListScreen({super.key});
@@ -43,6 +45,26 @@ class _ItemListScreenState extends State<ItemListScreen> {
       appBar: AppBar(
         title: Text(languageProvider.translate('items')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.output),
+            tooltip: 'Moved Out Items',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MovedOutItemsScreen()),
+              ).then((_) => _loadItems());
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Recycle Bin',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
+              ).then((_) => _loadItems());
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadItems,

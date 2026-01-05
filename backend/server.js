@@ -66,6 +66,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/outward-movements', require('./routes/outwardMovement.routes'));
 
 // 404 handler
 app.use((req, res) => {
