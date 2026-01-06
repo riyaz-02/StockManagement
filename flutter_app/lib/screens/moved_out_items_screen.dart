@@ -58,9 +58,18 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Moved Out Items'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Moved Out Items',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -118,23 +127,65 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
 
   Widget _buildFilterChip(String filter, IconData icon, int count) {
     final isSelected = _selectedFilter == filter;
-    return FilterChip(
-      selected: isSelected,
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 4),
-          Text(filter == 'ALL' ? 'All' : 
-               filter == 'REPAIR' ? 'Repair' :
-               filter == 'CUSTOMER_TRIAL' ? 'Customer' : 'Agent'),
-          const SizedBox(width: 4),
-          Text('($count)', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-      onSelected: (selected) {
-        setState(() => _selectedFilter = filter);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = filter;
+        });
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFFE94560), Color(0xFFD32F2F)],
+                )
+              : null,
+          color: isSelected ? null : Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              filter.replaceAll('_', ' '),
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withOpacity(0.3) : const Color(0xFFE94560).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFFE94560),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

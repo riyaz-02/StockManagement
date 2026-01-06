@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_constants.dart';
+import '../models/item_model.dart';
+import 'item_details_screen.dart';
 
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key});
@@ -48,8 +51,18 @@ class _BookingListScreenState extends State<BookingListScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(languageProvider.translate('bookings')),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          languageProvider.translate('bookings'),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -111,15 +124,29 @@ class _BookingListScreenState extends State<BookingListScreen> {
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _filter == value;
     return FilterChip(
-      label: Text(label),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       selected: isSelected,
+      showCheckmark: false,
       onSelected: (selected) {
         setState(() {
           _filter = value;
           _loadBookings();
         });
       },
-      selectedColor: AppColors.primary.withOpacity(0.3),
+      selectedColor: AppColors.primary,
+      backgroundColor: Colors.grey[100],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? AppColors.primary : Colors.grey[300]!,
+        ),
+      ),
     );
   }
 
@@ -156,14 +183,105 @@ class _BookingListScreenState extends State<BookingListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow('Barcode', item['barcode'] ?? ''),
-                _buildDetailRow('Weight', '${item['netWeight']}g'),
+                // Item Image and Details Section
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Item Image
+                    if (item['images'] != null && (item['images'] as List).isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          '${AppConstants.baseUrl}${item['images'][0]}',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 80,
+                            height: 80,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.inventory_2, color: Colors.grey, size: 40),
+                      ),
+                    const SizedBox(width: 16),
+                    // Item Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['name'] ?? 'Unknown Item',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Barcode: ${item['barcode'] ?? 'N/A'}',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          ),
+                          Text(
+                            'Weight: ${item['netWeight']}g',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          ),
+                          if (item['metalType'] != null)
+                            Text(
+                              '${item['metalType']} • ${item['purity'] ?? ''}',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                
+                // Booking Details
                 _buildDetailRow('Advance Amount', '₹${booking['advanceAmount']}'),
                 _buildDetailRow('Booking Date', _formatDate(booking['bookingDate'])),
                 _buildDetailRow('Expiry Date', _formatDate(booking['expiryDate'])),
+                if (item['containerId'] != null && item['containerId']['name'] != null)
+                  _buildDetailRow('Location', '${item['containerId']['name']} - Slot ${item['slotNumber'] ?? 'N/A'}'),
                 if (booking['remarks'] != null && booking['remarks'].isNotEmpty)
                   _buildDetailRow('Remarks', booking['remarks']),
                 const SizedBox(height: 16),
+                
+                // View Item Details Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.visibility),
+                    label: const Text('View Item Details'),
+                    onPressed: () {
+                      // Convert item data to Item model
+                      final itemModel = Item.fromJson(item);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ItemDetailsScreen(item: itemModel),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 
                 // Action Buttons
                 if (isActive)

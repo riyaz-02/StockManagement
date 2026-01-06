@@ -40,6 +40,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _nameController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _weightController = TextEditingController();
+  final _piecesController = TextEditingController(text: '1');
   final _huidController = TextEditingController();
   
   String _selectedItemType = 'ring';
@@ -70,6 +71,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _barcodeController.text = item.barcode;
       _generatedBarcode = item.barcode;
       _weightController.text = item.netWeight.toString();
+      _piecesController.text = item.numberOfPieces.toString();
       _huidController.text = item.huid;
       
       _selectedItemType = item.itemType;
@@ -97,34 +99,61 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
 
     // Fetch settings on init and set default values IF NOT EDITING
-    Future.microtask(() async {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-      await settingsProvider.fetchItemSettings();
+  Future.microtask(() async {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    await settingsProvider.fetchItemSettings();
+    
+    // Always fetch containers to ensure dropdown is populated
+    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    await containerProvider.fetchContainers();
+    
+    // Validate initial container is not locked
+    if (widget.initialContainerId != null && mounted) {
+      final initialContainer = containerProvider.containers.firstWhere(
+        (c) => c.id == widget.initialContainerId,
+        orElse: () => containerProvider.containers.first,
+      );
       
-      // Always fetch containers to ensure dropdown is populated
-      await Provider.of<ContainerProvider>(context, listen: false).fetchContainers();
-      
-      if (mounted) {
-        // Only set defaults if NEW item
-        if (widget.item == null) {
-          setState(() {
-            _selectedItemType = settingsProvider.itemTypes.isNotEmpty 
-                ? settingsProvider.itemTypes.first.toLowerCase() 
-                : 'ring';
-            _selectedMetalType = settingsProvider.metalTypes.isNotEmpty 
-                ? settingsProvider.metalTypes.first.toLowerCase() 
-                : 'gold';
-            _selectedPurity = settingsProvider.purityOptions.isNotEmpty 
-                ? settingsProvider.purityOptions.first 
-                : '916';
-          });
+      // If the initial container is locked, clear the selection and show warning
+      if (initialContainer.isLocked) {
+        setState(() {
+          _selectedContainerId = null;
+          _selectedSlotNumber = null;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Container "${initialContainer.name}" is locked. Please select a different container.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
         }
-
-        // Trigger analysis to populate recommendations
-        _analyzeContainer();
       }
-    });
-  }
+    }
+    
+    if (mounted) {
+      // Only set defaults if NEW item
+      if (widget.item == null) {
+        setState(() {
+          _selectedItemType = settingsProvider.itemTypes.isNotEmpty 
+              ? settingsProvider.itemTypes.first.toLowerCase() 
+              : 'ring';
+          _selectedMetalType = settingsProvider.metalTypes.isNotEmpty 
+              ? settingsProvider.metalTypes.first.toLowerCase() 
+              : 'gold';
+          _selectedPurity = settingsProvider.purityOptions.isNotEmpty 
+              ? settingsProvider.purityOptions.first 
+              : '916';
+        });
+      }
+
+      // Trigger analysis to populate recommendations
+      _analyzeContainer();
+    }
+  });
+}
 
   @override
   void dispose() {
@@ -389,6 +418,50 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
   Future<void> _saveItem() async {
     if (_formKey.currentState!.validate()) {
+      // Validation 1: Ensure a container is selected
+      if (_selectedContainerId == null || _selectedContainerId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a valid container before saving the item.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Validation 2: Check if selected container is locked
+      if (_selectedContainerId != null) {
+        Map<String, dynamic>? selectedContainer;
+        try {
+          selectedContainer = _recommendedContainers.firstWhere(
+            (c) => c['id'] == _selectedContainerId,
+          );
+        } catch (e) {
+          selectedContainer = null;
+        }
+        
+        if (selectedContainer != null && selectedContainer['status'] == 'Locked') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot add items to a locked container. Please select a different container.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+        
+        // Validation 3: Check if container is assignable
+        if (selectedContainer != null && selectedContainer['isAssignable'] == false) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Cannot add items to this container. Status: ${selectedContainer['status']}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+      }
+      
       final itemProvider = Provider.of<ItemProvider>(context, listen: false);
       
       final itemData = {
@@ -398,6 +471,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         'metalType': _selectedMetalType,
         'purity': _selectedPurity,
         'netWeight': double.parse(_weightController.text),
+        'numberOfPieces': int.parse(_piecesController.text),
         'weightCategory': _selectedWeightCategory,
         'huid': _isHallmarked ? _huidController.text : '',
         'description': '',
@@ -474,28 +548,17 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.6),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
         title: Text(
           widget.item == null ? 'Add New Item' : 'Edit Item',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
         ),
         actions: [
           if (widget.item != null)
@@ -594,16 +657,39 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 3.5 Weight Category (New Field)
-              _buildDropdown(
-                value: _selectedWeightCategory,
-                label: 'Weight Category',
-                icon: Icons.monitor_weight_outlined,
-                items: ['Light', 'Medium', 'Heavy'],
-                onChanged: (value) {
-                  setState(() => _selectedWeightCategory = value!);
-                  _analyzeContainer();
-                },
+              // 3.5 Number of Pieces & Weight Category
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _piecesController,
+                      label: 'Pieces',
+                      icon: Icons.numbers,
+                      required: true,
+                      keyboardType: TextInputType.number,
+                      hint: '1',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Required';
+                        final pieces = int.tryParse(value);
+                        if (pieces == null || pieces < 1) return 'Must be >= 1';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildDropdown(
+                      value: _selectedWeightCategory,
+                      label: 'Weight Category',
+                      icon: Icons.monitor_weight_outlined,
+                      items: ['Light', 'Medium', 'Heavy'],
+                      onChanged: (value) {
+                        setState(() => _selectedWeightCategory = value!);
+                        _analyzeContainer();
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               
@@ -907,7 +993,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         
         return DropdownMenuItem(
           value: container['id'] as String,
-          enabled: true,
+          enabled: isAssignable, // Only enable if container is assignable (not locked, active, has space)
           child: Opacity(
             opacity: isAssignable ? 1.0 : 0.5,
             child: Row(

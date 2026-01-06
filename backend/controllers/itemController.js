@@ -35,6 +35,7 @@ exports.createItem = async (req, res) => {
             metalType,
             purity,
             netWeight,
+            numberOfPieces,
             weightCategory,
             huid,
             images,
@@ -132,8 +133,8 @@ exports.createItem = async (req, res) => {
             metalType,
             purity,
             netWeight,
+            numberOfPieces: numberOfPieces || 1,
             weightCategory: weightCategory || 'Light', // Use provided value or default to Light
-            huid,
             huid,
             images: imagePaths,
             containerId: assignedContainerId,
@@ -282,6 +283,7 @@ exports.updateItem = async (req, res) => {
             metalType,
             purity,
             netWeight,
+            numberOfPieces,
             weightCategory,
             huid,
             images,
@@ -369,6 +371,7 @@ exports.updateItem = async (req, res) => {
         if (metalType) item.metalType = metalType;
         if (purity) item.purity = purity;
         if (netWeight) item.netWeight = netWeight;
+        if (numberOfPieces) item.numberOfPieces = numberOfPieces;
         if (weightCategory) item.weightCategory = weightCategory;
         if (huid !== undefined) item.huid = huid;
         if (status) item.status = status;

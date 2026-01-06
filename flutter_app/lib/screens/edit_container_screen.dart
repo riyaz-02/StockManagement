@@ -136,7 +136,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     });
   }
 
-  void _generateBarcode() {
+  Future<void> _generateBarcode() async {
     if (_selectedItemTypes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select item types first')),
@@ -153,7 +153,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     }
 
     final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-    _barcodeSerial = containerProvider.getNextSerial(prefix);
+    _barcodeSerial = await containerProvider.getNextSerial(prefix);
 
     setState(() {
       _generatedBarcode = '$prefix$_barcodeSerial';
@@ -229,21 +229,21 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     // because we already have the container data to show
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.primary,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
         title: const Text(
           'Edit Container',
           style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
       ),
       body: Container(
-        color: Colors.grey[50],
+        color: Colors.white,
         child: SafeArea(
           child: Form(
             key: _formKey,

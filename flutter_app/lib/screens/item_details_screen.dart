@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import '../models/item_model.dart';
 import '../providers/language_provider.dart';
+import '../providers/container_provider.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'create_booking_screen.dart';
 import 'send_to_repair_screen.dart';
 import 'add_edit_item_screen.dart';
+import 'container_view_screen.dart';
 
 import '../services/api_service.dart';
 
@@ -83,26 +85,18 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.6),
-                  ],
-                ),
-              ),
-            ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          _item.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
-        title: Text(_item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
@@ -385,10 +379,20 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                             ],
                           ),
                           
-                          // Row 3: Weight Category & HUID
+                          // Row 3: Pieces & Weight Category
                           const SizedBox(height: 8),
                           Row(
                             children: [
+                              // Number of Pieces
+                              Expanded(
+                                child: _buildCompactBox(
+                                  Icons.numbers,
+                                  'Pieces',
+                                  '${_item.numberOfPieces}',
+                                  Colors.orange,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               // Weight Category
                               Expanded(
                                 child: _buildCompactBox(
@@ -398,32 +402,86 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                   Colors.teal
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              
-                              // HUID / Hallmark Status
-                              Expanded(
-                                child: _buildCompactBox(
-                                  Icons.fingerprint, 
-                                  'Hallmark', 
-                                  widget.item.huid.isNotEmpty ? widget.item.huid : 'Non-Hallmarked', 
-                                  widget.item.huid.isNotEmpty ? Colors.pink : Colors.grey
-                                ),
-                              ),
                             ],
                           ),
+                          
+                          // Row 4: HUID
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: _buildCompactBox(
+                              Icons.fingerprint, 
+                              'Hallmark', 
+                              widget.item.huid.isNotEmpty ? widget.item.huid : 'Non-Hallmarked', 
+                              widget.item.huid.isNotEmpty ? Colors.pink : Colors.grey
+                            ),
+                          ),
 
-                          // Row 4: Location (Container)
+                          // Row 5: Location (Container) - Tappable
                           if (widget.item.containerId != null) ...[
                              const SizedBox(height: 8),
-                             SizedBox(
-                               width: double.infinity,
-                               child: _buildInfoChip(
-                                  Icons.inventory_2_outlined, 
-                                  'Location', 
-                                  widget.item.containerName != null 
-                                      ? '${widget.item.containerName}${widget.item.containerCode != null ? " - ${widget.item.containerCode}" : ""} - Slot ${widget.item.slotNumber}' 
-                                      : 'Slot ${widget.item.slotNumber}',
-                                ),
+                             InkWell(
+                               onTap: () async {
+                                 // Fetch container and navigate to container details
+                                 try {
+                                   final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+                                   await containerProvider.fetchContainer(widget.item.containerId!);
+                                   
+                                   if (containerProvider.selectedContainer != null && mounted) {
+                                     Navigator.push(
+                                       context,
+                                       MaterialPageRoute(
+                                         builder: (context) => ContainerViewScreen(
+                                           container: containerProvider.selectedContainer!,
+                                         ),
+                                       ),
+                                     );
+                                   }
+                                 } catch (e) {
+                                   if (mounted) {
+                                     ScaffoldMessenger.of(context).showSnackBar(
+                                       SnackBar(
+                                         content: Text('Error loading container: $e'),
+                                         backgroundColor: Colors.red,
+                                       ),
+                                     );
+                                   }
+                                 }
+                               },
+                               child: Container(
+                                 width: double.infinity,
+                                 padding: const EdgeInsets.all(10),
+                                 decoration: BoxDecoration(
+                                   color: AppColors.primary.withOpacity(0.05),
+                                   borderRadius: BorderRadius.circular(8),
+                                   border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                                 ),
+                                 child: Row(
+                                   children: [
+                                     Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.primary),
+                                     const SizedBox(width: 8),
+                                     Expanded(
+                                       child: Column(
+                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                         children: [
+                                           Text(
+                                             'Location',
+                                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+                                           ),
+                                           const SizedBox(height: 2),
+                                           Text(
+                                             widget.item.containerName != null 
+                                                 ? '${widget.item.containerName}${widget.item.containerCode != null ? " - ${widget.item.containerCode}" : ""} - Slot ${widget.item.slotNumber}' 
+                                                 : 'Slot ${widget.item.slotNumber}',
+                                             style: TextStyle(fontSize: 13, color: Colors.grey[800], fontWeight: FontWeight.w500),
+                                           ),
+                                         ],
+                                       ),
+                                     ),
+                                     Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.primary),
+                                   ],
+                                 ),
+                               ),
                              ),
                           ],
                           
@@ -1024,39 +1082,13 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     );
   }
 
+  // Note: Item restore functionality has been moved to the Recycle Bin screen
+  // with proper container validation. Restore is no longer available from item details.
   void _showRestoreConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Row(
-          children: [
-            Icon(Icons.restore_from_trash, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Restore Item?'),
-          ],
-        ),
-        content: const Text('This item will be restored to active status.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () async {
-              try {
-                await _apiService.restoreItem(_item.id);
-                Navigator.pop(context); // Close dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Item restored successfully')),
-                );
-                Navigator.pop(context, true); // Go back to recycle bin
-              } catch (e) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            child: const Text('Restore'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please restore items from the Recycle Bin screen'),
+        backgroundColor: Colors.orange,
       ),
     );
   }

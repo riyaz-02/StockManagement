@@ -1,8 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import '../utils/app_colors.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -42,7 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authProvider.error ?? 'Login failed'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFE94560),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -52,194 +54,386 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final logoHeight = screenWidth > 600 ? 80.0 : 65.0;
     
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              
-              // Logo
-              Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: const Icon(
-                    Icons.diamond,
-                    size: 50,
-                    color: Colors.white,
-                  ),
-                ),
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          // White base
+          Container(
+            color: Colors.white,
+          ),
+          // Decorative circles (matching home page)
+          Positioned(
+            right: -100,
+            top: -100,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFE94560).withOpacity(0.12),
               ),
-              const SizedBox(height: 30),
-              
-              // Title
-              Text(
-                languageProvider.translate('app_name'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+          ),
+          Positioned(
+            left: -80,
+            bottom: -80,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF667EEA).withOpacity(0.1),
               ),
-              const SizedBox(height: 8),
-              Text(
-                languageProvider.translate('login'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+            ),
+          ),
+          Positioned(
+            right: 5,
+            top: 5,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFFF6B9D).withOpacity(0.1),
               ),
-              const SizedBox(height: 40),
-              
-              // Language Selector
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+          ),
+          // Content - No scroll
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _LanguageButton(
-                    label: 'English',
-                    isSelected: languageProvider.currentLanguage == 'en',
-                    onTap: () => languageProvider.changeLanguage('en'),
+                  // Shop Logo
+                  Image.asset(
+                    'assets/images/lgp_logo_red.png',
+                    height: logoHeight,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.diamond,
+                        color: const Color(0xFFE94560),
+                        size: logoHeight,
+                      );
+                    },
                   ),
-                  const SizedBox(width: 16),
-                  _LanguageButton(
-                    label: 'বাংলা',
-                    isSelected: languageProvider.currentLanguage == 'bn',
-                    onTap: () => languageProvider.changeLanguage('bn'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-              
-              // Login Form
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // Mobile Number
-                    TextFormField(
-                      controller: _mobileController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText: languageProvider.translate('mobile_number'),
-                        prefixIcon: const Icon(Icons.phone),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return languageProvider.translate('required_field');
-                        }
-                        if (value.length < 10) {
-                          return languageProvider.translate('invalid_mobile');
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Password
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      decoration: InputDecoration(
-                        labelText: languageProvider.translate('password'),
-                        prefixIcon: const Icon(Icons.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return languageProvider.translate('required_field');
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 40),
-                    
-                    // Login Button
-                    Consumer<AuthProvider>(
-                      builder: (context, authProvider, child) {
-                        return SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: authProvider.isLoading ? null : _handleLogin,
-                            child: authProvider.isLoading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : Text(
-                                    languageProvider.translate('login_button'),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
+                  
+                  // Glassmorphism Login Card
+                  Expanded(
+                    child: Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                          child: Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(maxWidth: 500),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withOpacity(0.4),
+                                  Colors.white.withOpacity(0.25),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: const Color(0xFFE94560).withOpacity(0.3),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Title
+                                  const Text(
+                                    'Welcome Back',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1A1A1A),
                                     ),
                                   ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Sign in to continue',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  
+                                  // Language Selector
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _LanguageButton(
+                                        label: 'English',
+                                        isSelected: languageProvider.currentLanguage == 'en',
+                                        onTap: () => languageProvider.changeLanguage('en'),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      _LanguageButton(
+                                        label: 'বাংলা',
+                                        isSelected: languageProvider.currentLanguage == 'bn',
+                                        onTap: () => languageProvider.changeLanguage('bn'),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  
+                                  // Mobile Number
+                                  TextFormField(
+                                    controller: _mobileController,
+                                    keyboardType: TextInputType.phone,
+                                    style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
+                                    decoration: InputDecoration(
+                                      labelText: 'Mobile Number',
+                                      labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
+                                      prefixIcon: const Icon(Icons.phone, color: Color(0xFFE94560), size: 20),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.7),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.withOpacity(0.2),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFFE94560),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter mobile number';
+                                      }
+                                      if (value.length < 10) {
+                                        return 'Please enter valid mobile number';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+                                  
+                                  // Password
+                                  TextFormField(
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
+                                      prefixIcon: const Icon(Icons.lock, color: Color(0xFFE94560), size: 20),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          color: Colors.grey[600],
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _obscurePassword = !_obscurePassword;
+                                          });
+                                        },
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.7),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.withOpacity(0.2),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFFE94560),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter password';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+                                  
+                                  // Login Button
+                                  Consumer<AuthProvider>(
+                                    builder: (context, authProvider, child) {
+                                      return Container(
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFFE94560), Color(0xFFD32F2F)],
+                                          ),
+                                          borderRadius: BorderRadius.circular(14),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFFE94560).withOpacity(0.3),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: authProvider.isLoading ? null : _handleLogin,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                            ),
+                                          ),
+                                          child: authProvider.isLoading
+                                              ? const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                      Colors.white,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Text(
+                                                  'Login',
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  // Default Credentials Info
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF667EEA).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(0xFF667EEA).withOpacity(0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              size: 16,
+                                              color: const Color(0xFF667EEA),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Default Credentials',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF667EEA),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Admin: 9999999999 / admin123',
+                                          style: TextStyle(
+                                            color: Colors.grey[800],
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Staff: 8888888888 / staff123',
+                                          style: TextStyle(
+                                            color: Colors.grey[800],
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              
-              // Default Credentials Info
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Default Credentials:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[900],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Admin: 9999999999 / admin123',
-                      style: TextStyle(color: Colors.blue[800]),
-                    ),
-                    Text(
-                      'Staff: 8888888888 / staff123',
-                      style: TextStyle(color: Colors.blue[800]),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -261,16 +455,28 @@ class _LanguageButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.grey[200],
-          borderRadius: BorderRadius.circular(25),
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFFE94560), Color(0xFFD32F2F)],
+                )
+              : null,
+          color: isSelected ? null : Colors.white.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? Colors.transparent
+                : Colors.grey.withOpacity(0.3),
+            width: 1,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 12,
           ),
         ),
       ),

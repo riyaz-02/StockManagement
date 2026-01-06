@@ -102,28 +102,18 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
         : [];
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-            child: Container(
-                decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        container.isDeleted ? Colors.grey[800]! : AppColors.primary.withOpacity(0.8),
-                        container.isDeleted ? Colors.grey[700]! : AppColors.primary.withOpacity(0.6),
-                      ],
-                    ),
-                  ),
-            ),
-            ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          container.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
-        title: Text(container.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         actions: [
           if (!container.isDeleted)
             IconButton(

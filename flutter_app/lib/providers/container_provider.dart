@@ -208,12 +208,12 @@ class ContainerProvider with ChangeNotifier {
     return false;
   }
 
-  // Get next available serial for a prefix
-  int getNextSerial(String prefix) {
+  // Get next available serial for a prefix (checks both active and deleted containers)
+  Future<int> getNextSerial(String prefix) async {
     int maxSerial = 0;
     
+    // Check active containers
     for (var container in _containers) {
-      // Check qrCode first, fall back to ID if needed (though ID usually doesn't match prefix pattern)
       String? code = container.qrCode;
       
       if (code != null && code.startsWith(prefix)) {
@@ -223,6 +223,24 @@ class ContainerProvider with ChangeNotifier {
           maxSerial = serial;
         }
       }
+    }
+    
+    // Also check deleted containers to avoid barcode conflicts
+    try {
+      final deletedContainers = await fetchDeletedContainers();
+      for (var container in deletedContainers) {
+        String? code = container.qrCode;
+        
+        if (code != null && code.startsWith(prefix)) {
+          String remaining = code.substring(prefix.length);
+          int? serial = int.tryParse(remaining);
+          if (serial != null && serial > maxSerial) {
+            maxSerial = serial;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking deleted containers for serial: $e');
     }
     
     return maxSerial + 1;

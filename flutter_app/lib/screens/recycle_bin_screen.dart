@@ -35,15 +35,197 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
     });
   }
 
+  Future<void> _handleRestoreItem(Item item) async {
+    try {
+      // Fetch all containers to check if previous container is valid
+      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+      await containerProvider.fetchContainers();
+      
+      final containers = containerProvider.containers;
+      
+      // Check if item has a previous container
+      if (item.containerId != null && item.containerId!.isNotEmpty) {
+        // Find the previous container
+        final previousContainer = containers.where((c) => c.id == item.containerId).firstOrNull;
+        
+        if (previousContainer != null && 
+            previousContainer.isActive && 
+            !previousContainer.isLocked && 
+            previousContainer.availableSlots > 0) {
+          // Previous container is valid, restore directly
+          await _restoreItemToContainer(item, item.containerId!, item.slotNumber);
+          return;
+        }
+      }
+      
+      // Previous container is invalid or doesn't exist, show container selection dialog
+      await _showContainerSelectionDialog(item);
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error checking containers: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showContainerSelectionDialog(Item item) async {
+    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    final containers = containerProvider.containers;
+    
+    // Filter assignable containers for this item
+    final assignableContainers = containers.where((c) {
+      return c.isActive && 
+             !c.isLocked && 
+             c.availableSlots > 0 &&
+             c.metalType.any((m) => m.toLowerCase() == item.metalType.toLowerCase()) &&
+             c.allowedItemTypes.any((t) => t.toLowerCase() == item.itemType.toLowerCase());
+    }).toList();
+    
+    if (assignableContainers.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No valid containers available for this item. Please create or unlock a suitable container first.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+    
+    // Show dialog to select container
+    String? selectedContainerId;
+    int? selectedSlotNumber;
+    
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Select Container'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Previous container is not available. Please select a new container for "${item.name}".',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Container',
+                  border: OutlineInputBorder(),
+                ),
+                items: assignableContainers.map((container) {
+                  return DropdownMenuItem(
+                    value: container.id,
+                    child: Text(
+                      '${container.name} (${container.availableSlots}/${container.capacity} slots)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  selectedContainerId = value;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Slot Number (Optional)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Leave empty for auto-assign',
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  selectedSlotNumber = int.tryParse(value);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (selectedContainerId != null) {
+                _restoreItemToContainer(item, selectedContainerId!, selectedSlotNumber);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _restoreItemToContainer(Item item, String containerId, int? slotNumber) async {
+    try {
+      final response = await _apiService.restoreItem(item.id, containerId, slotNumber);
+      
+      if (mounted) {
+        if (response['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${item.name} restored successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadData(); // Refresh the list
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Failed to restore item'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error restoring item: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Recycle Bin'),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1A1A1A),
+          title: const Text(
+            'Recycle Bin',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 20,
+            ),
+          ),
           bottom: const TabBar(
+            labelColor: Color(0xFFE94560),
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Color(0xFFE94560),
             tabs: [
               Tab(text: 'Containers', icon: Icon(Icons.inventory_2_outlined)),
               Tab(text: 'Items', icon: Icon(Icons.category_outlined)),
@@ -335,6 +517,25 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                         const SizedBox(width: 12),
                         _buildCompactSpec(Icons.diamond, _formatText(item.metalType)),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Restore Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _handleRestoreItem(item),
+                        icon: const Icon(Icons.restore, size: 18),
+                        label: const Text('Restore Item'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

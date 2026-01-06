@@ -4,17 +4,35 @@ const path = require('path');
 const Item = require('../models/Item');
 
 // @desc    Create new container
+// @desc    Create new container
 // @route   POST /api/containers
 // @access  Private/Admin
 exports.createContainer = async (req, res) => {
     try {
-        const { name, type, allowedItemTypes, capacity, weightCategory, layoutType, qrCode, image } = req.body;
+        const { name, type, allowedItemTypes, capacity, weightCategory, layoutType, image, metalType, purity, qrCode } = req.body;
 
         // Validate required fields
         if (!name || !type || !capacity) {
             return res.status(400).json({
                 success: false,
                 message: 'Please provide name, type, and capacity'
+            });
+        }
+
+        // Validate barcode is provided
+        if (!qrCode || qrCode.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Barcode is required'
+            });
+        }
+
+        // Check if qrCode already exists in database (including deleted containers)
+        const existingContainer = await Container.findOne({ qrCode: qrCode.trim() });
+        if (existingContainer) {
+            return res.status(400).json({
+                success: false,
+                message: `Barcode "${qrCode}" is already in use${existingContainer.isDeleted ? ' by a deleted container' : ''}. Please generate a new barcode.`
             });
         }
 
@@ -25,8 +43,10 @@ exports.createContainer = async (req, res) => {
             capacity,
             weightCategory: weightCategory || 'mixed',
             layoutType: layoutType || 'grid',
-            qrCode,
-            image
+            qrCode: qrCode.trim(),
+            image,
+            metalType: metalType || [],
+            purity: purity || []
         });
 
         res.status(201).json({
@@ -42,6 +62,7 @@ exports.createContainer = async (req, res) => {
         });
     }
 };
+
 
 // @desc    Get all containers
 // @route   GET /api/containers

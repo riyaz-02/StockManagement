@@ -23,26 +23,18 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.6),
-                  ],
-                ),
-              ),
-            ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Item Settings',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
-        title: const Text('Item Settings', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: Consumer<SettingsProvider>(
         builder: (context, provider, child) {

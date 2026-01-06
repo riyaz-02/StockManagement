@@ -15,6 +15,7 @@ class Item {
   final String? containerCode; // Add containerCode
   final String? containerId;
   final int? slotNumber;
+  final int numberOfPieces;
   final bool slotReserved;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -36,6 +37,7 @@ class Item {
     this.containerName,
     this.containerCode, // Add to constructor
     this.slotNumber,
+    this.numberOfPieces = 1,
     this.slotReserved = false,
     required this.createdAt,
     required this.updatedAt,
@@ -65,6 +67,7 @@ class Item {
           ? json['containerId']['qrCode'] 
           : null, // Parse qrCode
       slotNumber: json['slotNumber'],
+      numberOfPieces: json['numberOfPieces'] ?? 1,
       slotReserved: json['slotReserved'] ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
@@ -91,6 +94,7 @@ class Item {
       'status': status,
       'containerId': containerId,
       'slotNumber': slotNumber,
+      'numberOfPieces': numberOfPieces,
       'slotReserved': slotReserved,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),

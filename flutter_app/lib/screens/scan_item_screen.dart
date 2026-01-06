@@ -75,8 +75,18 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(languageProvider.translate('scan_item')),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Scan Item',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),

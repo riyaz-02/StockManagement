@@ -121,7 +121,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     });
   }
 
-  void _generateBarcode() {
+  Future<void> _generateBarcode() async {
     if (_selectedItemTypes.isEmpty) {
       setState(() {
         _generatedBarcode = '';
@@ -138,7 +138,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     }
 
     final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-    _barcodeSerial = containerProvider.getNextSerial(prefix);
+    _barcodeSerial = await containerProvider.getNextSerial(prefix);
 
     setState(() {
       _generatedBarcode = '$prefix$_barcodeSerial';
@@ -216,21 +216,20 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
         title: const Text(
           'Add Container',
           style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
       ),
-      body: Container(
-        color: Colors.grey[50],
-        child: SafeArea(
+      body: SafeArea(
           child: Form(
             key: _formKey,
             child: ListView(
@@ -527,7 +526,6 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           ],
         ),
       ),
-        ),
       ),
     );
   }

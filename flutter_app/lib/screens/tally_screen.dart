@@ -96,8 +96,18 @@ class _TallyScreenState extends State<TallyScreen> {
     final tallyProvider = Provider.of<TallyProvider>(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(languageProvider.translate('start_tally')),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          languageProvider.translate('start_tally'),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

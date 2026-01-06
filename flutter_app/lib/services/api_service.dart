@@ -186,10 +186,16 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> restoreItem(String id) async {
+  Future<Map<String, dynamic>> restoreItem(String id, String containerId, int? slotNumber) async {
+    final body = {
+      'containerId': containerId,
+      if (slotNumber != null) 'slotNumber': slotNumber,
+    };
+    
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/items/$id/restore'),
       headers: await _getHeaders(),
+      body: json.encode(body),
     );
     return _handleResponse(response);
   }

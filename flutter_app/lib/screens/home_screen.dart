@@ -1,14 +1,14 @@
+import 'dart:ui';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/app_colors.dart';
 import 'scan_item_screen.dart';
-import 'add_edit_item_screen.dart';
 import 'item_list_screen.dart';
 import 'container_list_screen.dart';
 import 'tally_screen.dart';
-import 'repair_screen.dart';
 import 'booking_list_screen.dart';
 import 'reports_screen.dart';
 import 'settings_menu_screen.dart';
@@ -20,223 +20,464 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final languageProvider = Provider.of<LanguageProvider>(context);
     final user = authProvider.user;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(languageProvider.translate('home')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authProvider.logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: AppColors.primary,
-                      child: Text(
-                        user?.name.substring(0, 1).toUpperCase() ?? 'U',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+      backgroundColor: Colors.white,
+      body: CustomScrollView(
+        slivers: [
+          // Elegant Header with Logo and Glassmorphism Welcome
+          SliverAppBar(
+            expandedHeight: 180,
+            floating: false,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: Colors.white,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                children: [
+                  // White base
+                  Container(
+                    color: Colors.white,
+                  ),
+                  // Decorative circles (larger size)
+                  Positioned(
+                    right: -100,
+                    top: -100,
+                    child: Container(
+                      width: 280,
+                      height: 280,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFE94560).withOpacity(0.12),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome, ${user?.name ?? 'User'}!',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user?.role.toUpperCase() ?? '',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                  ),
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFFF6B9D).withOpacity(0.1),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Content
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final logoHeight = constraints.maxWidth > 600 ? 70.0 : 60.0;
+                          final now = DateTime.now();
+                          final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Shop Logo
+                              Image.asset(
+                                'assets/images/lgp_logo_red.png',
+                                height: logoHeight,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(
+                                    Icons.diamond,
+                                    color: const Color(0xFFE94560),
+                                    size: logoHeight,
+                                  );
+                                },
+                              ),
+                              const Spacer(),
+                              // Glassmorphism Welcome Card
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(0.4),
+                                          Colors.white.withOpacity(0.25),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFFE94560).withOpacity(0.3),
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        // Gradient Icon
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [Color(0xFFE94560), Color(0xFFFF6B9D)],
+                                            ),
+                                            borderRadius: BorderRadius.circular(10),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFFE94560).withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.waving_hand,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Text Content
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Welcome ${user?.name ?? 'User'}',
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF1A1A1A),
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 1),
+                                              Text(
+                                                '${days[now.weekday % 7]}, ${now.day} ${months[now.month - 1]} ${now.year} • ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[700],
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            
-            // Main Actions Grid
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.1,
-              children: [
-                _MenuCard(
-                  icon: Icons.qr_code_scanner,
-                  title: languageProvider.translate('scan_item'),
-                  color: AppColors.primary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ScanItemScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.inventory,
-                  title: languageProvider.translate('items'),
-                  color: AppColors.success,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ItemListScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.inventory_2,
-                  title: languageProvider.translate('containers'),
-                  color: AppColors.info,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ContainerListScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.checklist,
-                  title: languageProvider.translate('start_tally'),
-                  color: AppColors.warning,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TallyScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.build,
-                  title: languageProvider.translate('repair_items'),
-                  color: AppColors.secondary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RepairScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.bookmark,
-                  title: languageProvider.translate('bookings'),
-                  color: Colors.orange,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BookingListScreen()),
-                  ),
-                ),
-                _MenuCard(
-                  icon: Icons.assessment,
-                  title: languageProvider.translate('reports'),
-                  color: Colors.purple,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ReportsScreen()),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Settings Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.settings),
-                label: Text(languageProvider.translate('settings')),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.settings_outlined, color: Colors.grey[700], size: 24),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SettingsMenuScreen()),
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.logout, color: Color(0xFFE94560), size: 24),
+                onPressed: () async {
+                  await authProvider.logout();
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+
+          // Content Section
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Feature Cards Grid (removed section header)
+                  const SizedBox(height: 0),
+                  const Text(
+                        '',
+                        style: TextStyle(
+                          fontSize: 0,
+                        ),
+                      ),
+
+                  // Feature Cards Grid
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.15,
+                    children: [
+                      _ElegantCard(
+                        icon: Icons.qr_code_scanner_rounded,
+                        title: 'Scan Item',
+                        description: 'Quick barcode scan',
+                        primaryColor: const Color(0xFF667EEA),
+                        secondaryColor: const Color(0xFF764BA2),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ScanItemScreen()),
+                        ),
+                      ),
+                      _ElegantCard(
+                        icon: Icons.inventory_2_rounded,
+                        title: 'Inventory',
+                        description: 'View all items',
+                        primaryColor: const Color(0xFF11998E),
+                        secondaryColor: const Color(0xFF38EF7D),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ItemListScreen()),
+                        ),
+                      ),
+                      _ElegantCard(
+                        icon: Icons.widgets_rounded,
+                        title: 'Containers',
+                        description: 'Manage storage',
+                        primaryColor: const Color(0xFFEE0979),
+                        secondaryColor: const Color(0xFFFF6A00),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ContainerListScreen()),
+                        ),
+                      ),
+                      _ElegantCard(
+                        icon: Icons.fact_check_rounded,
+                        title: 'Stock Tally',
+                        description: 'Verify inventory',
+                        primaryColor: const Color(0xFFF093FB),
+                        secondaryColor: const Color(0xFFF5576C),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TallyScreen()),
+                        ),
+                      ),
+                      _ElegantCard(
+                        icon: Icons.event_note_rounded,
+                        title: 'Bookings',
+                        description: 'Customer orders',
+                        primaryColor: const Color(0xFF4FACFE),
+                        secondaryColor: const Color(0xFF00F2FE),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const BookingListScreen()),
+                        ),
+                      ),
+                      _ElegantCard(
+                        icon: Icons.analytics_rounded,
+                        title: 'Reports',
+                        description: 'Analytics & insights',
+                        primaryColor: const Color(0xFF43E97B),
+                        secondaryColor: const Color(0xFF38F9D7),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _MenuCard extends StatelessWidget {
+class _ElegantCard extends StatefulWidget {
   final IconData icon;
   final String title;
-  final Color color;
+  final String description;
+  final Color primaryColor;
+  final Color secondaryColor;
   final VoidCallback onTap;
 
-  const _MenuCard({
+  const _ElegantCard({
     required this.icon,
     required this.title,
-    required this.color,
+    required this.description,
+    required this.primaryColor,
+    required this.secondaryColor,
     required this.onTap,
   });
 
   @override
+  State<_ElegantCard> createState() => _ElegantCardState();
+}
+
+class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderStateMixin {
+  bool _isPressed = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 40,
-                  color: color,
-                ),
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+        _controller.forward();
+      },
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () {
+        setState(() => _isPressed = false);
+        _controller.reverse();
+      },
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: widget.primaryColor.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                // Gradient Background (subtle)
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          widget.primaryColor.withOpacity(0.1),
+                          widget.secondaryColor.withOpacity(0.05),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icon with gradient
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [widget.primaryColor, widget.secondaryColor],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.primaryColor.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          widget.icon,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const Spacer(),
+                      
+                      // Title
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A1A),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      
+                      // Description
+                      Text(
+                        widget.description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

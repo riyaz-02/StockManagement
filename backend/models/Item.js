@@ -63,6 +63,11 @@ const itemSchema = new mongoose.Schema({
         type: Number,
         default: null
     },
+    numberOfPieces: {
+        type: Number,
+        default: 1,
+        min: [1, 'Number of pieces must be at least 1']
+    },
     slotReserved: {
         type: Boolean,
         default: false
