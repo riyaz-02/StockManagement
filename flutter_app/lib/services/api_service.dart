@@ -151,6 +151,11 @@ class ApiService {
     );
     return _handleResponse(response);
   }
+  
+  // Alias for getItem
+  Future<Map<String, dynamic>> getItemById(String id) async {
+    return getItem(id);
+  }
 
   Future<Map<String, dynamic>> getItemByBarcode(String barcode) async {
     final response = await http.get(
@@ -159,6 +164,7 @@ class ApiService {
     );
     return _handleResponse(response);
   }
+
 
   Future<Map<String, dynamic>> createItem(Map<String, dynamic> data) async {
     final response = await http.post(
@@ -214,6 +220,15 @@ class ApiService {
       Uri.parse('${AppConstants.baseUrl}/scan'),
       headers: await _getHeaders(),
       body: json.encode({'barcode': barcode}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Lookup barcode - searches both items and containers
+  Future<Map<String, dynamic>> lookupBarcode(String barcode) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/scan/lookup/$barcode'),
+      headers: await _getHeaders(),
     );
     return _handleResponse(response);
   }
@@ -277,53 +292,6 @@ class ApiService {
   Future<Map<String, dynamic>> getRepairItems() async {
     final response = await http.get(
       Uri.parse('${AppConstants.baseUrl}/repair'),
-      headers: await _getHeaders(),
-    );
-    return _handleResponse(response);
-  }
-
-  // Tally
-  Future<Map<String, dynamic>> startTally(String description) async {
-    final response = await http.post(
-      Uri.parse('${AppConstants.baseUrl}/tally/start'),
-      headers: await _getHeaders(),
-      body: json.encode({'description': description}),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> scanItemInTally(String tallySessionId, String barcode) async {
-    final response = await http.post(
-      Uri.parse('${AppConstants.baseUrl}/tally/scan'),
-      headers: await _getHeaders(),
-      body: json.encode({
-        'tallySessionId': tallySessionId,
-        'barcode': barcode,
-      }),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> lockTally(String tallySessionId) async {
-    final response = await http.post(
-      Uri.parse('${AppConstants.baseUrl}/tally/lock'),
-      headers: await _getHeaders(),
-      body: json.encode({'tallySessionId': tallySessionId}),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> getTallySessions() async {
-    final response = await http.get(
-      Uri.parse('${AppConstants.baseUrl}/tally'),
-      headers: await _getHeaders(),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> getTallySession(String id) async {
-    final response = await http.get(
-      Uri.parse('${AppConstants.baseUrl}/tally/$id'),
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
@@ -558,6 +526,101 @@ class ApiService {
     // Send request
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+    return _handleResponse(response);
+  }
+
+  // ==================== TALLY METHODS ====================
+  
+  // Create new tally session
+  Future<Map<String, dynamic>> createTally(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/tally'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get all tally sessions
+  Future<Map<String, dynamic>> getTallySessions({String? status}) async {
+    var uri = Uri.parse('${AppConstants.baseUrl}/tally');
+    if (status != null) {
+      uri = uri.replace(queryParameters: {'status': status});
+    }
+    
+    final response = await http.get(
+      uri,
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get single tally session
+  Future<Map<String, dynamic>> getTallySession(String id) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/tally/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Scan item in tally
+  Future<Map<String, dynamic>> scanItemInTally(String tallyId, String barcode) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/scan'),
+      headers: await _getHeaders(),
+      body: json.encode({'barcode': barcode}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Lock tally session
+  Future<Map<String, dynamic>> lockTally(String tallyId, {String? remarks}) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/lock'),
+      headers: await _getHeaders(),
+      body: json.encode({'remarks': remarks ?? ''}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get tally report
+  Future<Map<String, dynamic>> getTallyReport(String tallyId) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/report'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Tag Printing APIs
+  
+  // Get all items for tag printing
+  Future<List<Map<String, dynamic>>> getItemsForTagPrinting() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/tag-print/items'),
+      headers: await _getHeaders(),
+    );
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data['items'] ?? []);
+  }
+
+  // Record tag print event
+  Future<Map<String, dynamic>> recordTagPrint(List<String> itemIds) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/tag-print/record'),
+      headers: await _getHeaders(),
+      body: json.encode({'itemIds': itemIds}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get tag print history for an item
+  Future<Map<String, dynamic>> getTagPrintHistory(String itemId) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/tag-print/history/$itemId'),
+      headers: await _getHeaders(),
+    );
     return _handleResponse(response);
   }
 }

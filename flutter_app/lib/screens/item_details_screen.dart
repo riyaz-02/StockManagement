@@ -1733,7 +1733,10 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
         title: const Text('Cancel Booking?'),
         content: const Text('Are you sure you want to cancel?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
@@ -1823,7 +1826,13 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Move Out of Stock', style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Move Out of Stock',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 
                 // Item Preview

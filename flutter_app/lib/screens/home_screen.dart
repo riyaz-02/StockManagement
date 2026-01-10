@@ -1,21 +1,48 @@
 import 'dart:ui';
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/app_colors.dart';
-import 'scan_item_screen.dart';
+import 'general_scan_screen.dart';
 import 'item_list_screen.dart';
 import 'container_list_screen.dart';
-import 'tally_screen.dart';
+import 'tally_list_screen.dart';
 import 'booking_list_screen.dart';
 import 'reports_screen.dart';
 import 'settings_menu_screen.dart';
 import 'login_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  Timer? _timer;
+  DateTime _currentTime = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +99,6 @@ class HomeScreen extends StatelessWidget {
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final logoHeight = constraints.maxWidth > 600 ? 70.0 : 60.0;
-                          final now = DateTime.now();
                           final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                           final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                           
@@ -162,16 +188,20 @@ class HomeScreen extends StatelessWidget {
                                                   color: Color(0xFF1A1A1A),
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
                                               ),
                                               const SizedBox(height: 1),
-                                              Text(
-                                                '${days[now.weekday % 7]}, ${now.day} ${months[now.month - 1]} ${now.year} • ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[700],
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  '${days[_currentTime.weekday % 7]}, ${_currentTime.day} ${months[_currentTime.month - 1]} • ${_currentTime.hour.toString().padLeft(2, '0')}:${_currentTime.minute.toString().padLeft(2, '0')}:${_currentTime.second.toString().padLeft(2, '0')}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey[700],
+                                                  ),
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
@@ -217,7 +247,7 @@ class HomeScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -231,24 +261,30 @@ class HomeScreen extends StatelessWidget {
                       ),
 
                   // Feature Cards Grid
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 1.15,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Adjust aspect ratio based on screen width
+                      final aspectRatio = constraints.maxWidth < 340 ? 0.95 : 1.1;
+                      return GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: aspectRatio,
                     children: [
                       _ElegantCard(
-                        icon: Icons.qr_code_scanner_rounded,
-                        title: 'Scan Item',
-                        description: 'Quick barcode scan',
-                        primaryColor: const Color(0xFF667EEA),
-                        secondaryColor: const Color(0xFF764BA2),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ScanItemScreen()),
-                        ),
+                        icon: Icons.qr_code_scanner,
+                        title: 'Scan',
+                        description: 'Scan Barcode',
+                        primaryColor: const Color(0xFFFF6B9D),
+                        secondaryColor: const Color(0xFFFF6B9D), // Assuming a single color for now, or adjust as needed
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const GeneralScanScreen()),
+                          );
+                        },
                       ),
                       _ElegantCard(
                         icon: Icons.inventory_2_rounded,
@@ -280,7 +316,7 @@ class HomeScreen extends StatelessWidget {
                         secondaryColor: const Color(0xFFF5576C),
                         onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const TallyScreen()),
+                          MaterialPageRoute(builder: (_) => const TallyListScreen()),
                         ),
                       ),
                       _ElegantCard(
@@ -306,7 +342,9 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
+                  );
+                },
+              ),
                 ],
               ),
             ),
@@ -421,21 +459,22 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                 
                 // Content
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Icon with gradient
                       Container(
-                        width: 56,
-                        height: 56,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [widget.primaryColor, widget.secondaryColor],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             BoxShadow(
                               color: widget.primaryColor.withOpacity(0.3),
@@ -447,20 +486,22 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                         child: Icon(
                           widget.icon,
                           color: Colors.white,
-                          size: 28,
+                          size: 26,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 14),
                       
                       // Title
                       Text(
                         widget.title,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 16.5,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1A1A1A),
                           letterSpacing: -0.3,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       
@@ -468,10 +509,13 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                       Text(
                         widget.description,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 11.5,
                           color: Colors.grey[600],
                           fontWeight: FontWeight.w500,
+                          height: 1.3,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

@@ -1,10 +1,8 @@
 class AppConstants {
-  // API Configuration
-  // For Web/Desktop: use localhost
-  static const String baseUrl = 'http://localhost:5000/api';
-  // For Android emulator: use http://10.0.2.2:5000/api
-  // For iOS simulator: use http://localhost:5000/api
-  // For real device: use http://YOUR_PC_IP:5000/api
+  // Base URL for API - Update this to your backend server's IP
+  static const String baseUrl = 'http://192.168.0.111:5000/api';
+  // For Android Emulator: use 'http://10.0.2.2:5000/api'
+  // For Web/Desktop: use 'http://localhost:5000/api'
   
   static const int connectionTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;

@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 import 'item_settings_screen.dart';
 import 'container_settings_screen.dart';
+import 'tag_printing_screen.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
   const SettingsMenuScreen({super.key});
@@ -79,6 +80,20 @@ class SettingsMenuScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ContainerSettingsScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildSettingCard(
+            context,
+            title: 'Tag Printing',
+            subtitle: 'Print barcode tags and view print history',
+            icon: Icons.print,
+            color: Colors.pink,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TagPrintingScreen()),
               );
             },
           ),

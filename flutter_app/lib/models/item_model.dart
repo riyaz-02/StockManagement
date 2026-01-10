@@ -17,6 +17,10 @@ class Item {
   final int? slotNumber;
   final int numberOfPieces;
   final bool slotReserved;
+  final bool tagsPrinted;
+  final DateTime? lastTagPrintedAt;
+  final int tagPrintCount;
+  final String? lastPrintedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -39,6 +43,10 @@ class Item {
     this.slotNumber,
     this.numberOfPieces = 1,
     this.slotReserved = false,
+    this.tagsPrinted = false,
+    this.lastTagPrintedAt,
+    this.tagPrintCount = 0,
+    this.lastPrintedBy,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -69,6 +77,14 @@ class Item {
       slotNumber: json['slotNumber'],
       numberOfPieces: json['numberOfPieces'] ?? 1,
       slotReserved: json['slotReserved'] ?? false,
+      tagsPrinted: json['tagsPrinted'] ?? false,
+      lastTagPrintedAt: json['lastTagPrintedAt'] != null
+          ? DateTime.parse(json['lastTagPrintedAt'])
+          : null,
+      tagPrintCount: json['tagPrintCount'] ?? 0,
+      lastPrintedBy: json['lastPrintedBy'] is String
+          ? json['lastPrintedBy']
+          : json['lastPrintedBy']?['_id'],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -96,6 +112,10 @@ class Item {
       'slotNumber': slotNumber,
       'numberOfPieces': numberOfPieces,
       'slotReserved': slotReserved,
+      'tagsPrinted': tagsPrinted,
+      'lastTagPrintedAt': lastTagPrintedAt?.toIso8601String(),
+      'tagPrintCount': tagPrintCount,
+      'lastPrintedBy': lastPrintedBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

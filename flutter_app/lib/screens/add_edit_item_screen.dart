@@ -7,8 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import '../models/item_model.dart';
+import '../providers/item_provider.dart';
 import '../providers/item_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/container_provider.dart';
@@ -286,27 +286,6 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
   }
 
-  Future<void> _scanBarcode() async {
-    try {
-      final barcode = await FlutterBarcodeScanner.scanBarcode(
-        '#ff6666',
-        'Cancel',
-        true,
-        ScanMode.BARCODE,
-      );
-      
-      if (barcode != '-1' && barcode.isNotEmpty) {
-        // Check if barcode exists
-        await _checkBarcodeExists(barcode);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scan failed: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
 
   Future<void> _checkBarcodeExists(String barcode) async {
     try {
@@ -711,15 +690,24 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               ),
               
               // 5. HUID (Conditional)
-              if (_isHallmarked) ...[
-                const SizedBox(height: 8),
+              if (_isHallmarked)
                 _buildTextField(
                   controller: _huidController,
                   label: 'HUID Number',
-                  icon: Icons.fingerprint,
+                  hint: 'Enter hallmark unique ID',
+                  icon: Icons.verified,
                   required: false,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      return TextEditingValue(
+                        text: newValue.text.toUpperCase(),
+                        selection: newValue.selection,
+                      );
+                    }),
+                  ],
                 ),
-              ],
               const SizedBox(height: 24),
               
               // 6. Container Selection
@@ -926,11 +914,6 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       icon: const Icon(Icons.refresh, color: Colors.blue),
                       tooltip: 'Generate New',
                     ),
-                    IconButton(
-                      onPressed: _scanBarcode,
-                      icon: const Icon(Icons.qr_code_scanner, color: Colors.orange),
-                      tooltip: 'Scan Existing',
-                    ),
                   ],
                 ),
               ),
@@ -1041,6 +1024,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     bool required = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
+    TextCapitalization? textCapitalization,
     String? suffix,
     String? hint,
     String? Function(String?)? validator,
@@ -1049,6 +1033,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization ?? TextCapitalization.none,
       decoration: InputDecoration(
         labelText: label + (required ? ' *' : ''),
         hintText: hint,

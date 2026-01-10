@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:provider/provider.dart';
 import '../providers/item_provider.dart';
 import '../providers/language_provider.dart';
@@ -20,27 +19,6 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
   void dispose() {
     _barcodeController.dispose();
     super.dispose();
-  }
-
-  Future<void> _scanBarcode() async {
-    try {
-      final barcode = await FlutterBarcodeScanner.scanBarcode(
-        '#${AppColors.primary.value.toRadixString(16)}',
-        'Cancel',
-        true,
-        ScanMode.BARCODE,
-      );
-
-      if (barcode != '-1' && mounted) {
-        _searchItem(barcode);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
   }
 
   Future<void> _searchItem(String barcode) async {
@@ -100,19 +78,13 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
             ),
             const SizedBox(height: 40),
             
-            // Scan Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.camera_alt),
-                label: Text(languageProvider.translate('scan_barcode')),
-                onPressed: _scanBarcode,
+            const Text(
+              'Enter Barcode Manually',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 24),
-            
-            const Text('OR', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 24),
             
             // Manual Entry

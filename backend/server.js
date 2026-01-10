@@ -19,6 +19,7 @@ const reportRoutes = require('./routes/report.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const settingsRoutes = require('./routes/settings');
 const customerRoutes = require('./routes/customer.routes');
+const tagPrintRoutes = require('./routes/tagPrint.routes');
 
 // Initialize express app
 const app = express();
@@ -67,6 +68,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/outward-movements', require('./routes/outwardMovement.routes'));
+app.use('/api/tag-print', tagPrintRoutes);
 
 // 404 handler
 app.use((req, res) => {

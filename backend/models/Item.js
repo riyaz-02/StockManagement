@@ -72,6 +72,25 @@ const itemSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    // Tag printing tracking
+    tagsPrinted: {
+        type: Boolean,
+        default: false
+    },
+    lastTagPrintedAt: {
+        type: Date,
+        default: null
+    },
+    tagPrintCount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    lastPrintedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now

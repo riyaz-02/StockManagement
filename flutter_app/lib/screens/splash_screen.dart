@@ -136,7 +136,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Animated Shop Logo
+                // Animated Shop Logo - 80% width with auto height
                 AnimatedBuilder(
                   animation: _animationController,
                   builder: (context, child) {
@@ -144,22 +144,25 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       opacity: _fadeAnimation,
                       child: ScaleTransition(
                         scale: _scaleAnimation,
-                        child: Image.asset(
-                          'assets/images/lgp_logo_red.png',
-                          height: 120,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.diamond,
-                              color: Color(0xFFE94560),
-                              size: 120,
-                            );
-                          },
+                        child: FractionallySizedBox(
+                          widthFactor: 0.8,
+                          child: Image.asset(
+                            'assets/images/lgp_logo_red.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.diamond,
+                                color: Color(0xFFE94560),
+                                size: 120,
+                              );
+                            },
+                          ),
                         ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 60),
+                const SizedBox(height: 24),
                 
                 // Glassmorphism Loading Card
                 FadeTransition(

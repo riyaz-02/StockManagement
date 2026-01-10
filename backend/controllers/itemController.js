@@ -173,7 +173,14 @@ exports.getItems = async (req, res) => {
 
         // By default, exclude deleted items unless explicitly requested
         if (status) {
-            filter.status = status;
+            // Support comma-separated status values
+            if (status.includes(',')) {
+                const statusArray = status.split(',').map(s => s.trim());
+                filter.status = { $in: statusArray };
+                console.log(`[GET ITEMS] Multiple statuses: ${statusArray.join(', ')}`);
+            } else {
+                filter.status = status;
+            }
         } else {
             filter.status = { $ne: 'deleted' };
         }
@@ -240,7 +247,7 @@ exports.getItemByBarcode = async (req, res) => {
 exports.getItem = async (req, res) => {
     try {
         const item = await Item.findById(req.params.id)
-            .populate('containerId', 'name type layoutType qrCode');
+            .populate('containerId', 'name type layoutType qrCode image');
 
         if (!item) {
             return res.status(404).json({
