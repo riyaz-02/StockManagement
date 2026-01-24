@@ -18,7 +18,7 @@ class GeneralScanScreen extends StatefulWidget {
   State<GeneralScanScreen> createState() => _GeneralScanScreenState();
 }
 
-class _GeneralScanScreenState extends State<GeneralScanScreen> {
+class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindingObserver {
   final MobileScannerController cameraController = MobileScannerController();
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
@@ -32,9 +32,50 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> {
   bool _isProcessing = false;
 
   final Duration _cooldownDuration = const Duration(seconds: 2);
+  bool _isInitializing = true;
+  bool _hasInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Start initialization after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startCameraWithDelay();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes (background/foreground)
+    if (state == AppLifecycleState.resumed) {
+      if (!_hasInitialized) {
+        _startCameraWithDelay();
+      }
+    }
+  }
+
+  Future<void> _startCameraWithDelay() async {
+    if (_hasInitialized) return;
+    
+    setState(() {
+      _isInitializing = true;
+    });
+
+    // Wait for camera to initialize
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+        _hasInitialized = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     cameraController.dispose();
     _barcodeController.dispose();
     _barcodeFocusNode.dispose();
@@ -50,7 +91,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> {
   Future<void> _playSound(String type) async {
     try {
       if (type == 'success') {
-        await _audioPlayer.play(AssetSource('sounds/success.mp3'));
+        await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
       } else {
         await _audioPlayer.play(AssetSource('sounds/error.mp3'));
       }
@@ -171,6 +212,25 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> {
             controller: cameraController,
             onDetect: _onBarcodeDetected,
           ),
+
+          // Camera initialization overlay
+          if (_isInitializing)
+            Container(
+              color: Colors.black,
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      'Initializing camera...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Top bar with gradient
           Positioned(

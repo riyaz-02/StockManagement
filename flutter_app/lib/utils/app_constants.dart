@@ -2,30 +2,22 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
-  // API Configuration - Auto-detects platform
-  static String get baseUrl {
-    if (kIsWeb) {
-      // For Web: Use localhost
-      return 'http://localhost:5000/api';
-    } else if (Platform.isAndroid) {
-      // For Android PHYSICAL DEVICE over Wi-Fi
-      const String physicalDeviceIP = '192.168.0.116';
-      return 'http://$physicalDeviceIP:5000/api';
-      
-      // For Android with USB debugging (ADB reverse):
-      // Run: adb reverse tcp:5000 tcp:5000
-      // return 'http://localhost:5000/api';
-      
-      // For Android EMULATOR:
-      // return 'http://10.0.2.2:5000/api';
-    } else if (Platform.isIOS) {
-      // For iOS: Use localhost (works on simulator)
-      return 'http://localhost:5000/api';
-    } else {
-      // For Desktop (Windows/Mac/Linux): Use localhost
-      return 'http://localhost:5000/api';
-    }
-  }
+  // Production API URL
+  static const String baseUrl = 'https://stockmanagement-production-0bff.up.railway.app/api';
+  
+  // Development URLs (uncomment for local development)
+  // static String get baseUrl {
+  //   if (kIsWeb) {
+  //     return 'http://localhost:5000/api';
+  //   } else if (Platform.isAndroid) {
+  //     const String physicalDeviceIP = '192.168.0.116';
+  //     return 'http://$physicalDeviceIP:5000/api';
+  //   } else if (Platform.isIOS) {
+  //     return 'http://localhost:5000/api';
+  //   } else {
+  //     return 'http://localhost:5000/api';
+  //   }
+  // }
   
   static const int connectionTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;
