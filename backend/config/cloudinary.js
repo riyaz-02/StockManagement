@@ -1,22 +1,20 @@
 const cloudinary = require('cloudinary').v2;
 
-// Configure Cloudinary with environment variables
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// Check if Cloudinary credentials are provided
+if (process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET) {
 
-// Test connection
-const testConnection = async () => {
-    try {
-        await cloudinary.api.ping();
-        console.log('✅ Cloudinary connected successfully');
-    } catch (error) {
-        console.error('❌ Cloudinary connection failed:', error.message);
-    }
-};
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
 
-testConnection();
+    console.log('✅ Cloudinary configured successfully');
+} else {
+    console.warn('⚠️  Cloudinary credentials not provided - image uploads will not work');
+    console.warn('   Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET');
+}
 
 module.exports = cloudinary;
