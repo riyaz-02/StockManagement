@@ -37,6 +37,7 @@ exports.createItem = async (req, res) => {
             netWeight,
             numberOfPieces,
             weightCategory,
+            weightAccuracy,
             huid,
             images,
             containerId,
@@ -49,9 +50,19 @@ exports.createItem = async (req, res) => {
             imagePaths = req.files.map(file => file.path); // Save relative path or full path
         }
 
-        // Also handle if images are passed as text (e.g. existing URLs)
+        // Also handle if images are passed as text (e.g. existing URLs or JSON string)
         if (images) {
-            const existingImages = Array.isArray(images) ? images : [images];
+            let existingImages;
+            // Parse if it's a JSON string
+            if (typeof images === 'string') {
+                try {
+                    existingImages = JSON.parse(images);
+                } catch (e) {
+                    existingImages = [images];
+                }
+            } else {
+                existingImages = Array.isArray(images) ? images : [images];
+            }
             imagePaths = [...imagePaths, ...existingImages];
         }
 
@@ -134,7 +145,8 @@ exports.createItem = async (req, res) => {
             purity,
             netWeight,
             numberOfPieces: numberOfPieces || 1,
-            weightCategory: weightCategory || 'Light', // Use provided value or default to Light
+            weightCategory: weightCategory || 'Light',
+            weightAccuracy: weightAccuracy || 'exact', // Default to exact if not provided
             huid,
             images: imagePaths,
             containerId: assignedContainerId,
@@ -143,10 +155,16 @@ exports.createItem = async (req, res) => {
         });
 
         // Update container slot
-        const container = await Container.findById(assignedContainerId);
-        const slot = container.slots.find(s => s.slotNumber === assignedSlotNumber);
-        slot.itemId = item._id;
-        await container.save();
+        if (assignedContainerId && assignedSlotNumber) {
+            const container = await Container.findById(assignedContainerId);
+            if (container) {
+                const slot = container.slots.find(s => s.slotNumber === assignedSlotNumber);
+                if (slot) {
+                    slot.itemId = item._id;
+                    await container.save();
+                }
+            }
+        }
 
         res.status(201).json({
             success: true,
@@ -292,6 +310,7 @@ exports.updateItem = async (req, res) => {
             netWeight,
             numberOfPieces,
             weightCategory,
+            weightAccuracy,
             huid,
             images,
             status,
@@ -319,9 +338,23 @@ exports.updateItem = async (req, res) => {
         }
 
         // Handle Images: Merge kept existing images + new uploaded images
-        // We only update the images array if specialized params (keptImages or req.files) are present.
-        // If neither are present, we fall back to standard 'images' array if provided, or leave as is.
-        if (keptImages !== undefined || (req.files && req.files.length > 0)) {
+        // Priority: images field (new Cloudinary URLs) > keptImages > req.files
+        if (images !== undefined) {
+            // New approach: images field contains all Cloudinary URLs as JSON string
+            let finalImages = [];
+            if (typeof images === 'string') {
+                try {
+                    finalImages = JSON.parse(images);
+                } catch (e) {
+                    finalImages = [images];
+                }
+            } else if (Array.isArray(images)) {
+                finalImages = images;
+            }
+            console.log('Using images field:', finalImages);
+            item.images = finalImages;
+        } else if (keptImages !== undefined || (req.files && req.files.length > 0)) {
+            // Legacy approach for backward compatibility
             let finalImages = [];
 
             // 1. Process kept images
@@ -366,9 +399,6 @@ exports.updateItem = async (req, res) => {
 
             console.log('Final Images to Save:', finalImages);
             item.images = finalImages;
-        } else if (images) {
-            // Fallback for simple updates without file logic
-            item.images = images;
         }
 
         // Update fields
@@ -380,6 +410,7 @@ exports.updateItem = async (req, res) => {
         if (netWeight) item.netWeight = netWeight;
         if (numberOfPieces) item.numberOfPieces = numberOfPieces;
         if (weightCategory) item.weightCategory = weightCategory;
+        if (weightAccuracy) item.weightAccuracy = weightAccuracy;
         if (huid !== undefined) item.huid = huid;
         if (status) item.status = status;
 
@@ -620,12 +651,19 @@ exports.permanentDeleteItem = async (req, res) => {
             });
         }
 
-        // Permanently delete the item
+        // Delete images from Cloudinary before deleting item
+        if (item.images && item.images.length > 0) {
+            const { deleteCloudinaryImages } = require('../utils/cloudinaryHelper');
+            const deletedCount = await deleteCloudinaryImages(item.images);
+            console.log(`🗑️ Deleted ${deletedCount}/${item.images.length} images from Cloudinary`);
+        }
+
+        // Permanently delete the item from database
         await Item.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
             success: true,
-            message: 'Item permanently deleted'
+            message: 'Item and associated images permanently deleted'
         });
     } catch (error) {
         console.error('Permanent delete item error:', error);

@@ -3,7 +3,6 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
-import '../utils/tag_pdf_generator.dart';
 
 class TagPrintPreviewScreen extends StatefulWidget {
   final List<Item> items;
@@ -22,15 +21,17 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
     setState(() => _isRecording = true);
 
     try {
-      // Record print event
+      // Record print event and generate PDF from backend
       final itemIds = widget.items.map((item) => item.id).toList();
+      
+      // Generate PDF from backend
+      final pdfBytes = await _apiService.generateTagsPDF(itemIds);
+      
+      // Record print event
       await _apiService.recordTagPrint(itemIds);
-
-      // Generate and print PDF
-      final pdf = await TagPdfGenerator.generateTags(widget.items);
       
       await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
+        onLayout: (PdfPageFormat format) async => pdfBytes,
       );
 
       if (mounted) {
@@ -60,9 +61,11 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
 
   Future<void> _sharePdf() async {
     try {
-      final pdf = await TagPdfGenerator.generateTags(widget.items);
+      final itemIds = widget.items.map((item) => item.id).toList();
+      final pdfBytes = await _apiService.generateTagsPDF(itemIds);
+      
       await Printing.sharePdf(
-        bytes: await pdf.save(),
+        bytes: pdfBytes,
         filename: 'barcode_tags_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
     } catch (e) {
@@ -79,9 +82,6 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final layoutInfo = TagPdfGenerator.getLayoutInfo();
-    final pageCount = TagPdfGenerator.calculatePageCount(widget.items.length);
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -126,10 +126,9 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
                 ),
                 const SizedBox(height: 12),
                 _buildInfoRow('Total Tags:', '${widget.items.length}'),
-                _buildInfoRow('Total Pages:', '$pageCount'),
-                _buildInfoRow('Tags per Page:', '${layoutInfo['tagsPerPage']}'),
-                _buildInfoRow('Layout:', '${layoutInfo['tagsPerRow']} × ${layoutInfo['tagsPerColumn']}'),
-                _buildInfoRow('Tag Size:', '1.5" × 2" (foldable)'),
+                _buildInfoRow('Tags per Page:', '100'),
+                _buildInfoRow('Layout:', '10 × 10'),
+                _buildInfoRow('Tag Size:', '0.7" × 1" (foldable)'),
                 _buildInfoRow('Paper:', 'A4'),
                 const SizedBox(height: 8),
                 Container(
@@ -178,8 +177,35 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: PdfPreview(
                   build: (format) async {
-                    final pdf = await TagPdfGenerator.generateTags(widget.items);
-                    return pdf.save();
+                    try {
+                      print('[PDF Preview] Fetching PDF from backend...');
+                      final itemIds = widget.items.map((item) => item.id).toList();
+                      print('[PDF Preview] Item IDs: $itemIds');
+                      
+                      final pdfBytes = await _apiService.generateTagsPDF(itemIds);
+                      print('[PDF Preview] Received PDF: ${pdfBytes.length} bytes');
+                      
+                      if (pdfBytes.isEmpty) {
+                        print('[PDF Preview] ERROR: Empty PDF bytes received');
+                        throw Exception('Empty PDF received from server');
+                      }
+                      
+                      // Validate PDF header
+                      if (pdfBytes.length < 4 || 
+                          pdfBytes[0] != 0x25 || pdfBytes[1] != 0x50 || 
+                          pdfBytes[2] != 0x44 || pdfBytes[3] != 0x46) {
+                        print('[PDF Preview] ERROR: Invalid PDF header');
+                        print('[PDF Preview] First 10 bytes: ${pdfBytes.take(10).toList()}');
+                        throw Exception('Invalid PDF format');
+                      }
+                      
+                      print('[PDF Preview] PDF validation passed');
+                      return pdfBytes;
+                    } catch (e, stackTrace) {
+                      print('[PDF Preview] ERROR: $e');
+                      print('[PDF Preview] Stack trace: $stackTrace');
+                      rethrow;
+                    }
                   },
                   allowPrinting: false,
                   allowSharing: false,

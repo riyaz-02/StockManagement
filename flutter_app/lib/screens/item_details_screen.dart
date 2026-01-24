@@ -256,13 +256,29 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
                             ),
-                            child: Text(
-                              '${_item.netWeight.toStringAsFixed(3)}g',
-                              style: const TextStyle(
-                                color: Colors.white, 
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 11
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${_item.netWeight.toStringAsFixed(3)}g',
+                                  style: const TextStyle(
+                                    color: Colors.white, 
+                                    fontWeight: FontWeight.bold, 
+                                    fontSize: 11
+                                  ),
+                                ),
+                                if (_item.weightAccuracy != 'exact') ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${_item.weightAccuracy == 'approx' ? 'Approx' : 'Bulk'})',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade300,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
@@ -372,7 +388,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                                 child: _buildCompactBox(
                                   Icons.scale_outlined,
                                   'Weight',
-                                  '${_item.netWeight.toStringAsFixed(3)}g',
+                                  '${_item.netWeight.toStringAsFixed(3)}g${_item.weightAccuracy != 'exact' ? ' (${_item.weightAccuracy == 'approx' ? 'Approx' : 'Bulk'})' : ''}',
                                   Colors.purple,
                                 ),
                               ),

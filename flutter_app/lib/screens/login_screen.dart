@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import 'home_screen.dart';
+import 'main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -162,10 +162,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   // Title
-                                  const Text(
-                                    'Welcome Back',
+                                  Text(
+                                    languageProvider.t('welcome_back'),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF1A1A1A),
@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Sign in to continue',
+                                    languageProvider.t('login_to_continue'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 13,
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     keyboardType: TextInputType.phone,
                                     style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
                                     decoration: InputDecoration(
-                                      labelText: 'Mobile Number',
+                                      labelText: languageProvider.t('mobile_number'),
                                       labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
                                       prefixIcon: const Icon(Icons.phone, color: Color(0xFFE94560), size: 20),
                                       filled: true,
@@ -260,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     obscureText: _obscurePassword,
                                     style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
                                     decoration: InputDecoration(
-                                      labelText: 'Password',
+                                      labelText: languageProvider.t('password'),
                                       labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
                                       prefixIcon: const Icon(Icons.lock, color: Color(0xFFE94560), size: 20),
                                       suffixIcon: IconButton(
@@ -357,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   ),
                                                 )
                                               : Text(
-                                                  'Login',
+                                                  languageProvider.t('login_button'),
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w700,
@@ -368,58 +368,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       );
                                     },
                                   ),
-                                  const SizedBox(height: 16),
-                                  
-                                  // Default Credentials Info
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF667EEA).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: const Color(0xFF667EEA).withOpacity(0.2),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.info_outline,
-                                              size: 16,
-                                              color: const Color(0xFF667EEA),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            const Text(
-                                              'Default Credentials',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                color: Color(0xFF667EEA),
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Admin: 9999999999 / admin123',
-                                          style: TextStyle(
-                                            color: Colors.grey[800],
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Staff: 8888888888 / staff123',
-                                          style: TextStyle(
-                                            color: Colors.grey[800],
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  const SizedBox(height: 8),
                                 ],
                               ),
                             ),

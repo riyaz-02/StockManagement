@@ -10,6 +10,7 @@ import '../providers/container_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_colors.dart';
 import '../models/container_model.dart';
+import '../services/api_service.dart';
 
 class EditContainerScreen extends StatefulWidget {
   final ItemContainer container;
@@ -28,6 +29,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   late TextEditingController _nameController;
   late TextEditingController _capacityController;
   final ImagePicker _imagePicker = ImagePicker();
+  final ApiService _apiService = ApiService();
   
   late String _selectedType;
   late String _selectedWeightCategory;
@@ -37,9 +39,11 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   late String _selectedLayoutType;
   late List<String> _selectedItemTypes;
   
-  // Image picker state
-  Uint8List? _selectedImageBytes;
-  String? _selectedImageName;
+  // Image state - Cloudinary approach
+  String? _existingImageUrl; // Existing Cloudinary URL
+  String? _uploadedImageUrl; // Newly uploaded Cloudinary URL
+  bool _isUploadingImage = false;
+  bool _isDeletingImage = false;
   
   // Barcode state
   late String _generatedBarcode;
@@ -62,6 +66,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     _selectedLayoutType = widget.container.layoutType;
     _selectedItemTypes = List.from(widget.container.allowedItemTypes);
     _generatedBarcode = widget.container.qrCode ?? '';
+    
+    // Initialize existing image URL
+    _existingImageUrl = widget.container.image;
     
     // Attempt to extract serial from barcode if possible, or just default to 1
     // Logic: if barcode is "R12", serial is 12.
@@ -103,37 +110,103 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
         imageQuality: 85,
       );
       
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _selectedImageBytes = bytes;
-          String name = image.name;
-          if (!name.toLowerCase().endsWith('.jpg') && 
-              !name.toLowerCase().endsWith('.jpeg') && 
-              !name.toLowerCase().endsWith('.png') && 
-              !name.toLowerCase().endsWith('.webp')) {
-            name = '$name.jpg';
+      if (image == null) return;
+
+      setState(() => _isUploadingImage = true);
+
+      try {
+        print('[UPLOAD] Uploading container image to Cloudinary...');
+        final result = await _apiService.uploadImage(image, folder: 'containers');
+        
+        if (result['success'] == true) {
+          final imageUrl = result['data']['url'];
+          setState(() {
+            _uploadedImageUrl = imageUrl;
+            _isUploadingImage = false;
+          });
+          print('[UPLOAD] ✅ Uploaded: $imageUrl');
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showMaterialBanner(
+              MaterialBanner(
+                content: const Text('Image uploaded successfully'),
+                backgroundColor: Colors.green.shade100,
+                leading: const Icon(Icons.check_circle, color: Colors.green),
+                actions: [
+                  TextButton(
+                    onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                    child: const Text('DISMISS'),
+                  ),
+                ],
+              ),
+            );
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              }
+            });
           }
-          _selectedImageName = name;
-        });
+        } else {
+          throw Exception('Upload failed');
+        }
+      } catch (e) {
+        setState(() => _isUploadingImage = false);
+        print('[UPLOAD] ❌ Failed: $e');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      setState(() => _isUploadingImage = false);
     }
   }
 
-  void _removeImage() {
-    setState(() {
-      _selectedImageBytes = null;
-      _selectedImageName = null;
-    });
+  Future<void> _removeImage({bool isExisting = false}) async {
+    if (_isDeletingImage) return; // Prevent double-click
+
+    setState(() => _isDeletingImage = true);
+
+    final imageUrl = isExisting ? _existingImageUrl : _uploadedImageUrl;
+    if (imageUrl == null) {
+      setState(() => _isDeletingImage = false);
+      return;
+    }
+
+    try {
+      final deleted = await _apiService.deleteImage(imageUrl);
+      
+      if (deleted) {
+        setState(() {
+          if (isExisting) {
+            _existingImageUrl = null;
+          } else {
+            _uploadedImageUrl = null;
+          }
+          _isDeletingImage = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showMaterialBanner(
+            MaterialBanner(
+              content: const Text('Image deleted successfully'),
+              backgroundColor: Colors.orange.shade100,
+              leading: const Icon(Icons.delete_outline, color: Colors.orange),
+              actions: [
+                TextButton(
+                  onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                  child: const Text('DISMISS'),
+                ),
+              ],
+            ),
+          );
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('[DELETE] Error: $e');
+      setState(() => _isDeletingImage = false);
+    }
   }
 
   Future<void> _generateBarcode() async {
@@ -174,16 +247,13 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
 
       final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
 
-      String? imageUrl;
-      if (_selectedImageBytes != null && _selectedImageName != null) {
-        imageUrl = await containerProvider.uploadImage(_selectedImageBytes!, _selectedImageName!);
-      }
+      // Use uploaded image URL or existing image URL
+      final imageUrl = _uploadedImageUrl ?? _existingImageUrl;
       
       final containerData = {
         'name': _nameController.text,
         'type': _selectedType,
         'capacity': int.parse(_capacityController.text),
-        'allowedItemTypes': _selectedItemTypes,
         'allowedItemTypes': _selectedItemTypes,
         'weightCategory': _selectedWeightCategory,
         'metalType': _selectedMetalTypes,
@@ -843,6 +913,10 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   }
 
   Widget _buildImagePickerSection() {
+    final hasExistingImage = _existingImageUrl != null;
+    final hasUploadedImage = _uploadedImageUrl != null;
+    final hasAnyImage = hasExistingImage || hasUploadedImage;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -850,35 +924,130 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey[300]!),
       ),
-      child: _selectedImageBytes != null
-          ? Row(
+      child: Column(
+        children: [
+          // Show existing image
+          if (hasExistingImage && !hasUploadedImage)
+            Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.memory(
-                    _selectedImageBytes!,
-                    height: 60,
-                    width: 60,
+                  child: Image.network(
+                    _existingImageUrl!,
+                    height: 100,
+                    width: 100,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 100,
+                      width: 100,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _selectedImageName ?? 'New Image',
-                    style: const TextStyle(fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
+                if (_isDeletingImage)
+                  Container(
+                    height: 100,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.black54,
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: _removeImage,
-                  color: Colors.red,
-                  tooltip: 'Remove',
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: _isDeletingImage ? null : () => _removeImage(isExisting: true),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _isDeletingImage ? Colors.grey : Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                    ),
+                  ),
                 ),
               ],
-            )
-          : InkWell(
+            ),
+          
+          // Show uploaded image
+          if (hasUploadedImage)
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    _uploadedImageUrl!,
+                    height: 100,
+                    width: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 100,
+                      width: 100,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                if (_isDeletingImage)
+                  Container(
+                    height: 100,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.black54,
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: _isDeletingImage ? null : () => _removeImage(isExisting: false),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _isDeletingImage ? Colors.grey : Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+          // Show upload progress
+          if (_isUploadingImage)
+            Container(
+              height: 100,
+              width: 100,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.blue.withOpacity(0.5)),
+                color: Colors.blue.withOpacity(0.1),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+
+          // Show add/replace button
+          if (!_isUploadingImage)
+            InkWell(
               onTap: _pickImage,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
@@ -889,7 +1058,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                     Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
                     const SizedBox(width: 8),
                     Text(
-                      'Replace Image',
+                      hasAnyImage ? 'Replace Image' : 'Add Image',
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 14,
@@ -900,6 +1069,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                 ),
               ),
             ),
+        ],
+      ),
     );
   }
 }

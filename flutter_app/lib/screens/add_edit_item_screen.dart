@@ -46,17 +46,23 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String _selectedItemType = 'ring';
   String _selectedMetalType = 'gold';
   String _selectedPurity = '916';
-  String _selectedWeightCategory = 'Light'; // Default
+  String _selectedWeightCategory = 'Light';
+  String _selectedWeightAccuracy = 'exact'; // Default
   String? _selectedContainerId;
   int? _selectedSlotNumber;
   bool _isHallmarked = false;
   String _generatedBarcode = '';
   bool _isLoadingContainers = false;
+  bool _isUploadingImages = false; // Track upload status
+  int? _deletingImageIndex; // Track which image is being deleted
+  bool _isDeletingExisting = false; // Track if deleting existing or uploaded image
 
   List<Map<String, dynamic>> _recommendedContainers = [];
   final List<XFile> _selectedImages = [];
   List<String> _existingImages = []; // Manage existing URLs
+  List<String> _uploadedImageUrls = []; // Track uploaded Cloudinary URLs
   final ImagePicker _picker = ImagePicker();
+  final ApiService _apiService = ApiService();
 
   @override
   @override
@@ -78,6 +84,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _selectedMetalType = item.metalType;
       _selectedPurity = item.purity;
       _selectedWeightCategory = item.weightCategory;
+      _selectedWeightAccuracy = item.weightAccuracy;
       _isHallmarked = item.huid.isNotEmpty;
       
       // Handle Container & Slot
@@ -375,24 +382,123 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   Future<void> _pickImages() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          _selectedImages.addAll(images);
+      if (images.isEmpty) return;
+
+      setState(() => _isUploadingImages = true);
+      int successCount = 0;
+      int failCount = 0;
+
+      // Upload each image immediately to Cloudinary
+      for (var image in images) {
+        try {
+          print('[UPLOAD] Uploading ${image.name} to Cloudinary...');
+          final result = await _apiService.uploadImage(image);
+          
+          if (result['success'] == true) {
+            final imageUrl = result['data']['url'];
+            setState(() {
+              _uploadedImageUrls.add(imageUrl);
+            });
+            successCount++;
+            print('[UPLOAD] ✅ Uploaded: $imageUrl');
+          } else {
+            failCount++;
+            throw Exception('Upload failed');
+          }
+        } catch (e) {
+          failCount++;
+          print('[UPLOAD] ❌ Failed to upload ${image.name}: $e');
+        }
+      }
+
+      setState(() => _isUploadingImages = false);
+
+      // Show result banner at top
+      if (mounted && successCount > 0) {
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: Text('$successCount image(s) uploaded successfully'),
+            backgroundColor: Colors.green.shade100,
+            leading: const Icon(Icons.check_circle, color: Colors.green),
+            actions: [
+              TextButton(
+                onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                child: const Text('DISMISS'),
+              ),
+            ],
+          ),
+        );
+        // Auto-hide after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          }
         });
       }
     } catch (e) {
-      if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e'), backgroundColor: Colors.red),
-        );
-      }
+      setState(() => _isUploadingImages = false);
     }
   }
 
-  void _removeImage(int index) {
+  /// Remove uploaded image and delete from Cloudinary
+  Future<void> _removeImage(int index, {bool isExisting = false}) async {
+    // Prevent double-click
+    if (_deletingImageIndex == index && _isDeletingExisting == isExisting) {
+      return;
+    }
+
     setState(() {
-      _selectedImages.removeAt(index);
+      _deletingImageIndex = index;
+      _isDeletingExisting = isExisting;
     });
+
+    final imageUrl = isExisting ? _existingImages[index] : _uploadedImageUrls[index];
+    
+    try {
+      // Delete from Cloudinary
+      final deleted = await _apiService.deleteImage(imageUrl);
+      
+      if (deleted) {
+        setState(() {
+          if (isExisting) {
+            _existingImages.removeAt(index);
+          } else {
+            _uploadedImageUrls.removeAt(index);
+          }
+          _deletingImageIndex = null;
+          _isDeletingExisting = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showMaterialBanner(
+            MaterialBanner(
+              content: const Text('Image deleted successfully'),
+              backgroundColor: Colors.orange.shade100,
+              leading: const Icon(Icons.delete_outline, color: Colors.orange),
+              actions: [
+                TextButton(
+                  onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                  child: const Text('DISMISS'),
+                ),
+              ],
+            ),
+          );
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            }
+          });
+        }
+      } else {
+        throw Exception('Failed to delete from Cloudinary');
+      }
+    } catch (e) {
+      print('[DELETE] Error: $e');
+      setState(() {
+        _deletingImageIndex = null;
+        _isDeletingExisting = false;
+      });
+    }
   }
 
   Future<void> _saveItem() async {
@@ -452,18 +558,22 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         'netWeight': double.parse(_weightController.text),
         'numberOfPieces': int.parse(_piecesController.text),
         'weightCategory': _selectedWeightCategory,
+        'weightAccuracy': _selectedWeightAccuracy,
         'huid': _isHallmarked ? _huidController.text : '',
         'description': '',
         'containerId': _selectedContainerId,
         'slotNumber': _selectedSlotNumber,
-        if (widget.item != null) 'keptImages': jsonEncode(_existingImages), // Send kept images
+        // Combine existing and newly uploaded Cloudinary URLs
+        'images': jsonEncode([..._existingImages, ..._uploadedImageUrls]),
       };
 
       bool success;
       if (widget.item != null) {
-        success = await itemProvider.updateItem(widget.item!.id, itemData, _selectedImages);
+        // Pass empty list since images are already in Cloudinary
+        success = await itemProvider.updateItem(widget.item!.id, itemData, []);
       } else {
-        success = await itemProvider.createItem(itemData, _selectedImages);
+        // Pass empty list since images are already in Cloudinary
+        success = await itemProvider.createItem(itemData, []);
       }
 
       if (mounted) {
@@ -670,6 +780,24 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // 3.75 Weight Accuracy
+              _buildDropdown(
+                value: _selectedWeightAccuracy,
+                label: 'Weight Accuracy',
+                icon: Icons.precision_manufacturing_outlined,
+                items: const ['exact', 'approx', 'bulk'],
+                onChanged: (value) {
+                  setState(() => _selectedWeightAccuracy = value!);
+                },
+                translate: false,
+                itemLabels: const {
+                  'exact': 'Exact',
+                  'approx': 'Approximate',
+                  'bulk': 'Bulk',
+                },
+              ),
               const SizedBox(height: 16),
               
               // 4. Hallmark Switch
@@ -733,14 +861,16 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (_existingImages.isNotEmpty || _selectedImages.isNotEmpty)
+              if (_existingImages.isNotEmpty || _uploadedImageUrls.isNotEmpty || _isUploadingImages)
                 SizedBox(
                   height: 100,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
                       // Existing Images
-                      ..._existingImages.map((path) {
+                      ..._existingImages.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final path = entry.value;
                         String imageUrl;
                         if (path.startsWith('http')) {
                           imageUrl = path;
@@ -767,21 +897,38 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                                 ),
                               ),
                             ),
+                            // Loading overlay during deletion
+                            if (_deletingImageIndex == index && _isDeletingExisting)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.black54,
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
                             Positioned(
                               top: 4,
                               right: 12,
                               child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _existingImages.remove(path);
-                                  });
-                                },
+                                onTap: (_deletingImageIndex == index && _isDeletingExisting) 
+                                    ? null 
+                                    : () => _removeImage(index, isExisting: true),
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
+                                  decoration: BoxDecoration(
+                                    color: (_deletingImageIndex == index && _isDeletingExisting) 
+                                        ? Colors.grey 
+                                        : Colors.red,
                                     shape: BoxShape.circle,
-                                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
                                   ),
                                   child: const Icon(Icons.close, size: 14, color: Colors.white),
                                 ),
@@ -791,10 +938,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         );
                       }),
                       
-                      // New Selected Images
-                      ..._selectedImages.asMap().entries.map((entry) {
+                      // Newly Uploaded Images (Cloudinary)
+                      ..._uploadedImageUrls.asMap().entries.map((entry) {
                         final index = entry.key;
-                        final file = entry.value;
+                        final imageUrl = entry.value;
                         return Stack(
                           children: [
                             Container(
@@ -807,22 +954,45 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: kIsWeb 
-                                    ? Image.network(file.path, fit: BoxFit.cover) 
-                                    : Image.file(File(file.path), fit: BoxFit.cover),
+                                child: Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                ),
                               ),
                             ),
+                            // Loading overlay during deletion
+                            if (_deletingImageIndex == index && !_isDeletingExisting)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.black54,
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
                             Positioned(
                               top: 4,
                               right: 12,
                               child: GestureDetector(
-                                onTap: () => _removeImage(index),
+                                onTap: (_deletingImageIndex == index && !_isDeletingExisting) 
+                                    ? null 
+                                    : () => _removeImage(index, isExisting: false),
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
+                                  decoration: BoxDecoration(
+                                    color: (_deletingImageIndex == index && !_isDeletingExisting) 
+                                        ? Colors.grey 
+                                        : Colors.red,
                                     shape: BoxShape.circle,
-                                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
                                   ),
                                   child: const Icon(Icons.close, size: 14, color: Colors.white),
                                 ),
@@ -831,6 +1001,22 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                           ],
                         );
                       }),
+                      
+                      // Upload Progress Indicator
+                      if (_isUploadingImages)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.withOpacity(0.5)),
+                            color: Colors.blue.withOpacity(0.1),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
                     ],
                   ),
                 )
@@ -923,18 +1109,36 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               // 9. Save Button
               Consumer<ItemProvider>(
                 builder: (context, provider, child) {
+                  final bool isDisabled = provider.isLoading || _isUploadingImages;
                   return SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: provider.isLoading ? null : _saveItem,
+                      onPressed: isDisabled ? null : _saveItem,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         elevation: 4,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: provider.isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
+                      child: isDisabled
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _isUploadingImages ? 'UPLOADING IMAGES...' : 'SAVING...',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            )
                           : const Text('SAVE ITEM', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                     ),
                   );
@@ -1081,6 +1285,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     required List<String> items,
     required void Function(String?) onChanged,
     bool translate = true,
+    Map<String, String>? itemLabels,
   }) {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
@@ -1089,12 +1294,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     if (!safeItems.contains(value) && value.isNotEmpty) {
       safeItems.add(value);
     }
-    // If value is empty and items not empty, default to first (should have been handled in initState, but safety net)
+    // If value is empty and items not empty, default to first
     String? safeValue = value;
     if (value.isEmpty && safeItems.isNotEmpty) {
       safeValue = safeItems.first;
     } else if (safeItems.isEmpty) {
-        // Fallback for completely empty lists
         safeItems.add('Default');
         safeValue = 'Default';
     }
@@ -1120,13 +1324,18 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         ),
       ),
       items: safeItems.map((item) {
+        String displayText;
+        if (itemLabels != null && itemLabels.containsKey(item)) {
+          displayText = itemLabels[item]!;
+        } else if (translate) {
+          displayText = _formatText(languageProvider.translate(item));
+        } else {
+          displayText = _formatText(item);
+        }
+        
         return DropdownMenuItem(
           value: item,
-          child: Text(
-            translate 
-                ? _formatText(languageProvider.translate(item)) 
-                : _formatText(item),
-          ),
+          child: Text(displayText),
         );
       }).toList(),
       onChanged: onChanged,

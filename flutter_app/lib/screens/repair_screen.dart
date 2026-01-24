@@ -49,12 +49,6 @@ class _RepairScreenState extends State<RepairScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(languageProvider.translate('repair_items')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadRepairItems,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

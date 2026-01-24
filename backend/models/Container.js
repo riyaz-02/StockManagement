@@ -118,4 +118,20 @@ containerSchema.virtual('reservedSlots').get(function () {
 containerSchema.set('toJSON', { virtuals: true });
 containerSchema.set('toObject', { virtuals: true });
 
+// ======================
+// INDEXES FOR PERFORMANCE
+// ======================
+
+// Index on name for search queries
+containerSchema.index({ name: 1 });
+
+// Index on type for filtering
+containerSchema.index({ type: 1 });
+
+// Compound index for active containers
+containerSchema.index({ isActive: 1, isDeleted: 1 });
+
+// Index for container listing
+containerSchema.index({ isDeleted: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Container', containerSchema);

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Barcode Tags</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: A4;
+      margin: 0.5in;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(10, 0.75in);
+      grid-template-rows: repeat(10, 1.05in);
+      gap: 3px;
+      page-break-after: always;
+    }
+
+    .tag {
+      width: 0.75in;
+      height: 1.05in;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tag-front,
+    .tag-back {
+      width: 100%;
+      height: 0.525in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5px 1.5px 3px 1.5px;
+      position: relative;
+    }
+
+    .tag-front {
+      border-bottom: 0.5px dashed #666;
+    }
+
+    .hallmark {
+      background-color: #ffdb0f;
+    }
+
+    .non-hallmark {
+      background-color: #ADD8E6;
+    }
+
+    .barcode-container {
+      background: white;
+      padding: 1px;
+      border-radius: 1px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 98%;
+    }
+
+    .barcode-container img {
+      width: 100%;
+      height: 20px;
+      object-fit: cover;
+    }
+
+    .barcode-text {
+      font-size: 3pt;
+      font-weight: bold;
+      margin-top: 0.3px;
+      color: #000;
+      white-space: nowrap;
+    }
+
+    .item-name {
+      font-size: 4.5pt;
+      font-weight: normal;
+      text-align: center;
+      color: #000;
+      width: 95%;
+      line-height: 1.0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .weight-box {
+      background: white;
+      padding: 1.5px 3px;
+      border-radius: 1.5px;
+      border: 0.3px solid;
+      margin-top: 1px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+      min-height: 13px;
+      overflow: hidden;
+    }
+
+    .weight-box.hallmark {
+      border-color: #DAA520;
+    }
+
+    .weight-box.non-hallmark {
+      border-color: #4682B4;
+    }
+
+    .weight-value {
+      font-size: 7pt;
+      font-weight: bold;
+      color: #000;
+      white-space: nowrap;
+      line-height: 1.1;
+    }
+
+    .purity-badge {
+      padding: 1.5px 4px;
+      border-radius: 1.5px;
+      margin-top: 2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+      min-height: 11px;
+      overflow: hidden;
+    }
+
+    .purity-badge.hallmark {
+      background-color: #b68303;
+    }
+
+    .purity-badge.non-hallmark {
+      background-color: #2e6ea3;
+    }
+
+    .purity-text {
+      font-size: 5pt;
+      font-weight: bold;
+      color: white;
+      white-space: nowrap;
+      line-height: 1.1;
+      display: block;
+    }
+
+    .huid-badge {
+      padding: 1px 3px;
+      border-radius: 1px;
+      margin-top: 1px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      min-height: 9px;
+      overflow: hidden;
+    }
+
+    .huid-badge.hallmark {
+      background-color: #b68303;
+    }
+
+    .huid-badge.non-hallmark {
+      background-color: #2e6ea3;
+    }
+
+    .huid-text {
+      font-size: 3.5pt;
+      font-weight: bold;
+      color: white;
+      white-space: nowrap;
+      line-height: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  {{TAGS_CONTENT}}
+</body>
+
+</html>

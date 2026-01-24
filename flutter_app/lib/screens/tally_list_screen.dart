@@ -31,7 +31,7 @@ class _TallyListScreenState extends State<TallyListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -43,17 +43,12 @@ class _TallyListScreenState extends State<TallyListScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadTallies,
-          ),
-        ],
       ),
       body: Column(
         children: [
           // Filter Chips
           Container(
+            color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -133,11 +128,11 @@ class _TallyListScreenState extends State<TallyListScreen> {
                 return RefreshIndicator(
                   onRefresh: _loadTallies,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     itemCount: tallyProvider.tallySessions.length,
                     itemBuilder: (context, index) {
                       final tally = tallyProvider.tallySessions[index];
-                      return _buildTallyCard(tally);
+                      return _buildCompactTallyCard(tally);
                     },
                   ),
                 );
@@ -167,29 +162,49 @@ class _TallyListScreenState extends State<TallyListScreen> {
 
   Widget _buildFilterChip(String label, String? status) {
     final isSelected = _filterStatus == status;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
+    return GestureDetector(
+      onTap: () {
         setState(() {
-          _filterStatus = selected ? status : null;
+          _filterStatus = isSelected ? null : status;
         });
         _loadTallies();
       },
-      selectedColor: AppColors.primary,
-      checkmarkColor: Colors.white,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildTallyCard(TallySession tally) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildCompactTallyCard(TallySession tally) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: InkWell(
         onTap: () async {
           await Navigator.push(
@@ -200,43 +215,34 @@ class _TallyListScreenState extends State<TallyListScreen> {
           );
           _loadTallies();
         },
+        onLongPress: () => _showTallyOptions(context, tally),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Row
+              // Header: Date, Status, Progress
               Row(
                 children: [
-                  // Date Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      DateFormat('dd MMM yyyy').format(tally.date),
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                  // Date with year
+                  Text(
+                    DateFormat('dd MMM yyyy').format(tally.date),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // Status Badge
-                  _buildStatusBadge(tally.status),
+                  const SizedBox(width: 8),
+                  // Status badge
+                  _buildCompactStatusBadge(tally.status),
                   const Spacer(),
                   // Progress
                   Text(
                     '${tally.progress}%',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: tally.progress == 100 
                           ? Colors.green 
@@ -245,121 +251,53 @@ class _TallyListScreenState extends State<TallyListScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
 
               // Description
               Text(
                 tally.description,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
                 ),
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
 
-              // Created By
-              if (tally.createdByName != null)
-                Text(
-                  'Created by ${tally.createdByName}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              const SizedBox(height: 12),
-
-              // Metrics Grid
+              // Items count
               Row(
                 children: [
-                  Expanded(
-                    child: _buildMetric(
-                      'Items',
-                      '${tally.scannedItemsCount}/${tally.expectedItems}',
-                      Icons.inventory_2_outlined,
-                      Colors.blue,
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildMetric(
-                      'Gold',
-                      '${tally.scannedGoldWeight.toStringAsFixed(1)}g\n/${tally.expectedGoldWeight.toStringAsFixed(1)}g',
-                      Icons.diamond_outlined,
-                      Colors.amber,
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildMetric(
-                      'Silver',
-                      '${tally.scannedSilverWeight.toStringAsFixed(1)}g\n/${tally.expectedSilverWeight.toStringAsFixed(1)}g',
-                      Icons.circle_outlined,
-                      Colors.grey,
+                  Icon(Icons.inventory_2_outlined, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${tally.scannedItemsCount}/${tally.expectedItems} items',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
 
-              // Out of Stock Count (if any)
-              if (tally.outOfStockCount > 0) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.output_outlined, 
-                                 size: 16, 
-                                 color: Colors.orange),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Out of Stock: ${tally.outOfStockCount}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+              // Metal breakdown - horizontal scrollable cards
+              if (tally.metalData.isNotEmpty)
+                SizedBox(
+                  height: 75,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: tally.metalData.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: EdgeInsets.only(right: index < tally.metalData.length - 1 ? 8 : 0),
+                        child: _buildMetalCard(tally.metalData[index]),
+                      );
+                    },
                   ),
                 ),
-              ],
-
-              // Action Button
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TallyDetailsScreen(tallyId: tally.id),
-                      ),
-                    );
-                    _loadTallies();
-                  },
-                  icon: Icon(
-                    tally.isLocked ? Icons.visibility : Icons.play_arrow,
-                  ),
-                  label: Text(
-                    tally.isLocked ? 'View Details' : 'Continue Scanning',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: tally.isLocked ? Colors.grey[700] : AppColors.primary,
-                    side: BorderSide(
-                      color: tally.isLocked ? Colors.grey[400]! : AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -367,51 +305,203 @@ class _TallyListScreenState extends State<TallyListScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildCompactStatusBadge(String status) {
     Color color;
-    IconData icon;
     String label;
 
     switch (status) {
       case 'active':
         color = Colors.green;
-        icon = Icons.play_circle_outline;
         label = 'Active';
         break;
       case 'locked':
         color = Colors.blue;
-        icon = Icons.lock_outline;
         label = 'Locked';
         break;
       case 'force_locked':
         color = Colors.orange;
-        icon = Icons.lock_clock;
-        label = 'Force Locked';
+        label = 'Force';
         break;
       default:
         color = Colors.grey;
-        icon = Icons.help_outline;
         label = status;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 9,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetalCard(MetalData metal) {
+    Color bgColor;
+    
+    switch (metal.metalType.toLowerCase()) {
+      case 'gold':
+        bgColor = const Color(0xFFE5B80B);
+        break;
+      case 'silver':
+        bgColor = const Color(0xFF9CA3AF);
+        break;
+      case 'platinum':
+        bgColor = const Color(0xFF6B7280);
+        break;
+      default:
+        bgColor = AppColors.primary;
+    }
+
+    final diff = metal.expectedWeight - metal.scannedWeight;
+    final isComplete = diff.abs() < 0.01;
+
+    return Container(
+      width: 130,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: bgColor.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
+          // Circular graphic decoration
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Metal type badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        metal.metalType.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    // Completion checkmark or difference indicator
+                    if (isComplete)
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: diff > 0 
+                              ? Colors.orange.withOpacity(0.3)
+                              : Colors.green.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${diff > 0 ? '-' : '+'}${diff.abs().toStringAsFixed(3)}g',
+                          style: const TextStyle(
+                            fontSize: 7,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                // Weight and items
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Scanned / Total weight
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          metal.scannedWeight.toStringAsFixed(3),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.1,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '/${metal.expectedWeight.toStringAsFixed(3)}g',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Items count
+                    Text(
+                      '${metal.scannedItemCount}/${metal.expectedItemCount} items',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -419,35 +509,93 @@ class _TallyListScreenState extends State<TallyListScreen> {
     );
   }
 
-  Widget _buildMetric(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
+  void _showTallyOptions(BuildContext context, TallySession tally) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Column(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
+      builder: (sheetContext) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                tally.description,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.open_in_new, color: Colors.blue),
+                title: const Text('View Details'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TallyDetailsScreen(tallyId: tally.id),
+                    ),
+                  ).then((_) => _loadTallies());
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _confirmDelete(context, tally);
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
-              height: 1.2,
-            ),
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, TallySession tally) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Tally Session?'),
+        content: Text(
+          'Are you sure you want to permanently delete "${tally.description}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final provider = Provider.of<TallyProvider>(context, listen: false);
+              final success = await provider.deleteTallySession(tally.id);
+              
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tally session deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _loadTallies();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(provider.error ?? 'Failed to delete'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
           ),
         ],
       ),

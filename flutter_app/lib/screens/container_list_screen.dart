@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/container_provider.dart';
 import '../providers/language_provider.dart';
+import '../services/api_service.dart';
+import '../utils/app_colors.dart';
 import '../models/container_model.dart' as models;
 import 'container_view_screen.dart';
 import 'add_container_screen.dart';
@@ -42,20 +44,13 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'Containers',
-          style: TextStyle(
+        title: Text(
+          languageProvider.t('containers'),
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Recycle Bin',
-            onPressed: () => _showRecycleBin(context),
-          ),
-        ],
       ),
       floatingActionButton: Container(
         decoration: BoxDecoration(
@@ -208,7 +203,11 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
                             border: Border.all(color: statusColor.withOpacity(0.3)),
                             image: (container.image != null && container.image!.isNotEmpty)
                                 ? DecorationImage(
-                                    image: NetworkImage('${AppConstants.baseUrl}${container.image}'),
+                                    image: NetworkImage(
+                                      container.image!.startsWith('http') 
+                                        ? container.image! 
+                                        : '${AppConstants.baseUrl}${container.image}'
+                                    ),
                                     fit: BoxFit.cover,
                                   )
                                 : null,
@@ -492,15 +491,5 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
         );
       },
     );
-  }
-
-  void _showRecycleBin(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
-    ).then((_) {
-      // Refresh list when returning from recycle bin
-      _refreshContainers();
-    });
   }
 }

@@ -67,6 +67,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/sounds/
+    - lib/l10n/
   
   # Fonts (optional - using Google Fonts instead)
   # fonts:

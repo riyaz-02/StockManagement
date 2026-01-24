@@ -98,7 +98,9 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
         : widget.container;
         
     final List<String> images = (container.image != null && container.image!.isNotEmpty)
-        ? ['${AppConstants.baseUrl}${container.image}']
+        ? [container.image!.startsWith('http') 
+            ? container.image! 
+            : '${AppConstants.baseUrl}${container.image}']
         : [];
 
     return Scaffold(

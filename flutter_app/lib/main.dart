@@ -9,7 +9,9 @@ import 'providers/item_provider.dart';
 import 'providers/container_provider.dart';
 import 'providers/tally_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/analytics_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/main_navigation_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() {
@@ -37,6 +39,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ContainerProvider()),
         ChangeNotifierProvider(create: (_) => TallyProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
       ],
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, child) {

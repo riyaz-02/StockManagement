@@ -91,6 +91,21 @@ const itemSchema = new mongoose.Schema({
         ref: 'User',
         default: null
     },
+    // Weight accuracy and verification tracking
+    weightAccuracy: {
+        type: String,
+        enum: ['exact', 'approx', 'bulk'],
+        required: true,
+        default: 'exact'
+    },
+    lastVerifiedWeight: {
+        type: Number,
+        default: null
+    },
+    lastVerifiedAt: {
+        type: Date,
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -133,8 +148,14 @@ itemSchema.statics.getTotalWeight = async function (filters = {}) {
     return await this.aggregate(pipeline);
 };
 
-// Index for faster queries
+
+// Comprehensive indexes for faster queries
+// Note: barcode and status already have index:true in schema definition above
 itemSchema.index({ status: 1, containerId: 1 });
 itemSchema.index({ itemType: 1, metalType: 1 });
+itemSchema.index({ metalType: 1, status: 1 }); // For reports and filtering
+itemSchema.index({ containerId: 1, slotNumber: 1 }); // For container views
+itemSchema.index({ createdAt: -1 }); // For sorting by date
+itemSchema.index({ status: 1, createdAt: -1 }); // For filtered lists
 
 module.exports = mongoose.model('Item', itemSchema);

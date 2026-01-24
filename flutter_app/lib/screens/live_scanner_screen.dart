@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../providers/tally_provider.dart';
 import '../utils/app_colors.dart';
+import '../widgets/weight_verification_dialog.dart';
 
 class LiveScannerScreen extends StatefulWidget {
   final String tallyId;
@@ -113,6 +114,7 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
     print('[SCAN] Processing barcode: $barcode');
     print('[SCAN] Current count: $_scannedCount/$_totalItems');
 
+
     final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
     
     try {
@@ -122,6 +124,63 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 
       if (result != null) {
         print('[SCAN] ✓ API returned success for barcode: $barcode');
+        
+        // **WEIGHT VERIFICATION CHECK**
+        final requiresWeightVerification = result['requiresWeightVerification'] ?? false;
+        
+        if (requiresWeightVerification) {
+          print('[SCAN] ⚖️ Weight verification required');
+          final itemData = result['data']?['item'];
+          
+          if (itemData != null) {
+            // Show weight verification dialog
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => WeightVerificationDialog(
+                itemData: itemData,
+                onVerified: (verifiedWeight) async {
+                  try {
+                    // Call API to verify weight
+                    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+                    await tallyProvider.verifyTallyWeight(
+                      widget.tallyId,
+                      itemData['_id'],
+                      verifiedWeight,
+                    );
+                    
+                    // Close dialog
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                    
+                    // Reload tally
+                    await _loadTallyInfo();
+                    
+                    // Show success feedback
+                    _playSound('success');
+                    HapticFeedback.lightImpact();
+                  } catch (e) {
+                    print('[SCAN] Weight verification error: $e');
+                    // Show error
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to verify weight: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+            );
+          }
+          
+          setState(() => _isProcessing = false);
+          return;
+        }
+        
         final isOutOfStock = result['isOutOfStock'] ?? false;
         
         // Play success sound and vibration

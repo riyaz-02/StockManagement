@@ -275,7 +275,35 @@ exports.scanItem = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Item already scanned in this tally session',
+                isDuplicate: true,
                 data: { item }
+            });
+        }
+
+        // **CHECK 3.5**: Check if weight verification is required
+        console.log(`[SCAN] Item weightAccuracy: "${item.weightAccuracy}" (type: ${typeof item.weightAccuracy})`);
+        const requiresWeightVerification = item.weightAccuracy && item.weightAccuracy !== 'exact';
+        console.log(`[SCAN] requiresWeightVerification: ${requiresWeightVerification}`);
+
+        if (requiresWeightVerification) {
+            console.log(`[SCAN] Item ${item._id} requires weight verification (${item.weightAccuracy})`);
+            // Return item details for weight verification popup
+            return res.status(200).json({
+                success: true,
+                requiresWeightVerification: true,
+                weightAccuracy: item.weightAccuracy,
+                message: 'Weight verification required',
+                data: {
+                    item: {
+                        _id: item._id,
+                        barcode: item.barcode,
+                        name: item.name,
+                        metalType: item.metalType,
+                        netWeight: item.netWeight,
+                        lastVerifiedWeight: item.lastVerifiedWeight,
+                        weightAccuracy: item.weightAccuracy
+                    }
+                }
             });
         }
 
@@ -421,6 +449,158 @@ exports.scanItem = async (req, res) => {
         });
     }
 };
+
+// @desc    Verify weight for approx/bulk items during tally
+// @route   PUT /api/tally/:id/verify-weight
+// @access  Private/Staff/Admin
+exports.verifyWeight = async (req, res) => {
+    try {
+        const { itemId, verifiedWeight } = req.body;
+
+        if (!itemId || !verifiedWeight) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide itemId and verifiedWeight'
+            });
+        }
+
+        // Validate weight is positive
+        if (verifiedWeight <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Weight must be greater than zero'
+            });
+        }
+
+        const tallySession = await TallySession.findById(req.params.id);
+
+        if (!tallySession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        // Check if tally is locked
+        if (tallySession.status === 'locked' || tallySession.status === 'force_locked') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tally session is locked. Cannot verify weight.'
+            });
+        }
+
+        // Find item
+        const item = await Item.findById(itemId);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Check if item already scanned
+        if (tallySession.isItemScanned(item._id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item already scanned in this tally session'
+            });
+        }
+
+        console.log(`[VERIFY WEIGHT] Item ${item._id}: ${item.netWeight}g → ${verifiedWeight}g`);
+
+        // Update item weight and verification tracking
+        item.netWeight = verifiedWeight;
+        item.lastVerifiedWeight = verifiedWeight;
+        item.lastVerifiedAt = new Date();
+        await item.save();
+
+        // Determine if item is out of stock
+        const outOfStockStatuses = ['repair', 'in_repair', 'UNDER_REPAIR',
+            'temporarily_removed', 'WITH_CUSTOMER',
+            'WITH_AGENT', 'sold'];
+        const isOutOfStock = outOfStockStatuses.includes(item.status);
+
+        // Mark item as scanned in items array
+        const itemInTally = tallySession.items.find(
+            i => i.itemId.toString() === item._id.toString()
+        );
+        if (itemInTally) {
+            itemInTally.isScanned = true;
+        }
+
+        // Update metalData array
+        if (!isOutOfStock) {
+            const metalType = item.metalType.toLowerCase();
+            const metalDataEntry = tallySession.metalData.find(
+                md => md.metalType.toLowerCase() === metalType
+            );
+
+            if (metalDataEntry) {
+                metalDataEntry.scannedWeight += verifiedWeight;
+                metalDataEntry.scannedItemCount += 1;
+            }
+        }
+
+        // Add to scanned items tracking
+        tallySession.scannedItemIds.push(item._id);
+        tallySession.scannedItemDetails.push({
+            itemId: item._id,
+            scannedAt: new Date(),
+            scannedBy: req.user.id,
+            status: isOutOfStock ? 'out_of_stock' : 'in_stock',
+            weight: verifiedWeight,
+            weightAccuracy: item.weightAccuracy,
+            metalType: item.metalType
+        });
+
+        // Update counters
+        tallySession.scannedItemsCount += 1;
+
+        if (isOutOfStock) {
+            tallySession.outOfStockCount += 1;
+        } else {
+            // Add weight only for in-stock items
+            if (item.metalType.toLowerCase() === 'gold') {
+                tallySession.scannedGoldWeight += verifiedWeight;
+            } else if (item.metalType.toLowerCase() === 'silver') {
+                tallySession.scannedSilverWeight += verifiedWeight;
+            }
+        }
+
+        // Save tally session
+        await tallySession.save();
+
+        // Calculate progress
+        const progress = tallySession.getProgress();
+
+        console.log(`[VERIFY WEIGHT] SUCCESS: Item ${item._id} verified at ${verifiedWeight}g. Progress: ${tallySession.scannedItemsCount}/${tallySession.expectedItems}`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Weight verified and item scanned successfully',
+            data: {
+                item,
+                verifiedWeight,
+                scannedCount: tallySession.scannedItemsCount,
+                expectedCount: tallySession.expectedItems,
+                progress,
+                scannedGoldWeight: tallySession.scannedGoldWeight,
+                expectedGoldWeight: tallySession.expectedGoldWeight,
+                scannedSilverWeight: tallySession.scannedSilverWeight,
+                expectedSilverWeight: tallySession.expectedSilverWeight,
+                outOfStockCount: tallySession.outOfStockCount
+            }
+        });
+    } catch (error) {
+        console.error('Verify weight error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while verifying weight'
+        });
+    }
+};
+
 
 // @desc    Lock tally session
 // @route   PUT /api/tally/:id/lock
@@ -600,6 +780,37 @@ exports.getTallyItems = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while fetching tally items'
+        });
+    }
+};
+
+// @desc    Delete tally session
+// @route   DELETE /api/tally/:id
+// @access  Private/Admin
+exports.deleteTally = async (req, res) => {
+    try {
+        const tally = await TallySession.findById(req.params.id);
+
+        if (!tally) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        // Permanently delete the tally session
+        await TallySession.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            success: true,
+            message: 'Tally session deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting tally:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting tally session',
+            error: error.message
         });
     }
 };

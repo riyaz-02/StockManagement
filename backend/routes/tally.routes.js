@@ -5,9 +5,11 @@ const {
     getTallySessions,
     getTallySession,
     scanItem,
+    verifyWeight,
     lockTally,
     getTallyReport,
-    getTallyItems
+    getTallyItems,
+    deleteTally
 } = require('../controllers/tallyController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -23,6 +25,8 @@ router.get('/:id/items', getTallyItems);
 // Staff and Admin routes
 router.post('/', authorize('admin', 'staff'), createTally);
 router.put('/:id/scan', authorize('admin', 'staff'), scanItem);
+router.put('/:id/verify-weight', authorize('admin', 'staff'), verifyWeight);
 router.put('/:id/lock', authorize('admin', 'staff'), lockTally);
+router.delete('/:id', authorize('admin'), deleteTally);
 
 module.exports = router;

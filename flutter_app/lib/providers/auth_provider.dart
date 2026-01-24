@@ -92,12 +92,31 @@ class AuthProvider with ChangeNotifier {
           role: _user!.role,
           language: language,
           mobile: _user!.mobile,
+          profileImage: _user!.profileImage,
           createdAt: _user!.createdAt,
         );
         await _storage.saveUser(_user!.toJson());
         notifyListeners();
       }
       return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Refresh user data from server
+  Future<bool> refreshUser() async {
+    if (_user == null) return false;
+    
+    try {
+      final response = await _apiService.getUser(_user!.id);
+      if (response['success'] == true) {
+        _user = User.fromJson(response['data']['user']);
+        await _storage.saveUser(response['data']['user']);
+        notifyListeners();
+        return true;
+      }
+      return false;
     } catch (e) {
       return false;
     }

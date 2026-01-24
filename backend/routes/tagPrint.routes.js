@@ -4,7 +4,8 @@ const { protect } = require('../middleware/auth');
 const {
     getItemsForTagPrinting,
     recordTagPrint,
-    getTagPrintHistory
+    getTagPrintHistory,
+    generateTagsPDF
 } = require('../controllers/tagPrintController');
 
 // All routes require authentication
@@ -18,5 +19,8 @@ router.post('/record', recordTagPrint);
 
 // Get tag print history for an item
 router.get('/history/:itemId', getTagPrintHistory);
+
+// Generate PDF for selected items
+router.post('/generate-pdf', generateTagsPDF);
 
 module.exports = router;

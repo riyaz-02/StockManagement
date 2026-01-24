@@ -13,7 +13,7 @@ const {
     permanentDeleteItem
 } = require('../controllers/itemController');
 const { protect, authorize } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const cloudinaryUpload = require('../middleware/cloudinaryUpload');
 
 // All routes require authentication
 router.use(protect);
@@ -24,8 +24,8 @@ router.get('/barcode/:code', getItemByBarcode);
 router.get('/:id', getItem);
 
 // Staff and Admin routes
-router.post('/', authorize('admin', 'staff'), upload.array('images', 5), createItem);
-router.put('/:id', authorize('admin', 'staff'), upload.array('images', 5), updateItem);
+router.post('/', authorize('admin', 'staff'), cloudinaryUpload.array('images', 5), createItem);
+router.put('/:id', authorize('admin', 'staff'), cloudinaryUpload.array('images', 5), updateItem);
 router.put('/:id/sell', authorize('admin', 'staff'), sellItem);
 router.put('/:id/remove-temporarily', authorize('admin', 'staff'), removeTemporarily);
 

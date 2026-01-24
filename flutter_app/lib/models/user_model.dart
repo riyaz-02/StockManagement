@@ -4,6 +4,7 @@ class User {
   final String role;
   final String language;
   final String mobile;
+  final String? profileImage;
   final DateTime createdAt;
 
   User({
@@ -12,6 +13,7 @@ class User {
     required this.role,
     required this.language,
     required this.mobile,
+    this.profileImage,
     required this.createdAt,
   });
 
@@ -22,6 +24,7 @@ class User {
       role: json['role'] ?? 'staff',
       language: json['language'] ?? 'en',
       mobile: json['mobile'] ?? '',
+      profileImage: json['profileImage'],
       createdAt: json['createdAt'] != null 
           ? DateTime.parse(json['createdAt']) 
           : DateTime.now(),
@@ -35,6 +38,7 @@ class User {
       'role': role,
       'language': language,
       'mobile': mobile,
+      if (profileImage != null) 'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
     };
   }

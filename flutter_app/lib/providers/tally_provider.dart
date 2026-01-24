@@ -134,19 +134,65 @@ class TallyProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      print('[PROVIDER] 📡 Calling API scanItemInTally for barcode: $barcode');
       final response = await _apiService.scanItemInTally(tallyId, barcode);
       
+      print('[PROVIDER] 📥 API Response: $response');
+      print('[PROVIDER] 🔍 Response success: ${response['success']}');
+      print('[PROVIDER] 🔍 Response requiresWeightVerification: ${response['requiresWeightVerification']}');
+      
       if (response['success'] == true) {
-        // Refresh current tally to get updated counts
+        // Check if weight verification is required
+        if (response['requiresWeightVerification'] == true) {
+          print('[PROVIDER] ⚖️ WEIGHT VERIFICATION REQUIRED - returning full response');
+          // Don't refresh tally yet - wait for weight verification
+          return response; // Return full response with requiresWeightVerification flag
+        }
+        
+        print('[PROVIDER] ✅ Normal scan - refreshing tally');
+        // For normal scans, refresh tally to get updated counts
         await fetchTallySession(tallyId);
-        return response['data'];
+        return response;
+      } else {
+        print('[PROVIDER] ❌ API returned success=false');
       }
     } catch (e) {
+      print('[PROVIDER] ❌ Exception: $e');
       _error = e.toString().replaceAll('Exception: ', '');
       notifyListeners();
     }
 
     return null;
+  }
+
+  // Verify weight for approx/bulk items during tally
+  Future<bool> verifyTallyWeight(String tallyId, String itemId, double verifiedWeight) async {
+    _error = null;
+    notifyListeners();
+
+    try {
+      print('[PROVIDER] 📡 Calling verifyTallyWeight for item: $itemId, weight: $verifiedWeight');
+      final response = await _apiService.verifyTallyWeight(tallyId, itemId, verifiedWeight);
+      
+      print('[PROVIDER] 📥 Verify weight response: $response');
+      
+      if (response['success'] == true) {
+        print('[PROVIDER] ✅ Weight verified successfully');
+        // Refresh tally to get updated data
+        await fetchTallySession(tallyId);
+        return true;
+      } else {
+        print('[PROVIDER] ❌ Weight verification failed');
+        _error = response['message'] ?? 'Failed to verify weight';
+        notifyListeners();
+      }
+    } catch (e) {
+      print('[PROVIDER] ❌ Exception during weight verification: $e');
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+    }
+
+    return false;
   }
 
   // Lock tally
@@ -221,5 +267,32 @@ class TallyProvider with ChangeNotifier {
     _currentTally = null;
     _error = null;
     notifyListeners();
+  }
+
+  // Delete tally session
+  Future<bool> deleteTallySession(String id) async {
+    _error = null;
+    
+    try {
+      final response = await _apiService.deleteTallySession(id);
+      if (response['success'] == true) {
+        // Remove from local list
+        _tallySessions.removeWhere((t) => t.id == id);
+        
+        // Clear current tally if it was deleted
+        if (_currentTally?.id == id) {
+          _currentTally = null;
+        }
+        
+        notifyListeners();
+        return true;
+      }
+      _error = response['message'] ?? 'Failed to delete tally session';
+      return false;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 }

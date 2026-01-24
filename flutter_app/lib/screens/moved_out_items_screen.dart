@@ -70,12 +70,6 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMovedOutItems,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

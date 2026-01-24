@@ -30,6 +30,10 @@ const userSchema = new mongoose.Schema({
         minlength: 6,
         select: false
     },
+    profileImage: {
+        type: String,
+        default: null
+    },
     isActive: {
         type: Boolean,
         default: true
@@ -37,8 +41,29 @@ const userSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
     }
 });
+
+// ======================
+// INDEXES FOR PERFORMANCE
+// ======================
+
+// Index on mobile for login queries
+userSchema.index({ mobile: 1 });
+
+// Index on role for authorization queries
+userSchema.index({ role: 1 });
+
+// Compound index for active users by role
+userSchema.index({ isActive: 1, role: 1 });
+
+// ======================
+// METHODS
+// ======================
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
@@ -48,6 +73,7 @@ userSchema.pre('save', async function (next) {
 
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    this.updatedAt = Date.now();
     next();
 });
 

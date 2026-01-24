@@ -238,7 +238,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
 
     print('[TALLY DETAILS] Opening scanner...');
     
-    // Navigate to live scanner screen
+    // Navigate to live scanner screen (with weight verification support)
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => LiveScannerScreen(tallyId: widget.tallyId),
@@ -349,39 +349,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
             ),
           ),
 
-          // SCAN/TYPE INPUT SECTION
-          if (!isLocked)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: TextField(
-                controller: _barcodeController,
-                focusNode: _focusNode,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: '🔍 Tap to Scan / Type Barcode',
-                  hintStyle: const TextStyle(fontSize: 13),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code_scanner, size: 20),
-                    onPressed: _openFullScreenScanner,
-                  ),
-                ),
-                onTap: _openFullScreenScanner,
-                readOnly: true,
-                onSubmitted: _processScan,
-              ),
-            ),
+
 
           // SCROLLABLE CONTENT
           Expanded(
@@ -598,36 +566,32 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     
     // If metalData is available, use it; otherwise fall back to legacy fields
     if (_tally!.metalData.isNotEmpty) {
-      for (var metalData in _tally!.metalData) {
+      for (int i = 0; i < _tally!.metalData.length; i++) {
+        final metalData = _tally!.metalData[i];
         cards.add(
-          SizedBox(
-            width: (MediaQuery.of(context).size.width - 32) / 2 - 4,
-            child: _buildMetalCard(
-              metalData.metalType,
-              metalData.scannedWeight,
-              metalData.expectedWeight,
-              _getMetalColor(metalData.metalType),
-              _getMetalIcon(metalData.metalType),
-            ),
+          _buildMetalCard(
+            metalData.metalType,
+            metalData.scannedWeight,
+            metalData.expectedWeight,
+            _getMetalColor(metalData.metalType),
+            _getMetalIcon(metalData.metalType),
           ),
         );
       }
     } else {
       // Fallback to legacy gold/silver display
-      for (var metal in _metalTypes) {
+      for (int i = 0; i < _metalTypes.length; i++) {
+        final metal = _metalTypes[i];
         final scanned = _getMetalWeight(metal, true);
         final expected = _getMetalWeight(metal, false);
         
         cards.add(
-          SizedBox(
-            width: (MediaQuery.of(context).size.width - 32) / 2 - 4,
-            child: _buildMetalCard(
-              metal,
-              scanned,
-              expected,
-              _getMetalColor(metal),
-              _getMetalIcon(metal),
-            ),
+          _buildMetalCard(
+            metal,
+            scanned,
+            expected,
+            _getMetalColor(metal),
+            _getMetalIcon(metal),
           ),
         );
       }
@@ -687,9 +651,6 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     Color color,
     IconData icon,
   ) {
-    final diff = expected - scanned;
-    final diffColor = diff.abs() < 0.01 ? Colors.green : Colors.red;
-    
     // Capitalize first letter for display
     final displayName = label[0].toUpperCase() + label.substring(1);
     
@@ -706,86 +667,166 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       expectedItemCount = metalData.expectedItemCount;
     }
 
+    // Calculate difference
+    final diff = expected - scanned;
+    final isComplete = diff.abs() < 0.01;
+
+    // Determine background color based on metal type
+    Color bgColor;
+    
+    switch (label.toLowerCase()) {
+      case 'gold':
+        bgColor = const Color(0xFFE5B80B); // Balanced gold color
+        break;
+      case 'silver':
+        bgColor = const Color(0xFF9CA3AF); // Lighter silver gray
+        break;
+      case 'platinum':
+        bgColor = const Color(0xFF6B7280); // Platinum gray
+        break;
+      default:
+        bgColor = color;
+    }
+
     return Container(
-      height: 85, // Fixed height for uniformity
-      padding: const EdgeInsets.all(10),
+      height: 110,
+      width: 180,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: bgColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          // Header: Icon + Name
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(
-                displayName,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
+          // Circular graphic decoration - larger
+          Positioned(
+            right: -35,
+            bottom: -35,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
               ),
-            ],
+            ),
           ),
-          
-          // Weight: Scanned / Expected
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                scanned.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              Text(
-                ' / ${expected.toStringAsFixed(1)}g',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          
-          // Items: Scanned / Total
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Items: $scannedItemCount/$expectedItemCount',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (diff.abs() > 0.01)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: diffColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${diff > 0 ? '-' : '+'}${diff.abs().toStringAsFixed(1)}g',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: diffColor,
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Metal type badge and difference
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        label.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
                     ),
-                  ),
+                    // Completion checkmark or difference indicator
+                    if (isComplete)
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: diff > 0 
+                              ? Colors.orange.withOpacity(0.3)
+                              : Colors.green.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${diff > 0 ? '-' : '+'}${diff.abs().toStringAsFixed(3)}g',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
+                // Weight and items details
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Scanned / Total weight
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          scanned.toStringAsFixed(3),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.1,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          ' / ${expected.toStringAsFixed(3)} g',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Items count
+                    Text(
+                      '$scannedItemCount / $expectedItemCount items',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

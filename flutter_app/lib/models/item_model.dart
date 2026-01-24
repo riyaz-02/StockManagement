@@ -8,11 +8,14 @@ class Item {
   final String purity;
   final double netWeight;
   final String weightCategory;
+  final String weightAccuracy;
+  final double? lastVerifiedWeight;
+  final DateTime? lastVerifiedAt;
   final String huid;
   final List<String> images;
   final String status;
   final String? containerName; 
-  final String? containerCode; // Add containerCode
+  final String? containerCode;
   final String? containerId;
   final int? slotNumber;
   final int numberOfPieces;
@@ -34,12 +37,15 @@ class Item {
     required this.purity,
     required this.netWeight,
     this.weightCategory = 'Light',
+    this.weightAccuracy = 'exact',
+    this.lastVerifiedWeight,
+    this.lastVerifiedAt,
     this.huid = '',
     this.images = const [],
     this.status = 'active',
     this.containerId,
     this.containerName,
-    this.containerCode, // Add to constructor
+    this.containerCode,
     this.slotNumber,
     this.numberOfPieces = 1,
     this.slotReserved = false,
@@ -62,6 +68,11 @@ class Item {
       purity: json['purity'] ?? '',
       netWeight: (json['netWeight'] ?? 0).toDouble(),
       weightCategory: json['weightCategory'] ?? 'Light',
+      weightAccuracy: json['weightAccuracy'] ?? 'exact',
+      lastVerifiedWeight: json['lastVerifiedWeight']?.toDouble(),
+      lastVerifiedAt: json['lastVerifiedAt'] != null
+          ? DateTime.parse(json['lastVerifiedAt'])
+          : null,
       huid: json['huid'] ?? '',
       images: List<String>.from(json['images'] ?? []),
       status: json['status'] ?? 'active',
@@ -73,7 +84,7 @@ class Item {
           : null,
       containerCode: json['containerId'] is Map 
           ? json['containerId']['qrCode'] 
-          : null, // Parse qrCode
+          : null,
       slotNumber: json['slotNumber'],
       numberOfPieces: json['numberOfPieces'] ?? 1,
       slotReserved: json['slotReserved'] ?? false,
@@ -105,6 +116,9 @@ class Item {
       'purity': purity,
       'netWeight': netWeight,
       'weightCategory': weightCategory,
+      'weightAccuracy': weightAccuracy,
+      'lastVerifiedWeight': lastVerifiedWeight,
+      'lastVerifiedAt': lastVerifiedAt?.toIso8601String(),
       'huid': huid,
       'images': images,
       'status': status,

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../models/item_model.dart';
 import '../providers/item_provider.dart';
 import '../providers/language_provider.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'item_details_screen.dart';
@@ -10,7 +13,9 @@ import 'recycle_bin_screen.dart';
 import 'moved_out_items_screen.dart';
 
 class ItemListScreen extends StatefulWidget {
-  const ItemListScreen({super.key});
+  final String? initialStatus;
+  
+  const ItemListScreen({super.key, this.initialStatus});
 
   @override
   State<ItemListScreen> createState() => _ItemListScreenState();
@@ -22,6 +27,10 @@ class _ItemListScreenState extends State<ItemListScreen> {
   @override
   void initState() {
     super.initState();
+    // Apply initial status filter if provided
+    if (widget.initialStatus != null) {
+      _statusFilter = widget.initialStatus!;
+    }
     _loadItems();
   }
 
@@ -46,11 +55,26 @@ class _ItemListScreenState extends State<ItemListScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'Items',
-          style: TextStyle(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Pop if we can (navigated here from another screen)
+            // Otherwise, the WillPopScope in MainNavigationScreen will handle it
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // Trigger back button behavior which MainNavigationScreen will catch
+              Navigator.maybePop(context);
+            }
+          },
+        ),
+        title: Consumer<LanguageProvider>(
+          builder: (context, languageProvider, child) => Text(
+            languageProvider.t('items'),
+            style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 20,
+          ),
           ),
         ),
         actions: [
@@ -63,20 +87,6 @@ class _ItemListScreenState extends State<ItemListScreen> {
                 MaterialPageRoute(builder: (_) => const MovedOutItemsScreen()),
               ).then((_) => _loadItems());
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Recycle Bin',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
-              ).then((_) => _loadItems());
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadItems,
           ),
         ],
       ),
@@ -227,10 +237,21 @@ class _ItemListScreenState extends State<ItemListScreen> {
                 child: ClipRRect(
                    borderRadius: BorderRadius.circular(12),
                    child: imageUrl != null 
-                       ? Image.network(
-                           imageUrl, 
+                       ? CachedNetworkImage(
+                           imageUrl: imageUrl,
                            fit: BoxFit.cover,
-                           errorBuilder: (_,__,___) => Icon(Icons.broken_image, color: statusColor),
+                           memCacheWidth: 200,
+                           maxWidthDiskCache: 400,
+                           placeholder: (context, url) => Center(
+                             child: CircularProgressIndicator(
+                               strokeWidth: 2,
+                               valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                             ),
+                           ),
+                           errorWidget: (context, url, error) => Icon(
+                             Icons.broken_image,
+                             color: statusColor,
+                           ),
                          )
                        : Icon(Icons.diamond_outlined, size: 30, color: statusColor),
                 ),

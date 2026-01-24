@@ -195,7 +195,11 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          // Navigate to home by triggering back button behavior
+                          // which will be caught by WillPopScope in MainNavigationScreen
+                          Navigator.of(context).maybePop();
+                        },
                       ),
                       const Expanded(
                         child: Text(

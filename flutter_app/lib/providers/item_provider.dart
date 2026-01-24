@@ -25,7 +25,19 @@ class ItemProvider with ChangeNotifier {
     try {
       Map<String, String>? queryParams = filters;
       if (status != null) {
-        queryParams = {...?filters, 'status': status};
+        // Map frontend status to backend status values
+        String backendStatus = status;
+        
+        // Handle special cases where one frontend status maps to multiple backend statuses
+        if (status == 'in_repair') {
+          // Include both in_repair and UNDER_REPAIR statuses
+          backendStatus = 'in_repair,UNDER_REPAIR';
+        } else if (status == 'out_of_stock') {
+          // Map out_of_stock to temporarily_removed
+          backendStatus = 'temporarily_removed';
+        }
+        
+        queryParams = {...?filters, 'status': backendStatus};
       }
       final response = await _apiService.getItems(queryParams: queryParams);
       if (response['success'] == true) {

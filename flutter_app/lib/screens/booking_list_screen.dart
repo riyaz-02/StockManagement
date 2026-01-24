@@ -56,6 +56,16 @@ class _BookingListScreenState extends State<BookingListScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1A1A),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.maybePop(context);
+            }
+          },
+        ),
         title: Text(
           languageProvider.translate('bookings'),
           style: const TextStyle(
@@ -63,12 +73,6 @@ class _BookingListScreenState extends State<BookingListScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadBookings,
-          ),
-        ],
       ),
       body: Column(
         children: [

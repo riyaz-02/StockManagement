@@ -22,26 +22,44 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _timer;
   DateTime _currentTime = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    WidgetsBinding.instance.addObserver(this);
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTimer();
+      setState(() => _currentTime = DateTime.now());
+    } else if (state == AppLifecycleState.paused) {
+      _timer?.cancel();
+    }
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    // Update every minute instead of every second for battery optimization
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {
           _currentTime = DateTime.now();
         });
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -180,15 +198,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Text(
-                                                'Welcome ${user?.name ?? 'User'}',
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFF1A1A1A),
+                                              Consumer<LanguageProvider>(
+                                                builder: (context, languageProvider, child) => Text(
+                                                  '${languageProvider.t('welcome_back')} ${user?.name ?? 'User'}',
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1A1A1A),
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1,
                                               ),
                                               const SizedBox(height: 1),
                                               FittedBox(
@@ -222,13 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.settings_outlined, color: Colors.grey[700], size: 24),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsMenuScreen()),
-                ),
-              ),
-              IconButton(
                 icon: const Icon(Icons.logout, color: Color(0xFFE94560), size: 24),
                 onPressed: () async {
                   await authProvider.logout();
@@ -260,94 +273,117 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                  // Feature Cards Grid
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Adjust aspect ratio based on screen width
-                      final aspectRatio = constraints.maxWidth < 340 ? 0.95 : 1.1;
-                      return GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: aspectRatio,
+                  // Feature Cards Grid - Auto-sizing based on content
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
                     children: [
-                      _ElegantCard(
-                        icon: Icons.qr_code_scanner,
-                        title: 'Scan',
-                        description: 'Scan Barcode',
-                        primaryColor: const Color(0xFFFF6B9D),
-                        secondaryColor: const Color(0xFFFF6B9D), // Assuming a single color for now, or adjust as needed
-                        onTap: () {
-                          Navigator.push(
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2, // Half width minus padding
+                        child: Consumer<LanguageProvider>(
+                          builder: (context, languageProvider, child) => _ElegantCard(
+                            icon: Icons.qr_code_scanner,
+                            title: languageProvider.t('scan_item'),
+                            description: languageProvider.t('scan_barcode'),
+                            primaryColor: const Color(0xFFFF6B9D),
+                            secondaryColor: const Color(0xFFFF6B9D),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const GeneralScanScreen()),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: Consumer<LanguageProvider>(
+                          builder: (context, languageProvider, child) => _ElegantCard(
+                            icon: Icons.inventory_2_rounded,
+                            title: languageProvider.t('items'),
+                            description: languageProvider.t('view_all_items'),
+                            primaryColor: const Color(0xFF11998E),
+                            secondaryColor: const Color(0xFF38EF7D),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ItemListScreen()),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: Consumer<LanguageProvider>(
+                          builder: (context, languageProvider, child) => _ElegantCard(
+                            icon: Icons.widgets_rounded,
+                            title: languageProvider.t('containers'),
+                            description: languageProvider.t('manage_storage'),
+                            primaryColor: const Color(0xFF8E2DE2),
+                            secondaryColor: const Color(0xFF4A00E0),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ContainerListScreen()),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: Consumer<LanguageProvider>(
+                          builder: (context, languageProvider, child) => _ElegantCard(
+                            icon: Icons.assessment_rounded,
+                            title: languageProvider.t('start_tally'),
+                            description: languageProvider.t('verify_inventory'),
+                            primaryColor: const Color(0xFFFF6B6B),
+                            secondaryColor: const Color(0xFFEE5A6F),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const TallyListScreen()),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: Consumer<LanguageProvider>(
+                          builder: (context, languageProvider, child) => _ElegantCard(
+                            icon: Icons.receipt_long_rounded,
+                            title: languageProvider.t('bookings'),
+                            description: languageProvider.t('customer_orders'),
+                            primaryColor: const Color(0xFF00C9FF),
+                            secondaryColor: const Color(0xFF92FE9D),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const BookingListScreen()),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: _ElegantCard(
+                          icon: Icons.analytics_rounded,
+                          title: 'Reports',
+                          description: 'Analytics & insights',
+                          primaryColor: const Color(0xFFF093FB),
+                          secondaryColor: const Color(0xFFF5576C),
+                          onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const GeneralScanScreen()),
-                          );
-                        },
-                      ),
-                      _ElegantCard(
-                        icon: Icons.inventory_2_rounded,
-                        title: 'Inventory',
-                        description: 'View all items',
-                        primaryColor: const Color(0xFF11998E),
-                        secondaryColor: const Color(0xFF38EF7D),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ItemListScreen()),
-                        ),
-                      ),
-                      _ElegantCard(
-                        icon: Icons.widgets_rounded,
-                        title: 'Containers',
-                        description: 'Manage storage',
-                        primaryColor: const Color(0xFFEE0979),
-                        secondaryColor: const Color(0xFFFF6A00),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ContainerListScreen()),
-                        ),
-                      ),
-                      _ElegantCard(
-                        icon: Icons.fact_check_rounded,
-                        title: 'Stock Tally',
-                        description: 'Verify inventory',
-                        primaryColor: const Color(0xFFF093FB),
-                        secondaryColor: const Color(0xFFF5576C),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TallyListScreen()),
-                        ),
-                      ),
-                      _ElegantCard(
-                        icon: Icons.event_note_rounded,
-                        title: 'Bookings',
-                        description: 'Customer orders',
-                        primaryColor: const Color(0xFF4FACFE),
-                        secondaryColor: const Color(0xFF00F2FE),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const BookingListScreen()),
-                        ),
-                      ),
-                      _ElegantCard(
-                        icon: Icons.analytics_rounded,
-                        title: 'Reports',
-                        description: 'Analytics & insights',
-                        primaryColor: const Color(0xFF43E97B),
-                        secondaryColor: const Color(0xFF38F9D7),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                            MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                          ),
                         ),
                       ),
                     ],
-                  );
-                },
-              ),
+                  ),
                 ],
               ),
             ),
+          ),
+          
+          // Bottom padding for navigation bar
+          SliverPadding(
+            padding: const EdgeInsets.only(bottom: 70),
           ),
         ],
       ),
@@ -458,67 +494,99 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                 ),
                 
                 // Content
-                Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Icon with gradient
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [widget.primaryColor, widget.secondaryColor],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: widget.primaryColor.withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          widget.icon,
-                          color: Colors.white,
-                          size: 26,
-                        ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Calculate responsive sizes based on card width
+                    final cardWidth = constraints.maxWidth;
+                    final isSmallScreen = cardWidth < 170;
+                    
+                    // Responsive sizes - more aggressive reduction for small screens
+                    final padding = isSmallScreen ? 8.0 : 14.0;
+                    final iconSize = isSmallScreen ? 36.0 : 46.0;
+                    final iconRadius = isSmallScreen ? 9.0 : 12.0;
+                    final iconInnerSize = isSmallScreen ? 18.0 : 24.0;
+                    final spacingAfterIcon = isSmallScreen ? 6.0 : 10.0;
+                    final titleFontSize = isSmallScreen ? 13.0 : 15.5;
+                    final spacingAfterTitle = isSmallScreen ? 2.0 : 3.0;
+                    final descriptionFontSize = isSmallScreen ? 9.5 : 11.0;
+                    
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        padding + 4, // Extra left padding
+                        padding,
+                        padding,
+                        padding,
                       ),
-                      const SizedBox(height: 14),
-                      
-                      // Title
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A1A),
-                          letterSpacing: -0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: LayoutBuilder(
+                        builder: (context, innerConstraints) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              // Icon with gradient
+                              Container(
+                                width: iconSize,
+                                height: iconSize,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [widget.primaryColor, widget.secondaryColor],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(iconRadius),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: widget.primaryColor.withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  widget.icon,
+                                  color: Colors.white,
+                                  size: iconInnerSize,
+                                ),
+                              ),
+                              SizedBox(height: spacingAfterIcon),
+                              
+                              // Title - flexible to prevent overflow
+                              Flexible(
+                                child: Text(
+                                  widget.title,
+                                  style: TextStyle(
+                                    fontSize: titleFontSize,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1A1A1A),
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              SizedBox(height: spacingAfterTitle),
+                              
+                              // Description - flexible to prevent overflow
+                              Flexible(
+                                child: Text(
+                                  widget.description,
+                                  style: TextStyle(
+                                    fontSize: descriptionFontSize,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                      const SizedBox(height: 4),
-                      
-                      // Description
-                      Text(
-                        widget.description,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ],
             ),

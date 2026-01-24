@@ -574,6 +574,19 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // Verify weight for approx/bulk items during tally
+  Future<Map<String, dynamic>> verifyTallyWeight(String tallyId, String itemId, double verifiedWeight) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/verify-weight'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'itemId': itemId,
+        'verifiedWeight': verifiedWeight,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
   // Lock tally session
   Future<Map<String, dynamic>> lockTally(String tallyId, {String? remarks}) async {
     final response = await http.put(
@@ -588,6 +601,26 @@ class ApiService {
   Future<Map<String, dynamic>> getTallyReport(String tallyId) async {
     final response = await http.get(
       Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/report'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Delete tally session
+  Future<Map<String, dynamic>> deleteTallySession(String id) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/tally/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Analytics APIs
+  
+  // Get dashboard statistics
+  Future<Map<String, dynamic>> getDashboardStats() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/analytics/dashboard'),
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
@@ -622,5 +655,234 @@ class ApiService {
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
+  }
+
+  // Generate PDF for selected items (server-side)
+  Future<Uint8List> generateTagsPDF(List<String> itemIds) async {
+    try {
+      final token = await _storage.getToken();
+      
+      // Custom headers for PDF download - don't use _getHeaders()
+      final headers = {
+        'Content-Type': 'application/json', // For request body
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/tag-print/generate-pdf'),
+        headers: headers,
+        body: jsonEncode({'itemIds': itemIds}),
+      );
+
+      print('[API] PDF response status: ${response.statusCode}');
+      print('[API] PDF response length: ${response.bodyBytes.length}');
+      print('[API] Content-Type: ${response.headers['content-type']}');
+      print('[API] First 10 bytes: ${response.bodyBytes.take(10).toList()}');
+
+      if (response.statusCode == 200) {
+        // Return raw bytes directly
+        final bytes = response.bodyBytes;
+        print('[API] Returning ${bytes.length} bytes');
+        return bytes;
+      } else {
+        final errorBody = utf8.decode(response.bodyBytes);
+        print('[API] Error response: $errorBody');
+        throw Exception('Failed to generate PDF: ${response.statusCode} - $errorBody');
+      }
+    } catch (e) {
+      print('[API] Exception generating PDF: $e');
+      rethrow;
+    }
+  }
+
+  // Cloudinary Image Upload
+  /// Upload single image to Cloudinary
+  /// [folder] - Optional folder name: 'items' (default) or 'containers'
+  /// Returns: {success: bool, data: {url: String, publicId: String}}
+  Future<Map<String, dynamic>> uploadImage(XFile imageFile, {String folder = 'items'}) async {
+    try {
+      final token = await _storage.getToken();
+      // Add folder query parameter
+      final uri = Uri.parse('${AppConstants.baseUrl}/upload/single?folder=$folder');
+      
+      var request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+      
+      // Add image file
+      final bytes = await imageFile.readAsBytes();
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: imageFile.name,
+          contentType: MediaType('image', imageFile.name.split('.').last),
+        ),
+      );
+      
+      print('[API] Uploading image to Cloudinary ($folder): ${imageFile.name}');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Image upload error: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete image from Cloudinary
+  /// imageUrl: Full Cloudinary URL
+  /// Returns: true if deleted successfully
+  Future<bool> deleteImage(String imageUrl) async {
+    try {
+      // Extract public_id from URL
+      // URL format: https://res.cloudinary.com/cloud-name/image/upload/v1234/folder/filename.jpg
+      final urlParts = imageUrl.split('/');
+      final uploadIndex = urlParts.indexOf('upload');
+      
+      if (uploadIndex == -1) {
+        print('[API] Not a Cloudinary URL, skipping deletion');
+        return false;
+      }
+
+      // Get everything after 'upload/v123456/'
+      final publicIdWithExt = urlParts.sublist(uploadIndex + 2).join('/');
+      // Remove file extension
+      final publicId = publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
+      
+      // Replace / with -- for URL encoding
+      final encodedPublicId = publicId.replaceAll('/', '--');
+      
+      final response = await http.delete(
+        Uri.parse('${AppConstants.baseUrl}/upload/$encodedPublicId'),
+        headers: await _getHeaders(),
+      );
+      
+      if (response.statusCode == 200) {
+        print('[API] ✅ Image deleted from Cloudinary: $publicId');
+        return true;
+      } else {
+        print('[API] ⚠️ Failed to delete image: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('[API] Image deletion error: $e');
+      return false;
+    }
+  }
+
+  // User Management Methods
+  /// Get all users (admin only)
+  Future<Map<String, dynamic>> getUsers() async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/users'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Get users error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get single user by ID
+  Future<Map<String, dynamic>> getUser(String id) async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/users/$id'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Get user error: $e');
+      rethrow;
+    }
+  }
+
+  /// Create new user (admin only)
+  Future<Map<String, dynamic>> createUser(Map<String, dynamic> userData) async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/users'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(userData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Create user error: $e');
+      rethrow;
+    }
+  }
+
+  /// Update user profile
+  Future<Map<String, dynamic>> updateUser(String id, Map<String, dynamic> userData) async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.put(
+        Uri.parse('${AppConstants.baseUrl}/users/$id'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(userData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Update user error: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete user (admin only)
+  Future<Map<String, dynamic>> deleteUser(String id) async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.delete(
+        Uri.parse('${AppConstants.baseUrl}/users/$id'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Delete user error: $e');
+      rethrow;
+    }
+  }
+
+  /// Change password
+  Future<Map<String, dynamic>> changePassword(String userId, String currentPassword, String newPassword) async {
+    try {
+      final token = await _storage.getToken();
+      final response = await http.put(
+        Uri.parse('${AppConstants.baseUrl}/users/$userId/password'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        }),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[API] Change password error: $e');
+      rethrow;
+    }
   }
 }
