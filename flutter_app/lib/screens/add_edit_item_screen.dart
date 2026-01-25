@@ -511,8 +511,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
   Future<void> _saveItem() async {
     if (_formKey.currentState!.validate()) {
-      // Validation 1: Ensure a container is selected
-      if (_selectedContainerId == null || _selectedContainerId!.isEmpty) {
+      // Validation 1: Ensure a container is selected (only for NEW items)
+      if (widget.item == null && (_selectedContainerId == null || _selectedContainerId!.isEmpty)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select a valid container before saving the item.'),
@@ -522,7 +522,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         return;
       }
       
-      // Validation 2: Check if selected container is locked
+      // Validation 2: Check if selected container is locked (only if container is being changed)
       if (_selectedContainerId != null) {
         Map<String, dynamic>? selectedContainer;
         try {
@@ -557,6 +557,14 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       
       final itemProvider = Provider.of<ItemProvider>(context, listen: false);
       
+      // Determine certification type
+      String certificationType = 'none';
+      if (_isHallmarked) {
+        certificationType = 'hallmarked';
+      } else if (_isHUID) {
+        certificationType = 'huid';
+      }
+      
       final itemData = {
         'name': _nameController.text,
         'barcode': _barcodeController.text,
@@ -567,7 +575,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         'numberOfPieces': int.parse(_piecesController.text),
         'weightCategory': _selectedWeightCategory,
         'weightAccuracy': _selectedWeightAccuracy,
-        'huid': _isHallmarked ? _huidController.text : '',
+        'certificationType': certificationType,
+        'huidNumber': _isHUID ? _huidController.text : null,
         'description': '',
         'containerId': _selectedContainerId,
         'slotNumber': _selectedSlotNumber,
@@ -808,30 +817,141 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               ),
               const SizedBox(height: 16),
               
-              // 4. Hallmark Switch
+              // 4. Certification Options (in one row)
               Row(
                 children: [
-                   Switch(
-                      value: _isHallmarked,
-                      onChanged: (value) {
+                  // Hallmark Option
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
                         setState(() {
-                          _isHallmarked = value;
-                          if (!value) _huidController.clear();
+                          _isHallmarked = !_isHallmarked;
+                          if (_isHallmarked) {
+                            _isHUID = false;
+                            _huidController.clear();
+                          }
                         });
                       },
-                      activeColor: AppColors.primary,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _isHallmarked ? const Color(0xFFB8860B) : Colors.grey[300]!,
+                            width: _isHallmarked ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: _isHallmarked ? const Color(0xFFFFD700).withOpacity(0.1) : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _isHallmarked ? Icons.check_circle : Icons.circle_outlined,
+                              color: _isHallmarked ? const Color(0xFFB8860B) : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Hallmarked',
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                            if (_isHallmarked) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFD700).withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFB8860B)),
+                                ),
+                                child: const Text(
+                                  '916',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFB8860B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                    const Text('Hallmarked', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // HUID Option
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _isHUID = !_isHUID;
+                          if (_isHUID) {
+                            _isHallmarked = false;
+                          } else {
+                            _huidController.clear();
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _isHUID ? const Color(0xFF0D47A1) : Colors.grey[300]!,
+                            width: _isHUID ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: _isHUID ? const Color(0xFF2196F3).withOpacity(0.1) : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _isHUID ? Icons.check_circle : Icons.circle_outlined,
+                              color: _isHUID ? const Color(0xFF0D47A1) : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'HUID',
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                            if (_isHUID) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2196F3).withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFF0D47A1)),
+                                ),
+                                child: const Text(
+                                  'HUID',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0D47A1),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               
-              // 5. HUID (Conditional)
-              if (_isHallmarked)
+              // HUID Number Input (shown when HUID is selected)
+              if (_isHUID) ...[
+                const SizedBox(height: 12),
                 _buildTextField(
                   controller: _huidController,
                   label: 'HUID Number',
-                  hint: 'Enter hallmark unique ID',
-                  icon: Icons.verified,
+                  hint: 'Enter HUID number',
+                  icon: Icons.qr_code_2,
                   required: false,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: [
@@ -844,11 +964,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     }),
                   ],
                 ),
+              ],
               const SizedBox(height: 24),
               
               // 6. Container Selection
-              const Text('Assign Container', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
               if (_isLoadingContainers)
                 const LinearProgressIndicator()
               else
