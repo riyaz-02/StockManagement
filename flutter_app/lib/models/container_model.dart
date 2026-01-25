@@ -24,7 +24,7 @@ class ContainerSlot {
     return ContainerSlot(
       slotNumber: json['slotNumber'] ?? 0,
       itemId: getItemId(),
-      reserved: json['reserved'] ?? false,
+      reserved: json['reserved'] == true || json['reserved'] == 'true',
     );
   }
 
@@ -110,9 +110,9 @@ class ItemContainer {
               ?.map((slot) => ContainerSlot.fromJson(slot))
               .toList() ??
           [],
-      isActive: json['isActive'] ?? true,
-      isDeleted: json['isDeleted'] ?? false,
-      isLocked: json['isLocked'] ?? false,
+      isActive: json['isActive'] == true || json['isActive'] == 'true' || json['isActive'] == null,
+      isDeleted: json['isDeleted'] == true || json['isDeleted'] == 'true',
+      isLocked: json['isLocked'] == true || json['isLocked'] == 'true',
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),

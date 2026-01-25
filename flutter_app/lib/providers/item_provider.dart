@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
+import '../utils/api_cache.dart';
 
 class ItemProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final ApiCache _cache = ApiCache();
 
   List<Item> _items = [];
   Item? _selectedItem;
@@ -67,7 +69,8 @@ class ItemProvider with ChangeNotifier {
     return null;
   }
 
-  // Scan barcode
+  // Scan barcode - NO CACHING for critical operations
+  // Caching disabled to ensure accurate tally counts and real-time status
   Future<Item?> scanBarcode(String barcode) async {
     _isLoading = true;
     _error = null;
@@ -77,6 +80,8 @@ class ItemProvider with ChangeNotifier {
       final response = await _apiService.scanBarcode(barcode);
       if (response['success'] == true) {
         _selectedItem = Item.fromJson(response['data']['item']);
+        // Clear any cached data for this barcode to prevent stale data
+        _cache.invalidate('barcode:$barcode');
         _isLoading = false;
         notifyListeners();
         return _selectedItem;
@@ -161,6 +166,10 @@ class ItemProvider with ChangeNotifier {
         if (_selectedItem?.id == id) {
           _selectedItem = updatedItem;
         }
+        // Invalidate cache for this item
+        if (updatedItem.barcode != null) {
+          _cache.invalidate('barcode:${updatedItem.barcode}');
+        }
         _isLoading = false;
         notifyListeners();
         return true;
@@ -179,6 +188,11 @@ class ItemProvider with ChangeNotifier {
     try {
       final response = await _apiService.deleteItem(id);
       if (response['success'] == true) {
+        // Invalidate cache before removing
+        final itemToDelete = _items.firstWhere((item) => item.id == id, orElse: () => _selectedItem!);
+        if (itemToDelete.barcode != null) {
+          _cache.invalidate('barcode:${itemToDelete.barcode}');
+        }
         _items.removeWhere((item) => item.id == id);
         if (_selectedItem?.id == id) {
           _selectedItem = null;

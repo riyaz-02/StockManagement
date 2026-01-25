@@ -71,11 +71,40 @@ const authLimiter = rateLimit({
 // GENERAL MIDDLEWARE
 // ======================
 
-// CORS
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+// CORS - Allow localhost for development
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      process.env.CORS_ORIGIN,
+      'http://localhost:3000',
+      'http://localhost:8080',
+      /^http:\/\/localhost:\d+$/,  // Any localhost port
+      /^http:\/\/127\.0\.0\.1:\d+$/  // Any 127.0.0.1 port
+    ];
+
+    // Check if origin matches any allowed pattern
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+
+    if (isAllowed || process.env.CORS_ORIGIN === '*') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
 
 // Body parser with size limits
 app.use(express.json({ limit: '10mb' }));
@@ -153,11 +182,12 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/repair', repairRoutes);
 app.use('/api/tally', tallyRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/customers', customerRoutes);
+app.use('/api/bookings', require('./routes/booking.routes'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/customers', require('./routes/customer.routes'));
 app.use('/api/outward-movements', require('./routes/outwardMovement.routes'));
-app.use('/api/tag-print', tagPrintRoutes);
+app.use('/api/tag-settings', require('./routes/tagSettings.routes'));
+app.use('/api/tag-print', require('./routes/tagPrint.routes'));
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', cloudinaryRoutes);
 app.use('/api/test', require('./routes/test.routes'));

@@ -885,4 +885,22 @@ class ApiService {
       rethrow;
     }
   }
+
+  // Tag Settings
+  Future<Map<String, dynamic>> getTagSettings() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/tag-settings'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateTagSettings(Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tag-settings'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return _handleResponse(response);
+  }
 }

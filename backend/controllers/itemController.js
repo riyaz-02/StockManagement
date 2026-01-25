@@ -38,7 +38,8 @@ exports.createItem = async (req, res) => {
             numberOfPieces,
             weightCategory,
             weightAccuracy,
-            huid,
+            certificationType,
+            huidNumber,
             images,
             containerId,
             slotNumber
@@ -146,8 +147,9 @@ exports.createItem = async (req, res) => {
             netWeight,
             numberOfPieces: numberOfPieces || 1,
             weightCategory: weightCategory || 'Light',
-            weightAccuracy: weightAccuracy || 'exact', // Default to exact if not provided
-            huid,
+            weightAccuracy: weightAccuracy || 'exact',
+            certificationType: certificationType || 'none',
+            huidNumber: huidNumber || null,
             images: imagePaths,
             containerId: assignedContainerId,
             slotNumber: assignedSlotNumber,
@@ -185,7 +187,7 @@ exports.createItem = async (req, res) => {
 // @access  Private
 exports.getItems = async (req, res) => {
     try {
-        const { status, itemType, metalType, containerId } = req.query;
+        const { status, itemType, metalType, containerId, search, purity, certificationType } = req.query;
 
         const filter = {};
 
@@ -206,6 +208,18 @@ exports.getItems = async (req, res) => {
         if (itemType) filter.itemType = itemType;
         if (metalType) filter.metalType = metalType;
         if (containerId) filter.containerId = containerId;
+        if (purity) filter.purity = purity;
+        if (certificationType) filter.certificationType = certificationType;
+
+        // Search functionality - search in name and barcode
+        if (search && search.trim()) {
+            const searchRegex = new RegExp(search.trim(), 'i');
+            filter.$or = [
+                { name: searchRegex },
+                { barcode: searchRegex }
+            ];
+            console.log(`[GET ITEMS] Search query: "${search}"`);
+        }
 
         const items = await Item.find(filter)
             .populate({
@@ -311,7 +325,8 @@ exports.updateItem = async (req, res) => {
             numberOfPieces,
             weightCategory,
             weightAccuracy,
-            huid,
+            certificationType,
+            huidNumber,
             images,
             status,
             barcode,
@@ -411,7 +426,8 @@ exports.updateItem = async (req, res) => {
         if (numberOfPieces) item.numberOfPieces = numberOfPieces;
         if (weightCategory) item.weightCategory = weightCategory;
         if (weightAccuracy) item.weightAccuracy = weightAccuracy;
-        if (huid !== undefined) item.huid = huid;
+        if (certificationType !== undefined) item.certificationType = certificationType;
+        if (huidNumber !== undefined) item.huidNumber = huidNumber;
         if (status) item.status = status;
 
         await item.save();

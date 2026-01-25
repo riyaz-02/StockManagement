@@ -2,22 +2,22 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
-  // Production API URL
-  static const String baseUrl = 'https://stockmanagement-production-0bff.up.railway.app/api';
+  // Development URL - localhost
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5000/api';
+    } else if (Platform.isAndroid) {
+      const String physicalDeviceIP = '192.168.0.116';
+      return 'http://$physicalDeviceIP:5000/api';
+    } else if (Platform.isIOS) {
+      return 'http://localhost:5000/api';
+    } else {
+      return 'http://localhost:5000/api';
+    }
+  }
   
-  // Development URLs (uncomment for local development)
-  // static String get baseUrl {
-  //   if (kIsWeb) {
-  //     return 'http://localhost:5000/api';
-  //   } else if (Platform.isAndroid) {
-  //     const String physicalDeviceIP = '192.168.0.116';
-  //     return 'http://$physicalDeviceIP:5000/api';
-  //   } else if (Platform.isIOS) {
-  //     return 'http://localhost:5000/api';
-  //   } else {
-  //     return 'http://localhost:5000/api';
-  //   }
-  // }
+  // Production API URL (comment above and uncomment this for production)
+  // static const String baseUrl = 'https://stockmanagement-production-0bff.up.railway.app/api';
   
   static const int connectionTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;

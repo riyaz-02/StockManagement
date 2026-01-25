@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:barcode_widget/barcode_widget.dart';
@@ -426,10 +426,18 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: _buildCompactBox(
-                              Icons.fingerprint, 
-                              'Hallmark', 
-                              widget.item.huid.isNotEmpty ? widget.item.huid : 'Non-Hallmarked', 
-                              widget.item.huid.isNotEmpty ? Colors.pink : Colors.grey
+                              Icons.verified,
+                              'Certification',
+                              widget.item.certificationType == 'huid' 
+                                  ? 'HUID: ${widget.item.huidNumber ?? "N/A"}'
+                                  : widget.item.certificationType == 'hallmarked'
+                                      ? 'Hallmarked'
+                                      : 'Not Certified',
+                              widget.item.certificationType == 'huid' 
+                                  ? Colors.pink 
+                                  : widget.item.certificationType == 'hallmarked'
+                                      ? Colors.amber
+                                      : Colors.grey,
                             ),
                           ),
 
@@ -921,62 +929,82 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     final mobileController = TextEditingController();
     final addressController = TextEditingController();
     final amountController = TextEditingController();
+    bool isSelling = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-               Text('Sell Item', style: Theme.of(context).textTheme.headlineSmall),
-               const SizedBox(height: 16),
-               TextField(controller: mobileController, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone))),
-               const SizedBox(height: 12),
-               TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
-               const SizedBox(height: 12),
-               TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home))),
-                const SizedBox(height: 12),
-               TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sale Amount', border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money))),
-               const SizedBox(height: 20),
-               ElevatedButton(
-                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, padding: const EdgeInsets.symmetric(vertical: 14)),
-                 onPressed: () async {
-                   if (mobileController.text.isEmpty || nameController.text.isEmpty) {
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and Mobile are required')));
-                     return;
-                   }
-                   try {
-                     final data = {
-                       'mobile': mobileController.text,
-                       'customerName': nameController.text,
-                       'address': addressController.text,
-                       'amount': double.tryParse(amountController.text),
-                     };
-                     
-                     final response = await _apiService.sellItem(_item.id, data);
-                     
-                     if (response['success'] == true) {
-                       Navigator.pop(context);
-                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item marked as Sold')));
-                       Navigator.pop(context, true); // Go back to list
-                     } else {
-                       throw response['message'] ?? 'Failed';
-                     }
-                   } catch (e) {
-                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                   }
-                 },
-                 child: const Text('Confirm Sale', style: TextStyle(fontSize: 16)),
-               ),
-               const SizedBox(height: 20),
-            ],
-          ),
-        ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                   Text('Sell Item', style: Theme.of(context).textTheme.headlineSmall),
+                   const SizedBox(height: 16),
+                   TextField(controller: mobileController, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone))),
+                   const SizedBox(height: 12),
+                   TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+                   const SizedBox(height: 12),
+                   TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home))),
+                    const SizedBox(height: 12),
+                   TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sale Amount', border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money))),
+                   const SizedBox(height: 20),
+                   ElevatedButton(
+                     style: ElevatedButton.styleFrom(
+                       backgroundColor: isSelling ? Colors.grey : AppColors.success,
+                       padding: const EdgeInsets.symmetric(vertical: 14),
+                     ),
+                     onPressed: isSelling ? null : () async {
+                       if (mobileController.text.isEmpty || nameController.text.isEmpty) {
+                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and Mobile are required')));
+                         return;
+                       }
+                       setSheetState(() => isSelling = true);
+                       try {
+                         final data = {
+                           'mobile': mobileController.text,
+                           'customerName': nameController.text,
+                           'address': addressController.text,
+                           'amount': double.tryParse(amountController.text),
+                         };
+                         
+                         final response = await _apiService.sellItem(_item.id, data);
+                         
+                         if (response['success'] == true) {
+                           Navigator.pop(context);
+                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item marked as Sold')));
+                           Navigator.pop(context, true); // Go back to list
+                         } else {
+                           setSheetState(() => isSelling = false);
+                           throw response['message'] ?? 'Failed';
+                         }
+                       } catch (e) {
+                         setSheetState(() => isSelling = false);
+                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                       }
+                     },
+                     child: isSelling
+                         ? const SizedBox(
+                             height: 20,
+                             width: 20,
+                             child: CircularProgressIndicator(
+                               strokeWidth: 2,
+                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                             ),
+                           )
+                         : const Text('Confirm Sale', style: TextStyle(fontSize: 16)),
+                   ),
+                   const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -988,6 +1016,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     final remarksController = TextEditingController();
     DateTime? expectedDate = DateTime.now().add(const Duration(days: 7));
     bool slotReserved = false;
+    bool isRepairing = false;
 
     showModalBottomSheet(
       context: context,
@@ -1027,12 +1056,16 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                  ),
                  const SizedBox(height: 20),
                  ElevatedButton(
-                   style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, padding: const EdgeInsets.symmetric(vertical: 14)),
-                   onPressed: () async {
+                   style: ElevatedButton.styleFrom(
+                     backgroundColor: isRepairing ? Colors.grey : Colors.orange,
+                     padding: const EdgeInsets.symmetric(vertical: 14),
+                   ),
+                   onPressed: isRepairing ? null : () async {
                      if (vendorController.text.isEmpty || typeController.text.isEmpty) {
                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vendor and Type are required')));
                        return;
                      }
+                     setSheetState(() => isRepairing = true);
                      try {
                        final data = {
                          'itemId': _item.id,
@@ -1050,13 +1083,24 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sent to Repair')));
                          Navigator.pop(context, true); // Go back
                        } else {
+                         setSheetState(() => isRepairing = false);
                          throw response['message'] ?? 'Failed';
                        }
                      } catch (e) {
+                       setSheetState(() => isRepairing = false);
                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                      }
                    },
-                   child: const Text('Confirm Repair', style: TextStyle(fontSize: 16)),
+                   child: isRepairing
+                       ? const SizedBox(
+                           height: 20,
+                           width: 20,
+                           child: CircularProgressIndicator(
+                             strokeWidth: 2,
+                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                           ),
+                         )
+                       : const Text('Confirm Repair', style: TextStyle(fontSize: 16)),
                  ),
                  const SizedBox(height: 20),
               ],
@@ -1179,6 +1223,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       final purityController = TextEditingController(text: _item.purity);
       final remarksController = TextEditingController();
       final originalWeight = _item.netWeight;
+      final isReturningNotifier = ValueNotifier<bool>(false);
 
       // Show bottom sheet with editable fields
       showModalBottomSheet(
@@ -1189,6 +1234,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
           builder: (context, setSheetState) {
             final currentWeight = double.tryParse(netWeightController.text) ?? originalWeight;
             final weightChange = currentWeight - originalWeight;
+            final isReturning = isReturningNotifier.value;
             
             return Padding(
               padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
@@ -1339,10 +1385,10 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                     // Return Button
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: isReturning ? Colors.grey : Colors.blue,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: () async {
+                      onPressed: isReturning ? null : () async {
                         // Validation
                         if (netWeightController.text.isEmpty || double.tryParse(netWeightController.text) == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1357,6 +1403,10 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           );
                           return;
                         }
+
+                        // Set loading state
+                        isReturningNotifier.value = true;
+                        setSheetState(() {});
 
                         try {
                           // Prepare update data
@@ -1388,11 +1438,21 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           );
                           _refreshData(); // Refresh item details
                         } catch (e) {
-                          Navigator.pop(context);
+                          isReturningNotifier.value = false;
+                          setSheetState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                         }
                       },
-                      child: const Text('Return', style: TextStyle(fontSize: 16)),
+                      child: isReturning
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Return', style: TextStyle(fontSize: 16)),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -1414,26 +1474,28 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     final nameController = TextEditingController();
     final mobileController = TextEditingController();
     final addressController = TextEditingController();
+    bool isAddingToWishlist = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-             Text('Add to Wishlist', style: Theme.of(context).textTheme.headlineSmall),
-             const SizedBox(height: 16),
-             TextField(controller: mobileController, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone))),
-             const SizedBox(height: 12),
-             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
-             const SizedBox(height: 12),
-             TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home))),
-             const SizedBox(height: 20),
-             ElevatedButton(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+               Text('Add to Wishlist', style: Theme.of(context).textTheme.headlineSmall),
+               const SizedBox(height: 16),
+               TextField(controller: mobileController, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone))),
+               const SizedBox(height: 12),
+               TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+               const SizedBox(height: 12),
+               TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home))),
+               const SizedBox(height: 20),
+               ElevatedButton(
                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, padding: const EdgeInsets.symmetric(vertical: 14)),
                onPressed: () async {
                  if (mobileController.text.isEmpty) {
@@ -1458,9 +1520,10 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                child: const Text('Add to Wishlist', style: TextStyle(fontSize: 16)),
              ),
              const SizedBox(height: 20),
-          ],
-        ),
-      ),
+           ],
+         ),
+       ),
+     ),
     );
   }
 
@@ -1475,6 +1538,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     DateTime? selectedDate = initialData?['expiryDate'] != null ? DateTime.tryParse(initialData!['expiryDate']) : null;
     
     final isEditing = bookingId != null;
+    bool isBooking = false;
 
     showModalBottomSheet(
       context: context,
@@ -1812,23 +1876,16 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
   // Move Out Bottom Sheet - Smart Multi-Type Outward Movement
   void _showMoveOutBottomSheet() {
     String? selectedMovementType;
-    final givenToController = TextEditingController();
-    final repairTypeController = TextEditingController();
-    final weightLossController = TextEditingController();
-    final jobCardController = TextEditingController();
+    final givenToController = TextEditingController(text: 'Workshop/Karigar');
+    String? selectedRepairType;
     final customerNameController = TextEditingController();
     final customerMobileController = TextEditingController();
-    final idProofTypeController = TextEditingController();
     final partyNameController = TextEditingController();
     String? selectedPartyType;
-    final gstinController = TextEditingController();
-    final consignmentTypeController = TextEditingController();
-    final challanController = TextEditingController();
     final remarksController = TextEditingController();
-    final grossWeightController = TextEditingController(text: _item.netWeight.toString());
-    final purityController = TextEditingController(text: _item.purity);
     DateTime? expectedReturnDate;
     DateTime outDate = DateTime.now();
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -1959,29 +2016,34 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Common Fields
-                TextField(
-                  controller: grossWeightController,
-                  decoration: const InputDecoration(labelText: 'Gross Weight (g) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.scale)),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: purityController,
-                  decoration: const InputDecoration(labelText: 'Purity *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.diamond)),
-                ),
-                const SizedBox(height: 12),
-                
                 // Conditional Fields
                 if (selectedMovementType == 'REPAIR') ...[
                   TextField(
                     controller: givenToController,
-                    decoration: const InputDecoration(labelText: 'Given To (Karigar/Workshop) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline)),
+                    decoration: const InputDecoration(labelText: 'Given To *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline)),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: repairTypeController,
-                    decoration: const InputDecoration(labelText: 'Repair Type (Optional)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.build_circle_outlined)),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Repair Type',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.build_circle_outlined),
+                    ),
+                    value: selectedRepairType,
+                    items: const [
+                      DropdownMenuItem(value: 'Polish', child: Text('Polish')),
+                      DropdownMenuItem(value: 'Resize', child: Text('Resize')),
+                      DropdownMenuItem(value: 'Stone Setting', child: Text('Stone Setting')),
+                      DropdownMenuItem(value: 'Chain Repair', child: Text('Chain Repair')),
+                      DropdownMenuItem(value: 'Clasp Repair', child: Text('Clasp Repair')),
+                      DropdownMenuItem(value: 'Engraving', child: Text('Engraving')),
+                      DropdownMenuItem(value: 'Other', child: Text('Other')),
+                    ],
+                    onChanged: (value) {
+                      setSheetState(() {
+                        selectedRepairType = value;
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -2052,18 +2114,18 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                 
                 // Submit Button
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, padding: const EdgeInsets.symmetric(vertical: 14)),
-                  onPressed: () async {
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isSubmitting ? Colors.grey : Colors.orange,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: isSubmitting ? null : () async {
                     // Validation
                     if (selectedMovementType == null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select movement type')));
                       return;
                     }
                     
-                    if (grossWeightController.text.isEmpty || double.tryParse(grossWeightController.text) == null || double.parse(grossWeightController.text) <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gross weight must be greater than 0')));
-                      return;
-                    }
+
                     
                     if (selectedMovementType == 'REPAIR' && givenToController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Given To is required for repair')));
@@ -2088,18 +2150,21 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                       }
                     }
                     
+                    // Set loading state
+                    setSheetState(() => isSubmitting = true);
+                    
                     try {
                       final data = {
                         'itemId': _item.id,
                         'movementType': selectedMovementType,
-                        'grossWeight': double.parse(grossWeightController.text),
-                        'purity': purityController.text,
+                        'grossWeight': _item.netWeight,
+                        'purity': _item.purity,
                         'outDate': outDate.toIso8601String(),
                         'expectedReturnDate': expectedReturnDate?.toIso8601String(),
                         'remarks': remarksController.text,
                         if (selectedMovementType == 'REPAIR') ...{
                           'givenTo': givenToController.text,
-                          'repairType': repairTypeController.text,
+                          'repairType': selectedRepairType ?? '',
                         },
                         if (selectedMovementType == 'CUSTOMER_TRIAL') ...{
                           'customerName': customerNameController.text,
@@ -2118,13 +2183,24 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                         _showMoveOutSuccessDialog(response['data']['movement']);
                         _refreshData();
                       } else {
+                        setSheetState(() => isSubmitting = false);
                         throw response['message'] ?? 'Failed';
                       }
                     } catch (e) {
+                      setSheetState(() => isSubmitting = false);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                     }
                   },
-                  child: const Text('Move Out', style: TextStyle(fontSize: 16)),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('Move Out', style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -2140,40 +2216,46 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
-            SizedBox(width: 8),
-            Text('Item Moved Out Successfully'),
-          ],
-        ),
+        contentPadding: const EdgeInsets.all(20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Movement ID: #${movement['_id']?.substring(0, 8) ?? 'N/A'}'),
+            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const SizedBox(height: 12),
+            const Text(
+              'Item Moved Out',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text('Status: ${movement['status'] ?? 'OUT'}'),
-            const SizedBox(height: 8),
-            Text('Type: ${movement['movementType'] ?? 'N/A'}'),
+            Text(
+              'ID: #${movement['_id']?.substring(0, 8) ?? 'N/A'}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Challan generation coming soon')),
+                    );
+                  },
+                  child: const Text('Challan', style: TextStyle(fontSize: 13)),
+                ),
+              ],
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Challan generation coming soon')),
-              );
-            },
-            child: const Text('Generate Challan'),
-          ),
-        ],
       ),
     );
   }
@@ -2210,3 +2292,4 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     );
   }
 }
+

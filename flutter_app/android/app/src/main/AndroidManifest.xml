@@ -9,7 +9,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
     <application
-        android:label="Jewellery Stock"
+        android:label="Laltu Guinea Palace"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

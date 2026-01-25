@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -23,6 +24,14 @@ class ItemListScreen extends StatefulWidget {
 
 class _ItemListScreenState extends State<ItemListScreen> {
   String _statusFilter = 'all';
+  String _searchQuery = '';
+  String? _metalTypeFilter;
+  String? _itemTypeFilter;
+  String? _purityFilter;
+  String? _certificationFilter;
+  
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -36,11 +45,38 @@ class _ItemListScreenState extends State<ItemListScreen> {
 
   void _loadItems() {
     final itemProvider = Provider.of<ItemProvider>(context, listen: false);
-    if (_statusFilter == 'all') {
-      itemProvider.fetchItems();
-    } else {
-      itemProvider.fetchItems(status: _statusFilter);
+    
+    // Build query parameters
+    Map<String, String> queryParams = {};
+    
+    if (_searchQuery.isNotEmpty) {
+      queryParams['search'] = _searchQuery;
     }
+    if (_metalTypeFilter != null) {
+      queryParams['metalType'] = _metalTypeFilter!;
+    }
+    if (_itemTypeFilter != null) {
+      queryParams['itemType'] = _itemTypeFilter!;
+    }
+    if (_purityFilter != null) {
+      queryParams['purity'] = _purityFilter!;
+    }
+    if (_certificationFilter != null) {
+      queryParams['certificationType'] = _certificationFilter!;
+    }
+    
+    // Use existing fetchItems method with status and filters
+    itemProvider.fetchItems(
+      status: _statusFilter == 'all' ? null : _statusFilter,
+      filters: queryParams.isEmpty ? null : queryParams,
+    );
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -78,6 +114,11 @@ class _ItemListScreenState extends State<ItemListScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Filters',
+            onPressed: () => _showFilterMenu(context),
+          ),
           IconButton(
             icon: const Icon(Icons.output),
             tooltip: 'Moved Out Items',
@@ -118,10 +159,49 @@ class _ItemListScreenState extends State<ItemListScreen> {
       ),
       body: Column(
         children: [
-          // Filter Chips
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by name or barcode...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFE94560)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                          _loadItems();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE94560), width: 2),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              onChanged: (value) {
+                if (_debounce?.isActive ?? false) _debounce!.cancel();
+                _debounce = Timer(const Duration(milliseconds: 300), () {
+                  setState(() => _searchQuery = value);
+                  _loadItems();
+                });
+              },
+            ),
+          ),
+          
+          // Status Filter Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 _buildFilterChip('All', 'all'),
@@ -136,6 +216,62 @@ class _ItemListScreenState extends State<ItemListScreen> {
               ],
             ),
           ),
+          
+          // Additional Filters Row with Clear Button
+          if (_metalTypeFilter != null || _itemTypeFilter != null || 
+              _purityFilter != null || _certificationFilter != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (_metalTypeFilter != null)
+                          _buildActiveFilterChip('Metal: $_metalTypeFilter', () {
+                            setState(() => _metalTypeFilter = null);
+                            _loadItems();
+                          }),
+                        if (_itemTypeFilter != null)
+                          _buildActiveFilterChip('Type: $_itemTypeFilter', () {
+                            setState(() => _itemTypeFilter = null);
+                            _loadItems();
+                          }),
+                        if (_purityFilter != null)
+                          _buildActiveFilterChip('Purity: $_purityFilter', () {
+                            setState(() => _purityFilter = null);
+                            _loadItems();
+                          }),
+                        if (_certificationFilter != null)
+                          _buildActiveFilterChip('Cert: $_certificationFilter', () {
+                            setState(() => _certificationFilter = null);
+                            _loadItems();
+                          }),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.clear_all, size: 16),
+                    label: const Text('Clear'),
+                    onPressed: () {
+                      setState(() {
+                        _metalTypeFilter = null;
+                        _itemTypeFilter = null;
+                        _purityFilter = null;
+                        _certificationFilter = null;
+                      });
+                      _loadItems();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFE94560),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Items List
           Expanded(
@@ -205,27 +341,29 @@ class _ItemListScreenState extends State<ItemListScreen> {
       }
     }
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ItemDetailsScreen(item: item),
-            ),
-          ).then((_) => _loadItems());
-        },
-        onLongPress: () => _showItemOptions(context, item),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
+    return Stack(
+      children: [
+        Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ItemDetailsScreen(item: item),
+                ),
+              ).then((_) => _loadItems());
+            },
+            onLongPress: () => _showItemOptions(context, item),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Item Image
+              // 1. Item Image (no badge here anymore)
               Container(
                 width: 80,
                 height: 80,
@@ -347,7 +485,59 @@ class _ItemListScreenState extends State<ItemListScreen> {
           ),
         ),
       ),
-    );
+    ),
+    // Certification Badge Overlay (positioned absolutely, doesn't take up space)
+    if (item.certificationType == 'hallmarked' || item.certificationType == 'huid')
+      Positioned(
+        top: 46, // More margin below status badge
+        right: 8,
+        child: Transform.rotate(
+          angle: -0.35, // Increased rotation for stamp effect
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: item.certificationType == 'hallmarked'
+                  ? const Color(0xFFFFD700).withOpacity(0.18)
+                  : const Color(0xFF2196F3).withOpacity(0.18),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: item.certificationType == 'hallmarked'
+                    ? const Color(0xFFB8860B).withOpacity(0.35)
+                    : const Color(0xFF0D47A1).withOpacity(0.35),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  item.certificationType == 'hallmarked'
+                      ? Icons.verified_rounded
+                      : Icons.qr_code_2_rounded,
+                  size: 16,
+                  color: item.certificationType == 'hallmarked'
+                      ? const Color(0xFFB8860B).withOpacity(0.75)
+                      : const Color(0xFF0D47A1).withOpacity(0.75),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  item.certificationType == 'hallmarked' ? '916' : 'HUID',
+                  style: TextStyle(
+                    color: item.certificationType == 'hallmarked'
+                        ? const Color(0xFFB8860B).withOpacity(0.85)
+                        : const Color(0xFF0D47A1).withOpacity(0.85),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+  ],
+);
   }
 
   void _showItemOptions(BuildContext context, dynamic item) {
@@ -532,5 +722,185 @@ class _ItemListScreenState extends State<ItemListScreen> {
       default:
         return Icons.inventory;
     }
+  }
+
+  Widget _buildActiveFilterChip(String label, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE94560).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE94560)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFE94560),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: Color(0xFFE94560),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFilterMenu(BuildContext context) {
+    // Hardcoded filter options (common values)
+    final metalTypes = ['Gold', 'Silver', 'Platinum'];
+    final itemTypes = ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Pendant', 'Chain', 'Bangle'];
+    final purityOptions = ['18k', '22k', '24k', '916', '999'];
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filter Items',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Metal Type Filter
+                    const Text('Metal Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: metalTypes.map((metal) {
+                        final isSelected = _metalTypeFilter == metal;
+                        return FilterChip(
+                          label: Text(metal),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _metalTypeFilter = selected ? metal : null;
+                            });
+                            setModalState(() {});
+                          },
+                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          checkmarkColor: const Color(0xFFE94560),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Item Type Filter
+                    const Text('Item Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: itemTypes.map((type) {
+                        final isSelected = _itemTypeFilter == type;
+                        return FilterChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _itemTypeFilter = selected ? type : null;
+                            });
+                            setModalState(() {});
+                          },
+                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          checkmarkColor: const Color(0xFFE94560),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Purity Filter
+                    const Text('Purity', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: purityOptions.map((purity) {
+                        final isSelected = _purityFilter == purity;
+                        return FilterChip(
+                          label: Text(purity),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _purityFilter = selected ? purity : null;
+                            });
+                            setModalState(() {});
+                          },
+                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          checkmarkColor: const Color(0xFFE94560),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Certification Filter
+                    const Text('Certification', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: ['hallmarked', 'huid', 'none'].map((cert) {
+                        final isSelected = _certificationFilter == cert;
+                        return FilterChip(
+                          label: Text(cert == 'none' ? 'Non-certified' : cert.toUpperCase()),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _certificationFilter = selected ? cert : null;
+                            });
+                            setModalState(() {});
+                          },
+                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          checkmarkColor: const Color(0xFFE94560),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Apply Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _loadItems();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE94560),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

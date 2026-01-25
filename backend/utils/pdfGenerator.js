@@ -13,6 +13,25 @@ class PDFGenerator {
         let browser;
 
         try {
+            // Fetch tag settings for purity colors
+            console.log('[PDF] Fetching tag settings...');
+            const Settings = require('../models/Settings');
+            let purityColorMap = {};
+
+            try {
+                const tagSettings = await Settings.findOne({ category: 'tag', type: 'printing' });
+                if (tagSettings && tagSettings.tagSettings && tagSettings.tagSettings.purityColors) {
+                    tagSettings.tagSettings.purityColors.forEach(pc => {
+                        purityColorMap[pc.purity] = pc.color;
+                    });
+                    console.log(`[PDF] Loaded ${Object.keys(purityColorMap).length} purity colors from settings`);
+                } else {
+                    console.log('[PDF] No tag settings found, using default colors');
+                }
+            } catch (err) {
+                console.error('[PDF] Error loading tag settings:', err);
+            }
+
             // Generate barcodes as data URLs first
             console.log('[PDF] Generating barcodes...');
             const itemsWithBarcodes = await Promise.all(
@@ -41,8 +60,8 @@ class PDFGenerator {
             const templatePath = path.join(__dirname, '../templates/tag-template.html');
             let htmlTemplate = await fs.readFile(templatePath, 'utf-8');
 
-            // Generate tags HTML with barcode data URLs
-            const tagsHTML = this._generateTagsHTML(itemsWithBarcodes);
+            // Generate tags HTML with barcode data URLs and purity colors
+            const tagsHTML = this._generateTagsHTML(itemsWithBarcodes, purityColorMap);
 
             // Replace placeholder
             const finalHTML = htmlTemplate.replace('{{TAGS_CONTENT}}', tagsHTML);
@@ -97,13 +116,13 @@ class PDFGenerator {
      * Generate HTML for all tags
      * @private
      */
-    static _generateTagsHTML(items) {
+    static _generateTagsHTML(items, purityColorMap = {}) {
         const tagsPerPage = 100; // 10 columns × 10 rows
         const pages = [];
 
         for (let i = 0; i < items.length; i += tagsPerPage) {
             const pageItems = items.slice(i, i + tagsPerPage);
-            const pageTags = pageItems.map(item => this._generateSingleTag(item)).join('\n');
+            const pageTags = pageItems.map(item => this._generateSingleTag(item, purityColorMap)).join('\n');
 
             // Fill remaining slots with empty tags
             const emptySlots = tagsPerPage - pageItems.length;
@@ -119,14 +138,18 @@ class PDFGenerator {
      * Generate HTML for a single tag
      * @private
      */
-    static _generateSingleTag(item) {
+    static _generateSingleTag(item, purityColorMap = {}) {
         const hasHallmark = item.huid && item.huid.trim() !== '';
         const colorClass = hasHallmark ? 'hallmark' : 'non-hallmark';
+
+        // Get purity color from settings or use default
+        const purityColor = purityColorMap[item.purity] || '#FFD700';
+        const purityStyle = `background-color: ${purityColor};`;
 
         return `
       <div class="tag">
         <!-- Front Side -->
-        <div class="tag-front ${colorClass}">
+        <div class="tag-front ${colorClass}" style="${purityStyle}">
           <div class="barcode-container">
             ${item.barcodeDataUrl ?
                 `<img src="${item.barcodeDataUrl}" alt="${item.barcode}" style="width: 100%; height: 12px;" />` :
@@ -140,7 +163,7 @@ class PDFGenerator {
         </div>
         
         <!-- Back Side -->
-        <div class="tag-back ${colorClass}">
+        <div class="tag-back ${colorClass}" style="${purityStyle}">
           <div class="item-name">${this._escapeHTML(item.name)}</div>
           <div class="weight-box ${colorClass}">
             <span class="weight-value">${item.netWeight.toFixed(3)}g</span>

@@ -40,10 +40,23 @@ const itemSchema = new mongoose.Schema({
         enum: ['Light', 'Medium', 'Heavy', 'Mixed'],
         default: 'Light'
     },
-    huid: {
+    certificationType: {
+        type: String,
+        enum: ['none', 'hallmarked', 'huid'],
+        default: 'none'
+    },
+    huidNumber: {
         type: String,
         trim: true,
-        default: ''
+        default: null,
+        sparse: true, // Allow multiple null values, but unique non-null values
+        index: true
+    },
+    // Deprecated: kept for backward compatibility with old data
+    huid: {
+        type: String,
+        trim: true
+        // No default - won't be saved in new items
     },
     images: [{
         type: String

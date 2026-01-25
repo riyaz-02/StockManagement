@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
 import 'tag_print_preview_screen.dart';
+import 'tag_settings_screen.dart';
 
 class TagPrintingScreen extends StatefulWidget {
   const TagPrintingScreen({super.key});
@@ -56,11 +57,14 @@ class _TagPrintingScreenState extends State<TagPrintingScreen> {
         // Type filter
         bool matchesType = true;
         switch (_filterType) {
-          case 'hallmark':
-            matchesType = item.huid.isNotEmpty;
+          case 'hallmarked':
+            matchesType = item.certificationType == 'hallmarked';
             break;
-          case 'non-hallmark':
-            matchesType = item.huid.isEmpty;
+          case 'huid':
+            matchesType = item.certificationType == 'huid';
+            break;
+          case 'non_hallmarked':
+            matchesType = item.certificationType == 'none';
             break;
           case 'not-printed':
             matchesType = !item.tagsPrinted;
@@ -127,6 +131,16 @@ class _TagPrintingScreenState extends State<TagPrintingScreen> {
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Tag Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TagSettingsScreen()),
+              );
+            },
+          ),
           if (_selectedItemIds.isNotEmpty)
             TextButton.icon(
               onPressed: _clearSelection,
@@ -208,7 +222,7 @@ class _TagPrintingScreenState extends State<TagPrintingScreen> {
                         itemBuilder: (context, index) {
                           final item = _filteredItems[index];
                           final isSelected = _selectedItemIds.contains(item.id);
-                          final hasHallmark = item.huid.isNotEmpty;
+                          final hasHUID = item.certificationType == 'huid';
 
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -289,12 +303,12 @@ class _TagPrintingScreenState extends State<TagPrintingScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: hasHallmark
+                                        color: hasHUID
                                             ? const Color(0xFFFFD700).withOpacity(0.2)
                                             : const Color(0xFFADD8E6).withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
-                                          color: hasHallmark
+                                          color: hasHUID
                                               ? const Color(0xFFFFD700)
                                               : const Color(0xFFADD8E6),
                                         ),
@@ -303,19 +317,19 @@ class _TagPrintingScreenState extends State<TagPrintingScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
-                                            hasHallmark ? Icons.verified : Icons.info_outline,
+                                            hasHUID ? Icons.verified : Icons.info_outline,
                                             size: 14,
-                                            color: hasHallmark
+                                            color: hasHUID
                                                 ? const Color(0xFFB8860B)
                                                 : const Color(0xFF4682B4),
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            hasHallmark ? 'Hallmark' : 'Non-HM',
+                                            hasHUID ? 'HUID' : 'Non-HUID',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
-                                              color: hasHallmark
+                                              color: hasHUID
                                                   ? const Color(0xFFB8860B)
                                                   : const Color(0xFF4682B4),
                                             ),

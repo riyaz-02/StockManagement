@@ -102,9 +102,43 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   }
 
   Future<void> _pickImage() async {
+    // Show bottom sheet to choose between camera and gallery
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Add Photo',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
       final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,

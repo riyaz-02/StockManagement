@@ -11,7 +11,8 @@ class Item {
   final String weightAccuracy;
   final double? lastVerifiedWeight;
   final DateTime? lastVerifiedAt;
-  final String huid;
+  final String certificationType; // 'none', 'hallmarked', 'huid'
+  final String? huidNumber; // Only for HUID certified items
   final List<String> images;
   final String status;
   final String? containerName; 
@@ -40,7 +41,8 @@ class Item {
     this.weightAccuracy = 'exact',
     this.lastVerifiedWeight,
     this.lastVerifiedAt,
-    this.huid = '',
+    this.certificationType = 'none',
+    this.huidNumber,
     this.images = const [],
     this.status = 'active',
     this.containerId,
@@ -73,7 +75,9 @@ class Item {
       lastVerifiedAt: json['lastVerifiedAt'] != null
           ? DateTime.parse(json['lastVerifiedAt'])
           : null,
-      huid: json['huid'] ?? '',
+      certificationType: json['certificationType'] ?? 
+          ((json['huid'] != null && json['huid'].toString().isNotEmpty) ? 'huid' : 'none'),
+      huidNumber: json['huidNumber'] ?? json['huid'],
       images: List<String>.from(json['images'] ?? []),
       status: json['status'] ?? 'active',
       containerId: json['containerId'] is String 
@@ -87,8 +91,8 @@ class Item {
           : null,
       slotNumber: json['slotNumber'],
       numberOfPieces: json['numberOfPieces'] ?? 1,
-      slotReserved: json['slotReserved'] ?? false,
-      tagsPrinted: json['tagsPrinted'] ?? false,
+      slotReserved: json['slotReserved'] == true || json['slotReserved'] == 'true',
+      tagsPrinted: json['tagsPrinted'] == true || json['tagsPrinted'] == 'true',
       lastTagPrintedAt: json['lastTagPrintedAt'] != null
           ? DateTime.parse(json['lastTagPrintedAt'])
           : null,
@@ -119,7 +123,8 @@ class Item {
       'weightAccuracy': weightAccuracy,
       'lastVerifiedWeight': lastVerifiedWeight,
       'lastVerifiedAt': lastVerifiedAt?.toIso8601String(),
-      'huid': huid,
+      'certificationType': certificationType,
+      'huidNumber': huidNumber,
       'images': images,
       'status': status,
       'containerId': containerId,
@@ -153,7 +158,8 @@ class Item {
     String? purity,
     double? netWeight,
     String? weightCategory,
-    String? huid,
+    String? certificationType,
+    String? huidNumber,
     List<String>? images,
     String? status,
     String? containerId,
@@ -172,7 +178,8 @@ class Item {
       purity: purity ?? this.purity,
       netWeight: netWeight ?? this.netWeight,
       weightCategory: weightCategory ?? this.weightCategory,
-      huid: huid ?? this.huid,
+      certificationType: certificationType ?? this.certificationType,
+      huidNumber: huidNumber ?? this.huidNumber,
       images: images ?? this.images,
       status: status ?? this.status,
       containerId: containerId ?? this.containerId,

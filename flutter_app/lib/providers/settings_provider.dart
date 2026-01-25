@@ -160,6 +160,37 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
+  // Tag Settings
+  Future<Map<String, dynamic>?> getTagSettings() async {
+    try {
+      final response = await _apiService.getTagSettings();
+      return response;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> updateTagSettings({
+    required double tagWidth,
+    required double tagHeight,
+    required List<Map<String, String>> purityColors,
+  }) async {
+    try {
+      final response = await _apiService.updateTagSettings({
+        'tagWidth': tagWidth,
+        'tagHeight': tagHeight,
+        'purityColors': purityColors,
+      });
+      return response['message'] != null;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();

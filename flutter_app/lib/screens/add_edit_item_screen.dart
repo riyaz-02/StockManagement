@@ -50,7 +50,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String _selectedWeightAccuracy = 'exact'; // Default
   String? _selectedContainerId;
   int? _selectedSlotNumber;
+  
+  // Certification - Simple checkboxes
   bool _isHallmarked = false;
+  bool _isHUID = false;
+  
   String _generatedBarcode = '';
   bool _isLoadingContainers = false;
   bool _isUploadingImages = false; // Track upload status
@@ -78,15 +82,19 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _generatedBarcode = item.barcode;
       _weightController.text = item.netWeight.toString();
       _piecesController.text = item.numberOfPieces.toString();
-      _huidController.text = item.huid;
       
       _selectedItemType = item.itemType;
       _selectedMetalType = item.metalType;
       _selectedPurity = item.purity;
       _selectedWeightCategory = item.weightCategory;
       _selectedWeightAccuracy = item.weightAccuracy;
-      _isHallmarked = item.huid.isNotEmpty;
       
+      // Load certification data
+      _isHallmarked = item.certificationType == 'hallmarked';
+      _isHUID = item.certificationType == 'huid';
+      if (_isHUID && item.huidNumber != null) {
+        _huidController.text = item.huidNumber!;
+      }
       // Handle Container & Slot
       _selectedContainerId = item.containerId;
       _selectedSlotNumber = item.slotNumber;

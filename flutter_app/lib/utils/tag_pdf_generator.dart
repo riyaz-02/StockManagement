@@ -23,6 +23,72 @@ class TagPdfGenerator {
   static const int tagsPerColumn = 8; // (11.69" - 1" margins) / 1.2" ≈ 8
   static const int tagsPerPage = 80; // 10 × 8
 
+  /// Get background color based on purity
+  static PdfColor _getPurityColor(String purity, Map<String, String>? purityColorMap) {
+    // Use configured colors if available
+    if (purityColorMap != null && purityColorMap.containsKey(purity)) {
+      try {
+        return PdfColor.fromHex(purityColorMap[purity]!);
+      } catch (e) {
+        print('Error parsing color for purity $purity: $e');
+      }
+    }
+    
+    // Fallback to default colors if not configured
+    switch (purity.toLowerCase()) {
+      case '24k':
+      case '999':
+      case '24':
+        return PdfColor.fromHex('#FFD700'); // Pure gold - Golden
+      case '22k':
+      case '916':
+      case '22':
+        return PdfColor.fromHex('#F4C430'); // 22K gold - Saffron gold
+      case '18k':
+      case '750':
+      case '18':
+        return PdfColor.fromHex('#FFE4B5'); // 18K gold - Moccasin
+      case '14k':
+      case '585':
+      case '14':
+        return PdfColor.fromHex('#FFDAB9'); // 14K gold - Peach puff
+      case '10k':
+      case '417':
+      case '10':
+        return PdfColor.fromHex('#FFE4E1'); // 10K gold - Misty rose
+      default:
+        return PdfColor.fromHex('#ADD8E6'); // Default - Light blue
+    }
+  }
+
+  /// Get accent color based on purity
+  static PdfColor _getPurityAccentColor(String purity) {
+    switch (purity.toLowerCase()) {
+      case '24k':
+      case '999':
+      case '24':
+        return PdfColor.fromHex('#DAA520'); // Goldenrod
+      case '22k':
+      case '916':
+      case '22':
+        return PdfColor.fromHex('#CD853F'); // Peru
+      case '18k':
+      case '750':
+      case '18':
+        return PdfColor.fromHex('#D2691E'); // Chocolate
+      case '14k':
+      case '585':
+      case '14':
+        return PdfColor.fromHex('#B8860B'); // Dark goldenrod
+      case '10k':
+      case '417':
+      case '10':
+        return PdfColor.fromHex('#A0522D'); // Sienna
+      default:
+        return PdfColor.fromHex('#4682B4'); // Steel blue
+    }
+  }
+
   /// Render Bengali text as image for proper display
   static Future<Uint8List> _renderTextAsImage(
     String text, {
@@ -82,8 +148,25 @@ class TagPdfGenerator {
   }
 
   /// Generate PDF document with barcode tags
-  static Future<pw.Document> generateTags(List<Item> items) async {
+  static Future<pw.Document> generateTags(List<Item> items, {dynamic settingsProvider}) async {
     final pdf = pw.Document();
+    
+    // Fetch tag settings for purity colors
+    Map<String, String>? purityColorMap;
+    if (settingsProvider != null) {
+      try {
+        final tagSettings = await settingsProvider.getTagSettings();
+        if (tagSettings != null && tagSettings['purityColors'] != null) {
+          purityColorMap = {};
+          for (var pc in tagSettings['purityColors']) {
+            purityColorMap[pc['purity']] = pc['color'];
+          }
+          print('📋 [PDF] Loaded ${purityColorMap.length} purity colors from settings');
+        }
+      } catch (e) {
+        print('⚠️ [PDF] Could not load tag settings, using default colors: $e');
+      }
+    }
     
     // Load font - Roboto for clean numbers and text
     final bengaliFont = await PdfGoogleFonts.robotoRegular();
@@ -117,7 +200,7 @@ class TagPdfGenerator {
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(pageMargin),
-          build: (context) => _buildTagPage(pageItems, bengaliFont, pageNameImages),
+          build: (context) => _buildTagPage(pageItems, bengaliFont, pageNameImages, purityColorMap),
         ),
       );
     }
@@ -126,7 +209,7 @@ class TagPdfGenerator {
   }
 
   /// Build a page of tags
-  static pw.Widget _buildTagPage(List<Item> items, pw.Font bengaliFont, List<pw.MemoryImage?> nameImages) {
+  static pw.Widget _buildTagPage(List<Item> items, pw.Font bengaliFont, List<pw.MemoryImage?> nameImages, Map<String, String>? purityColorMap) {
     // Create grid of tags
     final rows = <pw.Widget>[];
     
@@ -136,7 +219,7 @@ class TagPdfGenerator {
       for (int col = 0; col < tagsPerRow; col++) {
         final index = row * tagsPerRow + col;
         if (index < items.length) {
-          rowItems.add(_buildTag(items[index], bengaliFont, nameImages[index]));
+          rowItems.add(_buildTag(items[index], bengaliFont, nameImages[index], purityColorMap));
         } else {
           // Empty placeholder
           rowItems.add(pw.SizedBox(width: tagWidth, height: tagHeight));
@@ -169,18 +252,12 @@ class TagPdfGenerator {
   }
 
   /// Build a single foldable tag (front and back side by side)
-  static pw.Widget _buildTag(Item item, pw.Font bengaliFont, pw.MemoryImage? nameImage) {
-    final hasHallmark = item.huid.isNotEmpty;
+  static pw.Widget _buildTag(Item item, pw.Font bengaliFont, pw.MemoryImage? nameImage, Map<String, String>? purityColorMap) {
+    final bool hasHUID = item.certificationType == 'huid';
     
-    // Color coding
-    final bgColor = hasHallmark
-        ? PdfColor.fromHex('#FFD700') // Golden for hallmark
-        : PdfColor.fromHex('#ADD8E6'); // Light blue for non-hallmark
-    
-    final accentColor = hasHallmark
-        ? PdfColor.fromHex('#DAA520') // Goldenrod
-        : PdfColor.fromHex('#4682B4'); // Steel blue
-    
+    // Color coding based on purity - use configured colors from settings
+    final bgColor = _getPurityColor(item.purity, purityColorMap);
+    final accentColor = _getPurityAccentColor(item.purity);
     final textColor = PdfColors.black;
     
     return pw.Container(
@@ -240,10 +317,10 @@ class TagPdfGenerator {
                         ),
                       ),
                       // HUID on front side if exists
-                      if (hasHallmark) ...[
+                      if (hasHUID && item.huidNumber != null && item.huidNumber!.isNotEmpty) ...[
                         pw.SizedBox(height: 0.3),
                         pw.Text(
-                          'HUID: ${item.huid}',
+                          'HUID: ${item.huidNumber}',
                           style: pw.TextStyle(
                             fontSize: 2.8,
                             fontWeight: pw.FontWeight.bold,
