@@ -139,8 +139,11 @@ class PDFGenerator {
      * @private
      */
     static _generateSingleTag(item, purityColorMap = {}) {
-        const hasHallmark = item.huid && item.huid.trim() !== '';
-        const colorClass = hasHallmark ? 'hallmark' : 'non-hallmark';
+        // Check certification type
+        const isHallmarked = item.certificationType === 'hallmarked';
+        const isHUID = item.certificationType === 'huid';
+        const hasHUID = isHUID && item.huidNumber && item.huidNumber.trim() !== '';
+        const colorClass = (isHallmarked || isHUID) ? 'hallmark' : 'non-hallmark';
 
         // Get purity color from settings or use default
         const purityColor = purityColorMap[item.purity] || '#FFD700';
@@ -168,7 +171,8 @@ class PDFGenerator {
           <div class="weight-box ${colorClass}">
             <span class="weight-value">${item.netWeight.toFixed(3)}g</span>
           </div>
-          ${hasHallmark ? `<div class="huid-badge ${colorClass}"><span class="huid-text">HUID: ${item.huid}</span></div>` : ''}
+          ${hasHUID ? `<div class="huid-badge ${colorClass}"><span class="huid-text">HUID: ${item.huidNumber}</span></div>` : ''}
+          ${isHallmarked ? `<div class="huid-badge ${colorClass}"><span class="huid-text">916 Hallmarked</span></div>` : ''}
         </div>
       </div>
     `;

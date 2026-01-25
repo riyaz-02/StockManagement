@@ -120,7 +120,7 @@ exports.generateTagsPDF = async (req, res) => {
 
         // Fetch items
         const items = await Item.find({ _id: { $in: itemIds } })
-            .select('barcode name netWeight purity huid')
+            .select('barcode name netWeight purity certificationType huidNumber')
             .lean();
 
         console.log(`[PDF Generation] Found ${items.length} items in database`);
@@ -138,7 +138,9 @@ exports.generateTagsPDF = async (req, res) => {
             barcode: items[0].barcode,
             name: items[0].name,
             weight: items[0].netWeight,
-            purity: items[0].purity
+            purity: items[0].purity,
+            certificationType: items[0].certificationType,
+            huidNumber: items[0].huidNumber
         });
 
         // Generate PDF
