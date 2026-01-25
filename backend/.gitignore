@@ -40,3 +40,7 @@ coverage/
 .cache/
 temp/
 tmp/
+
+# Sensitive files (credentials)
+add-admin.js
+deploy/DEPLOYMENT_GUIDE.md
