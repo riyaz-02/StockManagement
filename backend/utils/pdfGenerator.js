@@ -171,8 +171,6 @@ class PDFGenerator {
           <div class="weight-box ${colorClass}">
             <span class="weight-value">${item.netWeight.toFixed(3)}g</span>
           </div>
-          ${hasHUID ? `<div class="huid-badge ${colorClass}"><span class="huid-text">HUID: ${item.huidNumber}</span></div>` : ''}
-          ${isHallmarked ? `<div class="huid-badge ${colorClass}"><span class="huid-text">916 Hallmarked</span></div>` : ''}
         </div>
       </div>
     `;
