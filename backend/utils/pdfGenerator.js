@@ -149,6 +149,21 @@ class PDFGenerator {
         const purityColor = purityColorMap[item.purity] || '#FFD700';
         const purityStyle = `background-color: ${purityColor};`;
 
+        // Dynamic font sizing for weight based on text length
+        const weightText = `${item.netWeight.toFixed(3)}g`;
+        const weightLength = weightText.length;
+        let weightFontSize = '11pt'; // Default
+
+        if (weightLength >= 10) {
+            weightFontSize = '7pt'; // Very large weights (1000+)
+        } else if (weightLength >= 9) {
+            weightFontSize = '8pt'; // Large weights (100-999)
+        } else if (weightLength >= 8) {
+            weightFontSize = '9pt'; // Medium-large weights
+        } else if (weightLength >= 7) {
+            weightFontSize = '10pt'; // Medium weights
+        }
+
         return `
       <div class="tag">
         <!-- Front Side -->
@@ -169,7 +184,7 @@ class PDFGenerator {
         <div class="tag-back ${colorClass}" style="${purityStyle}">
           <div class="item-name">${this._escapeHTML(item.name)}</div>
           <div class="weight-box ${colorClass}">
-            <span class="weight-value">${item.netWeight.toFixed(3)}g</span>
+            <span class="weight-value" style="font-size: ${weightFontSize};">${weightText}</span>
           </div>
         </div>
       </div>
