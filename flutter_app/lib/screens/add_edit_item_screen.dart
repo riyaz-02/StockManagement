@@ -387,6 +387,101 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     );
   }
 
+  Future<void> _showImageSourceDialog() async {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Add Photos',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFFE94560)),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _captureFromCamera();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Color(0xFFE94560)),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImages();
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _captureFromCamera() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      
+      if (image == null) return;
+
+      setState(() => _isUploadingImages = true);
+
+      try {
+        print('[CAMERA] Uploading captured image to Cloudinary...');
+        final result = await _apiService.uploadImage(image);
+        
+        if (result['success'] == true) {
+          final imageUrl = result['data']['url'];
+          setState(() {
+            _uploadedImageUrls.add(imageUrl);
+          });
+          print('[CAMERA] ✅ Uploaded: $imageUrl');
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Photo captured and uploaded successfully'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Upload failed');
+        }
+      } catch (e) {
+        print('[CAMERA] ❌ Failed to upload: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload photo: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+
+      setState(() => _isUploadingImages = false);
+    } catch (e) {
+      setState(() => _isUploadingImages = false);
+      print('[CAMERA] ❌ Camera error: $e');
+    }
+  }
+
   Future<void> _pickImages() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage();
@@ -981,7 +1076,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 children: [
                   const Text('Item Images', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   TextButton.icon(
-                    onPressed: _pickImages,
+                    onPressed: _showImageSourceDialog,
                     icon: const Icon(Icons.add_a_photo),
                     label: const Text('Add Photos'),
                   ),

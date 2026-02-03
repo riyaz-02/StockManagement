@@ -175,10 +175,8 @@ class PDFGenerator {
             }
             <div class="barcode-text">${item.barcode}</div>
           </div>
-          <div class="purity-badge ${colorClass}">
-            <span class="purity-text">${item.netWeight.toFixed(3)}g</span>
-            <span class="purity-text">•</span>
-            <span class="purity-text">${item.purity}</span>
+          <div class="front-weight-display">
+            <span class="front-weight-text">${item.netWeight.toFixed(3)}g</span>
           </div>
         </div>
         

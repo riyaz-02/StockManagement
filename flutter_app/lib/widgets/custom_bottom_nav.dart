@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
+import '../screens/general_scan_screen.dart';
 
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -60,13 +61,13 @@ class CustomBottomNav extends StatelessWidget {
                       context: context,
                       icon: Icons.bookmark_rounded,
                       label: languageProvider.t('bookings'),
-                      index: 3,
+                      index: 2,
                     ),
                     _buildNavItem(
                       context: context,
                       icon: Icons.settings_rounded,
                       label: languageProvider.t('settings'),
-                      index: 4,
+                      index: 3,
                     ),
                   ],
                 ),
@@ -138,40 +139,48 @@ class CustomBottomNav extends StatelessWidget {
   }
 
   Widget _buildCenterButton() {
-    final isActive = currentIndex == 2;
-    
-    return Container(
-      margin: const EdgeInsets.only(left: 5),
-      child: Transform.translate(
-        offset: const Offset(0, -12),
-        child: GestureDetector(
-          onTap: () => onTap(2),
-          child: Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFE94560),
-                  Color(0xFFD32F2F),
-                  Color(0xFFC62828),
+    return Builder(
+      builder: (context) => Container(
+        margin: const EdgeInsets.only(left: 5),
+        child: Transform.translate(
+          offset: const Offset(0, -12),
+          child: GestureDetector(
+            onTap: () {
+              // Navigate to scanner screen instead of tab switching
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GeneralScanScreen(),
+                ),
+              );
+            },
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFE94560),
+                    Color(0xFFD32F2F),
+                    Color(0xFFC62828),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE94560).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE94560).withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.qr_code_scanner_rounded,
-              color: Colors.white,
-              size: 35,
+              child: const Icon(
+                Icons.qr_code_scanner_rounded,
+                color: Colors.white,
+                size: 35,
+              ),
             ),
           ),
         ),

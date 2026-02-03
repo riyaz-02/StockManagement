@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jewellery_stock_app/screens/home_screen.dart';
 import 'package:jewellery_stock_app/screens/item_list_screen.dart';
-import 'package:jewellery_stock_app/screens/general_scan_screen.dart';
 import 'package:jewellery_stock_app/screens/settings_menu_screen.dart';
 import 'package:jewellery_stock_app/screens/booking_list_screen.dart';
 import 'package:jewellery_stock_app/widgets/custom_bottom_nav.dart';
@@ -16,12 +15,11 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  // Screens for each navigation item
+  // Screens for each navigation item (Scanner removed - uses push navigation)
   final List<Widget> _screens = [
     const HomeScreen(),
     const ItemListScreen(),
-    const GeneralScanScreen(),
-    const BookingListScreen(), // Actual booking screen
+    const BookingListScreen(),
     const SettingsMenuScreen(),
   ];
 

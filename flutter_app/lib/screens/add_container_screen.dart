@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import '../providers/container_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 
@@ -23,6 +24,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   final _nameController = TextEditingController();
   final _capacityController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
+  final ApiService _apiService = ApiService();
   
   String _selectedType = 'drawer';
   String _selectedWeightCategory = 'light';
@@ -32,9 +34,9 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   String _selectedLayoutType = 'grid';
   List<String> _selectedItemTypes = [];
   
-  // Image picker state
-  Uint8List? _selectedImageBytes;
-  String? _selectedImageName;
+  // Image upload state
+  String? _uploadedImageUrl;
+  bool _isUploadingImage = false;
   
   // Barcode state
   String _generatedBarcode = '';
@@ -122,36 +124,54 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         imageQuality: 85,
       );
       
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _selectedImageBytes = bytes;
-          String name = image.name;
-          if (!name.toLowerCase().endsWith('.jpg') && 
-              !name.toLowerCase().endsWith('.jpeg') && 
-              !name.toLowerCase().endsWith('.png') && 
-              !name.toLowerCase().endsWith('.webp')) {
-            name = '$name.jpg';
+      if (image == null) return;
+
+      setState(() => _isUploadingImage = true);
+
+      try {
+        print('[UPLOAD] Uploading container image to Cloudinary...');
+        final result = await _apiService.uploadImage(image, folder: 'containers');
+        
+        if (result['success'] == true) {
+          final imageUrl = result['data']['url'];
+          setState(() {
+            _uploadedImageUrl = imageUrl;
+            _isUploadingImage = false;
+          });
+          print('[UPLOAD] ✅ Uploaded: $imageUrl');
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image uploaded successfully'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
           }
-          _selectedImageName = name;
-        });
+        } else {
+          throw Exception('Upload failed');
+        }
+      } catch (e) {
+        setState(() => _isUploadingImage = false);
+        print('[UPLOAD] ❌ Failed: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload image: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      setState(() => _isUploadingImage = false);
     }
   }
 
   void _removeImage() {
     setState(() {
-      _selectedImageBytes = null;
-      _selectedImageName = null;
+      _uploadedImageUrl = null;
     });
   }
 
@@ -192,11 +212,6 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       }
 
       final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-      
-      String? imageUrl;
-      if (_selectedImageBytes != null && _selectedImageName != null) {
-        imageUrl = await containerProvider.uploadImage(_selectedImageBytes!, _selectedImageName!);
-      }
 
       final containerData = {
         'name': _nameController.text,
@@ -204,12 +219,11 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         'capacity': int.parse(_capacityController.text),
         'allowedItemTypes': _selectedItemTypes,
         'weightCategory': _selectedWeightCategory,
-        'weightCategory': _selectedWeightCategory,
         'metalType': _selectedMetalTypes,
         'purity': _selectedPurity,
         'layoutType': _selectedLayoutType,
         'qrCode': _generatedBarcode,
-        if (imageUrl != null) 'image': imageUrl,
+        if (_uploadedImageUrl != null) 'image': _uploadedImageUrl,
       };
 
       final success = await containerProvider.createContainer(containerData);
@@ -701,56 +715,64 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey[300]!),
       ),
-      child: _selectedImageBytes != null
-          ? Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.memory(
-                    _selectedImageBytes!,
-                    height: 60,
-                    width: 60,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _selectedImageName ?? 'Image',
-                    style: const TextStyle(fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: _removeImage,
-                  color: Colors.red,
-                  tooltip: 'Remove',
-                ),
-              ],
-            )
-          : InkWell(
-              onTap: _pickImage,
-              borderRadius: BorderRadius.circular(8),
+      child: _isUploadingImage
+          ? const Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : _uploadedImageUrl != null
+              ? Row(
                   children: [
-                    Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Add Image',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        _uploadedImageUrl!,
+                        height: 60,
+                        width: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Image uploaded',
+                        style: TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: _removeImage,
+                      color: Colors.red,
+                      tooltip: 'Remove',
+                    ),
                   ],
+                )
+              : InkWell(
+                  onTap: _pickImage,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Add Image',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
