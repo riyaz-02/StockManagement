@@ -56,22 +56,27 @@ app.use(mongoSanitize());
 // Prevent parameter pollution
 app.use(hpp());
 
-// Rate limiting
+// Rate limiting - Skip for authenticated users
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased to 1000 for stock audit/tally operations
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for authenticated users (they have a valid JWT token)
+  skip: (req) => {
+    const authHeader = req.headers.authorization;
+    return authHeader && authHeader.startsWith('Bearer ');
+  }
 });
 
-// Apply rate limiting to all API routes
+// Apply rate limiting to all API routes (but skips authenticated users)
 app.use('/api/', limiter);
 
-// Stricter rate limiting for auth routes
+// Stricter rate limiting for auth routes (login/register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
+  max: 10, // Increased from 5 to 10 to allow more login attempts
   message: 'Too many login attempts, please try again later.',
   skipSuccessfulRequests: true,
 });
