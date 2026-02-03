@@ -32,6 +32,14 @@ const cloudinaryRoutes = require('./routes/cloudinary.routes');
 const app = express();
 
 // ======================
+// PROXY CONFIGURATION
+// ======================
+
+// Trust proxy - Required for Railway and other cloud platforms
+// This allows express-rate-limit to correctly identify client IPs
+app.set('trust proxy', 1);
+
+// ======================
 // SECURITY MIDDLEWARE
 // ======================
 

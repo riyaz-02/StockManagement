@@ -52,8 +52,7 @@ const userSchema = new mongoose.Schema({
 // INDEXES FOR PERFORMANCE
 // ======================
 
-// Index on mobile for login queries
-userSchema.index({ mobile: 1 });
+// Note: mobile field already has a unique index from schema definition (line 24)
 
 // Index on role for authorization queries
 userSchema.index({ role: 1 });
