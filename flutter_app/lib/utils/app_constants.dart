@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
-  // Production API URL
-  static const String baseUrl = 'https://stockmanagement-production-0bff.up.railway.app/api';
+  // Production API URL - AWS EC2 Mumbai
+  static const String baseUrl = 'http://13.203.224.156/api';
   
   // Development URL - localhost (comment above and uncomment this for local development)
   // static String get baseUrl {
