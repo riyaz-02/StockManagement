@@ -152,16 +152,21 @@ class PDFGenerator {
         // Dynamic font sizing for weight based on text length
         const weightText = `${item.netWeight.toFixed(3)}g`;
         const weightLength = weightText.length;
-        let weightFontSize = '11pt'; // Default
+        let backWeightFontSize = '11pt'; // Default for back side
+        let frontWeightFontSize = '10pt'; // Default for front side
 
         if (weightLength >= 10) {
-            weightFontSize = '7pt'; // Very large weights (1000+)
+            backWeightFontSize = '7pt'; // Very large weights (1000+)
+            frontWeightFontSize = '6pt';
         } else if (weightLength >= 9) {
-            weightFontSize = '8pt'; // Large weights (100-999)
+            backWeightFontSize = '8pt'; // Large weights (100-999)
+            frontWeightFontSize = '7pt';
         } else if (weightLength >= 8) {
-            weightFontSize = '9pt'; // Medium-large weights
+            backWeightFontSize = '9pt'; // Medium-large weights
+            frontWeightFontSize = '8pt';
         } else if (weightLength >= 7) {
-            weightFontSize = '10pt'; // Medium weights
+            backWeightFontSize = '10pt'; // Medium weights
+            frontWeightFontSize = '9pt';
         }
 
         return `
@@ -176,7 +181,7 @@ class PDFGenerator {
             <div class="barcode-text">${item.barcode}</div>
           </div>
           <div class="front-weight-display">
-            <span class="front-weight-text">${item.netWeight.toFixed(3)}g</span>
+            <span class="front-weight-text" style="font-size: ${frontWeightFontSize};">${weightText}</span>
           </div>
         </div>
         
@@ -184,7 +189,7 @@ class PDFGenerator {
         <div class="tag-back ${colorClass}" style="${purityStyle}">
           <div class="item-name">${this._escapeHTML(item.name)}</div>
           <div class="weight-box ${colorClass}">
-            <span class="weight-value" style="font-size: ${weightFontSize};">${weightText}</span>
+            <span class="weight-value" style="font-size: ${backWeightFontSize};">${weightText}</span>
           </div>
         </div>
       </div>
