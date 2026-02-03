@@ -20,12 +20,31 @@ class ApiService {
 
   // Handle API response
   Map<String, dynamic> _handleResponse(http.Response response) {
-    final body = json.decode(response.body);
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return body;
-    } else {
-      throw Exception(body['message'] ?? 'An error occurred');
+    // Check if response is HTML instead of JSON
+    final contentType = response.headers['content-type'] ?? '';
+    if (contentType.contains('text/html')) {
+      print('[API] ERROR: Received HTML response instead of JSON');
+      print('[API] Status Code: ${response.statusCode}');
+      print('[API] URL: ${response.request?.url}');
+      print('[API] Response preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+      throw Exception('Server returned HTML instead of JSON. Status: ${response.statusCode}. This usually means the endpoint was not found or there\'s a server configuration issue.');
+    }
+
+    try {
+      final body = json.decode(response.body);
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return body;
+      } else {
+        throw Exception(body['message'] ?? 'An error occurred');
+      }
+    } catch (e) {
+      if (e is FormatException) {
+        print('[API] JSON Parse Error: ${e.message}');
+        print('[API] Response body: ${response.body}');
+        throw Exception('Invalid JSON response from server');
+      }
+      rethrow;
     }
   }
 
