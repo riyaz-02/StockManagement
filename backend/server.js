@@ -145,7 +145,7 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 const mongoOptions = {
   maxPoolSize: 20, // Increased from 10 for better concurrency
   minPoolSize: 5,  // Increased from 2 for faster response
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 30000, // Increased to 30 seconds for Railway
   socketTimeoutMS: 45000,
 };
 
@@ -154,13 +154,22 @@ if (process.env.NODE_ENV !== 'production') {
   mongoose.set('debug', true);
 }
 
+// Log MongoDB URI (masked) for debugging
+const mongoUri = process.env.MONGODB_URI;
+if (!mongoUri) {
+  logger.error('❌ MONGODB_URI environment variable is not set!');
+  process.exit(1);
+}
+logger.info(`Connecting to MongoDB: ${mongoUri.substring(0, 20)}...`);
+
 mongoose.connect(process.env.MONGODB_URI, mongoOptions)
   .then(() => {
     logger.info('✅ MongoDB connected successfully');
     logger.info(`Database: ${mongoose.connection.name}`);
   })
   .catch((err) => {
-    logger.error('❌ MongoDB connection error:', err);
+    logger.error('❌ MongoDB connection error:', err.message);
+    logger.error('Full error:', err);
     process.exit(1);
   });
 
