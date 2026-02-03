@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
+const compression = require('compression');
 const logger = require('./config/logger');
 
 // Load environment variables
@@ -114,6 +115,17 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Response compression - reduces payload size by 60-80%
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Balance between compression ratio and speed
+}));
+
 // Body parser with size limits
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -131,11 +143,16 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 // ======================
 
 const mongoOptions = {
-  maxPoolSize: 10, // Maximum number of connections in the pool
-  minPoolSize: 2,  // Minimum number of connections
+  maxPoolSize: 20, // Increased from 10 for better concurrency
+  minPoolSize: 5,  // Increased from 2 for faster response
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
 };
+
+// Enable query logging in development
+if (process.env.NODE_ENV !== 'production') {
+  mongoose.set('debug', true);
+}
 
 mongoose.connect(process.env.MONGODB_URI, mongoOptions)
   .then(() => {

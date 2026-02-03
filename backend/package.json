@@ -24,6 +24,7 @@
     "bcryptjs": "^2.4.3",
     "bwip-js": "^4.8.0",
     "cloudinary": "^1.41.3",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "exceljs": "^4.4.0",

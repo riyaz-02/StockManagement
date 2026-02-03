@@ -87,7 +87,8 @@ exports.getContainers = async (req, res) => {
 
         const containers = await Container.find(filter)
             .populate('slots.itemId', 'name barcode netWeight status')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         res.status(200).json({
             success: true,
