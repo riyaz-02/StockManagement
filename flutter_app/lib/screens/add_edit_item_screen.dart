@@ -43,9 +43,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _piecesController = TextEditingController(text: '1');
   final _huidController = TextEditingController();
   
-  String _selectedItemType = 'ring';
-  String _selectedMetalType = 'gold';
-  String _selectedPurity = '916';
+  String _selectedItemType = ''; // Start blank
+  String _selectedMetalType = ''; // Start blank
+  String _selectedPurity = ''; // Start blank
   String _selectedWeightCategory = 'Light';
   String _selectedWeightAccuracy = 'exact'; // Default
   String? _selectedContainerId;
@@ -149,23 +149,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
     
     if (mounted) {
-      // Only set defaults if NEW item
-      if (widget.item == null) {
-        setState(() {
-          _selectedItemType = settingsProvider.itemTypes.isNotEmpty 
-              ? settingsProvider.itemTypes.first.toLowerCase() 
-              : 'ring';
-          _selectedMetalType = settingsProvider.metalTypes.isNotEmpty 
-              ? settingsProvider.metalTypes.first.toLowerCase() 
-              : 'gold';
-          _selectedPurity = settingsProvider.purityOptions.isNotEmpty 
-              ? settingsProvider.purityOptions.first 
-              : '916';
-        });
+      // Don't auto-fill type/metal/purity - let user choose
+      // Only trigger analysis if we have values to analyze
+      if (_selectedItemType.isNotEmpty && _selectedMetalType.isNotEmpty && _selectedPurity.isNotEmpty) {
+        _analyzeContainer();
       }
-
-      // Trigger analysis to populate recommendations
-      _analyzeContainer();
     }
   });
 }
@@ -287,14 +275,17 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         _recommendedContainers = recommended;
         _isLoadingContainers = false;
         
-        // Auto-select logic: Always pick the best match based on current specs
-        // This ensures that changing weight/type immediately updates to the best container
-        final best = recommended.firstOrNull;
-        if (best != null && (best['isAssignable'] as bool)) {
-          _selectedContainerId = best['id'] as String;
-        } else {
-          _selectedContainerId = null;
+        // Auto-select logic: Only auto-select if no container was pre-selected
+        // If user came from container slot, preserve that selection
+        if (_selectedContainerId == null || widget.initialContainerId == null) {
+          final best = recommended.firstOrNull;
+          if (best != null && (best['isAssignable'] as bool)) {
+            _selectedContainerId = best['id'] as String;
+          } else {
+            _selectedContainerId = null;
+          }
         }
+        // If initialContainerId was set, keep it (don't override)
       });
     } catch (e) {
       if (mounted) setState(() => _isLoadingContainers = false);
@@ -770,9 +761,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
             ),
         ],
       ),
-      body: _selectedItemType.isEmpty || _selectedMetalType.isEmpty || _selectedPurity.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
+      body: Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -1516,17 +1505,17 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     if (!safeItems.contains(value) && value.isNotEmpty) {
       safeItems.add(value);
     }
-    // If value is empty and items not empty, default to first
-    String? safeValue = value;
-    if (value.isEmpty && safeItems.isNotEmpty) {
-      safeValue = safeItems.first;
-    } else if (safeItems.isEmpty) {
-        safeItems.add('Default');
-        safeValue = 'Default';
+    // Handle empty items list
+    if (safeItems.isEmpty) {
+      safeItems.add('No options available');
     }
+    
+    // Allow null value to show hint
+    String? safeValue = value.isEmpty ? null : value;
     
     return DropdownButtonFormField<String>(
       value: safeValue,
+      hint: Text('Select $label', style: TextStyle(color: Colors.grey[600])),
       decoration: InputDecoration(
         labelText: '$label *',
         prefixIcon: Icon(icon, color: AppColors.primary),
