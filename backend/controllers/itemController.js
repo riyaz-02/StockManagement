@@ -182,6 +182,45 @@ exports.createItem = async (req, res) => {
     }
 };
 
+// @desc    Get available filter options
+// @route   GET /api/items/filter-options
+// @access  Private
+exports.getFilterOptions = async (req, res) => {
+    try {
+        const [metalTypes, itemTypes, purities, weightRange] = await Promise.all([
+            Item.distinct('metalType', { status: { $ne: 'deleted' } }),
+            Item.distinct('itemType', { status: { $ne: 'deleted' } }),
+            Item.distinct('purity', { status: { $ne: 'deleted' } }),
+            Item.aggregate([
+                { $match: { status: { $ne: 'deleted' } } },
+                {
+                    $group: {
+                        _id: null,
+                        minWeight: { $min: '$netWeight' },
+                        maxWeight: { $max: '$netWeight' }
+                    }
+                }
+            ])
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                metalTypes: metalTypes.filter(Boolean).sort(),
+                itemTypes: itemTypes.filter(Boolean).sort(),
+                purities: purities.filter(Boolean).sort(),
+                weightRange: weightRange[0] || { minWeight: 0, maxWeight: 100 }
+            }
+        });
+    } catch (error) {
+        console.error('Get filter options error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching filter options'
+        });
+    }
+};
+
 // @desc    Get all items
 // @route   GET /api/items
 // @access  Private
@@ -210,6 +249,17 @@ exports.getItems = async (req, res) => {
         if (containerId) filter.containerId = containerId;
         if (purity) filter.purity = purity;
         if (certificationType) filter.certificationType = certificationType;
+
+        // Weight range filtering
+        if (req.query.minWeight || req.query.maxWeight) {
+            filter.netWeight = {};
+            if (req.query.minWeight) {
+                filter.netWeight.$gte = parseFloat(req.query.minWeight);
+            }
+            if (req.query.maxWeight) {
+                filter.netWeight.$lte = parseFloat(req.query.maxWeight);
+            }
+        }
 
         // Search functionality - search in name and barcode
         if (search && search.trim()) {
@@ -689,3 +739,78 @@ exports.permanentDeleteItem = async (req, res) => {
         });
     }
 };
+
+// @desc    Mark item as no sell
+// @route   PUT /api/items/:id/mark-no-sell
+// @access  Private
+exports.markAsNoSell = async (req, res) => {
+    try {
+        const item = await Item.findById(req.params.id);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Don't allow marking sold or deleted items as no_sell
+        if (item.status === 'sold' || item.status === 'deleted') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot mark ${item.status} items as no sell`
+            });
+        }
+
+        item.status = 'no_sell';
+        await item.save();
+
+        console.log(`✓ Item ${item.barcode} marked as no sell`);
+
+        res.json({
+            success: true,
+            data: item,
+            message: 'Item marked as no sell successfully'
+        });
+    } catch (error) {
+        console.error('Mark as no sell error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while marking item as no sell'
+        });
+    }
+};
+
+// @desc    Mark item as active (remove no sell status)
+// @route   PUT /api/items/:id/mark-active
+// @access  Private
+exports.markAsActive = async (req, res) => {
+    try {
+        const item = await Item.findById(req.params.id);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        item.status = 'active';
+        await item.save();
+
+        console.log(`✓ Item ${item.barcode} marked as active`);
+
+        res.json({
+            success: true,
+            data: item,
+            message: 'Item marked as active successfully'
+        });
+    } catch (error) {
+        console.error('Mark as active error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while marking item as active'
+        });
+    }
+};
+

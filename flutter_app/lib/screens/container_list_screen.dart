@@ -20,8 +20,12 @@ class ContainerListScreen extends StatefulWidget {
   State<ContainerListScreen> createState() => _ContainerListScreenState();
 }
 
-class _ContainerListScreenState extends State<ContainerListScreen> {
+class _ContainerListScreenState extends State<ContainerListScreen> with AutomaticKeepAliveClientMixin {
   String _statusFilter = 'all';
+  
+  @override
+  bool get wantKeepAlive => true;
+  
   @override
   void initState() {
     super.initState();
@@ -36,6 +40,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
@@ -144,6 +150,7 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
           }
 
           return ListView.builder(
+            key: const PageStorageKey<String>('containersListView'),
             padding: const EdgeInsets.all(16),
             itemCount: _filterContainers(provider.containers).length,
             itemBuilder: (context, index) {

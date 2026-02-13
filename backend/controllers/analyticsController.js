@@ -42,7 +42,8 @@ exports.getDashboardStats = async (req, res) => {
             sold: 0,
             UNDER_REPAIR: 0,
             WITH_CUSTOMER: 0,
-            WITH_AGENT: 0
+            WITH_AGENT: 0,
+            no_sell: 0
         };
 
         itemsByStatus.forEach(item => {
@@ -75,7 +76,8 @@ exports.getDashboardStats = async (req, res) => {
             repair: 0,
             in_repair: 0,
             temporarily_removed: 0,
-            UNDER_REPAIR: 0
+            UNDER_REPAIR: 0,
+            no_sell: 0
         };
 
         weightByStatus.forEach(item => {
@@ -99,13 +101,13 @@ exports.getDashboardStats = async (req, res) => {
         console.log(`   Total Tallies: ${totalTallies}, Active: ${activeTallies}`);
 
         // Get CURRENT STOCK by metal (only items physically in shop)
-        // Include: active, booked, in_repair, UNDER_REPAIR
+        // Include: active, booked, in_repair, UNDER_REPAIR, no_sell
         // Exclude: WITH_CUSTOMER, WITH_AGENT, temporarily_removed, sold, deleted
         const currentStockByMetal = await Item.aggregate([
             {
                 $match: {
                     isDeleted: { $ne: true },
-                    status: { $in: ['active', 'booked', 'in_repair', 'UNDER_REPAIR'] }
+                    status: { $in: ['active', 'booked', 'in_repair', 'UNDER_REPAIR', 'no_sell'] }
                 }
             },
             {

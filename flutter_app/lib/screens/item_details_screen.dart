@@ -576,12 +576,37 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           () => _showMoveOutBottomSheet(),
                         ),
                         _buildIconButton(
+                          Icons.block,
+                          'No Sell',
+                          Colors.red,
+                          () => _showMarkAsNoSellConfirmation(context),
+                        ),
+                        _buildIconButton(
                           Icons.delete_outline,
                           'Delete',
-                          Colors.red,
+                          Colors.red.shade700,
                           () => _showDeleteConfirmation(context),
                         ),
                       ],
+                    ),
+
+                  // Mark as Active button for no_sell items
+                  if (_item.status == 'no_sell')
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showMarkAsActiveConfirmation(context),
+                        icon: const Icon(Icons.check_circle),
+                        label: const Text('Mark as Active'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
 
                   // Restore/Permanent Delete buttons for deleted items
@@ -908,6 +933,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       case 'repair':
       case 'in_repair': return Icons.build;
       case 'sold': return Icons.sell;
+      case 'no_sell': return Icons.block;
       default: return Icons.inventory;
     }
   }
@@ -919,6 +945,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       case 'repair':
       case 'in_repair': return AppColors.statusRepair;
       case 'sold': return AppColors.statusSold;
+      case 'no_sell': return Colors.red;
       default: return Colors.grey;
     }
   }
@@ -1184,6 +1211,88 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
               }
             },
             child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMarkAsNoSellConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.block, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Mark as No Sell?'),
+          ],
+        ),
+        content: const Text('This item will be marked as not available for sale. You can change it back to active later.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(context);
+              try {
+                await _apiService.markItemAsNoSell(_item.id);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Item marked as no sell'), backgroundColor: Colors.green),
+                  );
+                  _refreshData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                }
+              }
+            },
+            child: const Text('Mark as No Sell'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMarkAsActiveConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Mark as Active?'),
+          ],
+        ),
+        content: const Text('This item will be marked as active and available for sale again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(context);
+              try {
+                await _apiService.markItemAsActive(_item.id);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Item marked as active'), backgroundColor: Colors.green),
+                  );
+                  _refreshData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                }
+              }
+            },
+            child: const Text('Mark as Active'),
           ),
         ],
       ),

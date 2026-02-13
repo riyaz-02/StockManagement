@@ -90,8 +90,12 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getContainer(String id) async {
+    // Add timestamp to prevent caching (HTTP 304 fix)
+    final uri = Uri.parse('${AppConstants.baseUrl}/containers/$id').replace(
+      queryParameters: {'_': DateTime.now().millisecondsSinceEpoch.toString()},
+    );
     final response = await http.get(
-      Uri.parse('${AppConstants.baseUrl}/containers/$id'),
+      uri,
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
@@ -160,6 +164,14 @@ class ApiService {
       uri = uri.replace(queryParameters: queryParams);
     }
     final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getItemFilterOptions() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/items/filter-options'),
+      headers: await _getHeaders(),
+    );
     return _handleResponse(response);
   }
 
@@ -342,6 +354,22 @@ class ApiService {
       Uri.parse('${AppConstants.baseUrl}/items/$id/sell'),
       headers: await _getHeaders(),
       body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> markItemAsNoSell(String id) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/items/$id/mark-no-sell'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> markItemAsActive(String id) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/items/$id/mark-active'),
+      headers: await _getHeaders(),
     );
     return _handleResponse(response);
   }
@@ -921,5 +949,40 @@ class ApiService {
       body: jsonEncode(data),
     );
     return _handleResponse(response);
+  }
+
+  // Generate PDF for blank tags
+  Future<Uint8List> generateBlankTagsPDF(Map<String, int> purityCounts) async {
+    try {
+      final token = await _storage.getToken();
+      
+      // Custom headers for PDF download
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/tag-print/generate-blank-tags-pdf'),
+        headers: headers,
+        body: jsonEncode({'purityCounts': purityCounts}),
+      );
+
+      print('[API] Blank Tags PDF response status: ${response.statusCode}');
+      print('[API] Blank Tags PDF response length: ${response.bodyBytes.length}');
+
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+        print('[API] Returning ${bytes.length} bytes for blank tags PDF');
+        return bytes;
+      } else {
+        final errorBody = utf8.decode(response.bodyBytes);
+        print('[API] Error response: $errorBody');
+        throw Exception('Failed to generate blank tags PDF: ${response.statusCode} - $errorBody');
+      }
+    } catch (e) {
+      print('[API] Exception generating blank tags PDF: $e');
+      rethrow;
+    }
   }
 }

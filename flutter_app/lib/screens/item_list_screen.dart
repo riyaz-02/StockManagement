@@ -22,16 +22,22 @@ class ItemListScreen extends StatefulWidget {
   State<ItemListScreen> createState() => _ItemListScreenState();
 }
 
-class _ItemListScreenState extends State<ItemListScreen> {
+class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAliveClientMixin {
   String _statusFilter = 'all';
   String _searchQuery = '';
   String? _metalTypeFilter;
   String? _itemTypeFilter;
   String? _purityFilter;
   String? _certificationFilter;
+  double? _minWeight;
+  double? _maxWeight;
+  RangeValues? _weightRange;
   
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -40,6 +46,10 @@ class _ItemListScreenState extends State<ItemListScreen> {
     if (widget.initialStatus != null) {
       _statusFilter = widget.initialStatus!;
     }
+    // Fetch filter options
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ItemProvider>(context, listen: false).fetchFilterOptions();
+    });
     _loadItems();
   }
 
@@ -64,6 +74,12 @@ class _ItemListScreenState extends State<ItemListScreen> {
     if (_certificationFilter != null) {
       queryParams['certificationType'] = _certificationFilter!;
     }
+    if (_minWeight != null) {
+      queryParams['minWeight'] = _minWeight.toString();
+    }
+    if (_maxWeight != null) {
+      queryParams['maxWeight'] = _maxWeight.toString();
+    }
     
     // Use existing fetchItems method with status and filters
     itemProvider.fetchItems(
@@ -81,6 +97,8 @@ class _ItemListScreenState extends State<ItemListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final languageProvider = Provider.of<LanguageProvider>(context);
     final itemProvider = Provider.of<ItemProvider>(context);
     final items = itemProvider.items;
@@ -219,7 +237,8 @@ class _ItemListScreenState extends State<ItemListScreen> {
           
           // Additional Filters Row with Clear Button
           if (_metalTypeFilter != null || _itemTypeFilter != null || 
-              _purityFilter != null || _certificationFilter != null)
+              _purityFilter != null || _certificationFilter != null ||
+              _minWeight != null || _maxWeight != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
@@ -249,6 +268,18 @@ class _ItemListScreenState extends State<ItemListScreen> {
                             setState(() => _certificationFilter = null);
                             _loadItems();
                           }),
+                        if (_minWeight != null || _maxWeight != null)
+                          _buildActiveFilterChip(
+                            'Weight: ${_minWeight?.toStringAsFixed(1) ?? '0'}-${_maxWeight?.toStringAsFixed(1) ?? '∞'}g',
+                            () {
+                              setState(() {
+                                _minWeight = null;
+                                _maxWeight = null;
+                                _weightRange = null;
+                              });
+                              _loadItems();
+                            }
+                          ),
                       ],
                     ),
                   ),
@@ -261,6 +292,9 @@ class _ItemListScreenState extends State<ItemListScreen> {
                         _itemTypeFilter = null;
                         _purityFilter = null;
                         _certificationFilter = null;
+                        _minWeight = null;
+                        _maxWeight = null;
+                        _weightRange = null;
                       });
                       _loadItems();
                     },
@@ -280,6 +314,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
                 : items.isEmpty
                     ? _buildEmptyState(languageProvider)
                     : ListView.builder(
+                        key: const PageStorageKey<String>('itemsListView'),
                         padding: const EdgeInsets.all(16),
                         itemCount: items.length,
                         itemBuilder: (context, index) {
@@ -758,13 +793,16 @@ class _ItemListScreenState extends State<ItemListScreen> {
   }
 
   void _showFilterMenu(BuildContext context) {
-    // Hardcoded filter options (common values)
-    final metalTypes = ['Gold', 'Silver', 'Platinum'];
-    final itemTypes = ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Pendant', 'Chain', 'Bangle'];
-    final purityOptions = ['18k', '22k', '24k', '916', '999'];
+    // Get dynamic filter options from provider
+    final filterOptions = Provider.of<ItemProvider>(context, listen: false).filterOptions;
+    final metalTypes = (filterOptions?['metalTypes'] as List?)?.cast<String>() ?? ['Gold', 'Silver', 'Platinum'];
+    final itemTypes = (filterOptions?['itemTypes'] as List?)?.cast<String>() ?? ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Pendant', 'Chain', 'Bangle'];
+    final purityOptions = (filterOptions?['purities'] as List?)?.cast<String>() ?? ['18k', '22k', '24k', '916', '999'];
+    final weightRange = filterOptions?['weightRange'];
     
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -773,14 +811,28 @@ class _ItemListScreenState extends State<ItemListScreen> {
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Filter Items',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filter Items',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetContext),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     
@@ -874,6 +926,53 @@ class _ItemListScreenState extends State<ItemListScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 16),
+                    
+                    // Weight Range Filter
+                    if (weightRange != null) ...[
+                      const Text('Weight Range (grams)', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      RangeSlider(
+                        values: _weightRange ?? RangeValues(
+                          (weightRange['minWeight'] ?? 0).toDouble(),
+                          (weightRange['maxWeight'] ?? 100).toDouble(),
+                        ),
+                        min: (weightRange['minWeight'] ?? 0).toDouble(),
+                        max: (weightRange['maxWeight'] ?? 100).toDouble(),
+                        divisions: 100,
+                        labels: RangeLabels(
+                          (_weightRange?.start ?? weightRange['minWeight']).toStringAsFixed(2),
+                          (_weightRange?.end ?? weightRange['maxWeight']).toStringAsFixed(2),
+                        ),
+                        activeColor: const Color(0xFFE94560),
+                        inactiveColor: const Color(0xFFE94560).withOpacity(0.2),
+                        onChanged: (RangeValues values) {
+                          setState(() {
+                            _weightRange = values;
+                            _minWeight = values.start;
+                            _maxWeight = values.end;
+                          });
+                          setModalState(() {});
+                        },
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${_minWeight?.toStringAsFixed(2) ?? weightRange['minWeight']}g',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              '${_maxWeight?.toStringAsFixed(2) ?? weightRange['maxWeight']}g',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     const SizedBox(height: 24),
                     
                     // Apply Button
@@ -891,7 +990,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16)),
+                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16, color: Colors.white)),
                       ),
                     ),
                   ],

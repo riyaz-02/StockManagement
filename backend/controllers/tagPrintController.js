@@ -167,3 +167,94 @@ exports.generateTagsPDF = async (req, res) => {
         });
     }
 };
+
+// Generate unique barcode (same logic as itemController)
+const generateBarcode = async () => {
+    // Generate 5 random digits (10000-99999)
+    let barcode;
+    let exists = true;
+
+    // Keep generating until we find a unique one
+    while (exists) {
+        // Generate random 5-digit number
+        barcode = String(Math.floor(10000 + Math.random() * 90000));
+
+        // Check if it already exists
+        const existingItem = await Item.findOne({ barcode });
+        exists = !!existingItem;
+    }
+
+    return barcode;
+};
+
+// Generate PDF for blank tags
+exports.generateBlankTagsPDF = async (req, res) => {
+    try {
+        const { purityCounts } = req.body;
+
+        console.log(`[Blank Tags PDF] Request received for purity counts:`, purityCounts);
+
+        if (!purityCounts || typeof purityCounts !== 'object' || Object.keys(purityCounts).length === 0) {
+            console.log('[Blank Tags PDF] Invalid request: No purity counts provided');
+            return res.status(400).json({
+                success: false,
+                message: 'Purity counts object is required'
+            });
+        }
+
+        // Validate that at least one purity has count > 0
+        const totalCount = Object.values(purityCounts).reduce((sum, count) => sum + (parseInt(count) || 0), 0);
+        if (totalCount === 0) {
+            console.log('[Blank Tags PDF] Invalid request: Total count is 0');
+            return res.status(400).json({
+                success: false,
+                message: 'At least one purity must have count greater than 0'
+            });
+        }
+
+        console.log(`[Blank Tags PDF] Generating ${totalCount} blank tags`);
+
+        // Generate blank tags with unique barcodes
+        const blankTags = [];
+        for (const [purity, count] of Object.entries(purityCounts)) {
+            const tagCount = parseInt(count) || 0;
+            if (tagCount > 0) {
+                console.log(`[Blank Tags PDF] Generating ${tagCount} tags for purity: ${purity}`);
+                for (let i = 0; i < tagCount; i++) {
+                    const barcode = await generateBarcode();
+                    blankTags.push({
+                        barcode,
+                        purity,
+                        name: '', // Blank name
+                        netWeight: 0, // Will be shown as blank in PDF
+                        certificationType: 'none' // Default for blank tags
+                    });
+                }
+            }
+        }
+
+        console.log(`[Blank Tags PDF] Generated ${blankTags.length} blank tags with unique barcodes`);
+
+        // Generate PDF
+        console.log('[Blank Tags PDF] Starting PDF generation...');
+        const pdfBuffer = await PDFGenerator.generateBlankTagsPDF(blankTags);
+        console.log(`[Blank Tags PDF] PDF generated successfully: ${pdfBuffer.length} bytes`);
+
+        // Set headers for binary PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=blank-tags-${Date.now()}.pdf`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        // Send raw binary buffer
+        res.end(pdfBuffer, 'binary');
+
+    } catch (error) {
+        console.error('[Blank Tags PDF] Error:', error);
+        console.error('[Blank Tags PDF] Stack:', error.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate blank tags PDF',
+            error: error.message
+        });
+    }
+};

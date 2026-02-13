@@ -26,6 +26,15 @@ class ContainerViewScreen extends StatefulWidget {
 class _ContainerViewScreenState extends State<ContainerViewScreen> {
   int _currentImageIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Force fetch fresh container data to get updated slot information with images
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ContainerProvider>(context, listen: false).fetchContainer(widget.container.id);
+    });
+  }
+
   // Format text helper
   String _formatText(String text) {
     if (RegExp(r'^\d').hasMatch(text)) {
@@ -541,16 +550,16 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
   }
 
   Widget _buildSlotsGrid(models.ItemContainer container) {
-    final columns = container.layoutType == 'linear' ? 5 : 6;
+    final columns = container.layoutType == 'linear' ? 3 : 4;
     
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-        crossAxisSpacing: 6,
-        mainAxisSpacing: 6,
-        childAspectRatio: 1,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.85,
       ),
       itemCount: container.slots.length,
       itemBuilder: (context, index) {
@@ -578,32 +587,32 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     return GestureDetector(
       onTap: () async {
         if (slot.isOccupied) {
-              // Fetch item details and navigate
-              try {
-                String? itemId;
-                final dynamic rawItemId = slot.itemId;
-                if (rawItemId == null) return;
-                
-                if (rawItemId is String) {
-                   if (rawItemId.startsWith('{')) {
-                     final idMatch = RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
-                     itemId = idMatch?.group(1);
-                   } else {
-                     itemId = rawItemId;
-                   }
-                } else if (rawItemId is Map) {
-                   if (rawItemId.containsKey('_id')) itemId = rawItemId['_id'].toString();
-                   else if (rawItemId.containsKey('id')) itemId = rawItemId['id'].toString();
-                }
+          // Fetch item details and navigate
+          try {
+            String? itemId;
+            final dynamic rawItemId = slot.itemId;
+            if (rawItemId == null) return;
+            
+            if (rawItemId is String) {
+               if (rawItemId.startsWith('{')) {
+                 final idMatch = RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
+                 itemId = idMatch?.group(1);
+               } else {
+                 itemId = rawItemId;
+               }
+            } else if (rawItemId is Map) {
+               if (rawItemId.containsKey('_id')) itemId = rawItemId['_id'].toString();
+               else if (rawItemId.containsKey('id')) itemId = rawItemId['id'].toString();
+            }
 
-                if (itemId != null && itemId.isNotEmpty && itemId != 'null') {
-                    final apiService = ApiService();
-                    final response = await apiService.getItem(itemId);
-                    if (mounted && response['success'] == true) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: Item.fromJson(response['data']['item']))));
-                    }
+            if (itemId != null && itemId.isNotEmpty && itemId != 'null') {
+                final apiService = ApiService();
+                final response = await apiService.getItem(itemId);
+                if (mounted && response['success'] == true) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: Item.fromJson(response['data']['item']))));
                 }
-              } catch (e) { print(e); }
+            }
+          } catch (e) { print(e); }
         } else {
           // Empty Slot Tap
           if (container.isLocked) {
@@ -616,74 +625,261 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
             );
           } else {
             // Navigate to Add Item
-             await Navigator.push(
-               context,
-               MaterialPageRoute(
-                 builder: (_) => AddEditItemScreen(
-                   initialContainerId: container.id,
-                   initialSlotNumber: slot.slotNumber,
-                 ),
-               ),
-             );
-             // Refresh container on return
-             if (mounted) {
-               Provider.of<ContainerProvider>(context, listen: false).fetchContainer(container.id);
-             }
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AddEditItemScreen(
+                  initialContainerId: container.id,
+                  initialSlotNumber: slot.slotNumber,
+                ),
+              ),
+            );
+            // Refresh container on return
+            if (mounted) {
+              Provider.of<ContainerProvider>(context, listen: false).fetchContainer(container.id);
+            }
           }
         }
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  slotColor.withOpacity(0.8),
-                  slotColor.withOpacity(0.6),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: slot.isOccupied ? Colors.white.withOpacity(0.4) : slotColor.withOpacity(0.3),
-                width: 2,
-              ),
-              boxShadow: slot.isOccupied
-                  ? [
-                      BoxShadow(
-                        color: slotColor.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null)
-                    Icon(
-                      icon,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  if (icon != null) const SizedBox(height: 2),
-                  Text(
-                    slot.slotNumber.toString(),
-                    style: TextStyle(
-                      color: slot.isEmpty ? Colors.black54 : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background - Item photo for occupied slots
+              if (slot.isOccupied && slot.itemImage != null && slot.itemImage!.isNotEmpty)
+                Image.network(
+                  slot.itemImage!.startsWith('http') 
+                      ? slot.itemImage! 
+                      : '${AppConstants.baseUrl}${slot.itemImage}',
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            slotColor.withOpacity(0.3),
+                            slotColor.withOpacity(0.1),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: Colors.white.withOpacity(0.8),
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error loading image for slot ${slot.slotNumber}: $error');
+                    print('Image URL: ${slot.itemImage}');
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            slotColor.withOpacity(0.3),
+                            slotColor.withOpacity(0.1),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          color: Colors.white.withOpacity(0.6),
+                          size: 36,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        slotColor.withOpacity(0.3),
+                        slotColor.withOpacity(0.1),
+                      ],
                     ),
                   ),
-                ],
+                ),
+              
+              // Subtle overlay for occupied slots to ensure text readability
+              if (slot.isOccupied && slot.itemImage != null && slot.itemImage!.isNotEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.05),
+                        Colors.black.withOpacity(0.25),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Border
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: slot.isOccupied 
+                        ? Colors.white.withOpacity(0.4) 
+                        : slotColor.withOpacity(0.4),
+                    width: 2,
+                  ),
+                ),
               ),
-            ),
+              
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top: Slot number badge
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: slot.isOccupied 
+                              ? Colors.white.withOpacity(0.95)
+                              : Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          slot.slotNumber.toString(),
+                          style: TextStyle(
+                            color: slot.isOccupied ? Colors.black87 : Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    // Center: Icon and status for empty/reserved
+                    if (!slot.isOccupied)
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (icon != null)
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.9),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    icon,
+                                    color: slotColor,
+                                    size: 28,
+                                  ),
+                                ),
+                              if (icon != null) const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  slot.isReserved ? 'Reserved' : 'Add Item',
+                                  style: TextStyle(
+                                    color: slotColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                    
+                    // Bottom: Weight for occupied slots
+                    if (slot.isOccupied && slot.itemWeight != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.scale,
+                              size: 12,
+                              color: Colors.black54,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${slot.itemWeight!.toStringAsFixed(3)}g',
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

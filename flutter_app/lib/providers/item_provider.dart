@@ -12,11 +12,13 @@ class ItemProvider with ChangeNotifier {
   Item? _selectedItem;
   bool _isLoading = false;
   String? _error;
+  Map<String, dynamic>? _filterOptions;
 
   List<Item> get items => _items;
   Item? get selectedItem => _selectedItem;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Map<String, dynamic>? get filterOptions => _filterOptions;
 
   // Get all items
   Future<void> fetchItems({String? status, Map<String, String>? filters}) async {
@@ -53,6 +55,20 @@ class ItemProvider with ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  // Get filter options
+  Future<void> fetchFilterOptions() async {
+    try {
+      final response = await _apiService.getItemFilterOptions();
+      if (response['success'] == true) {
+        _filterOptions = response['data'];
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error fetching filter options: $e');
+      // Don't set error state for filter options, just log it
+    }
   }
 
   // Get item by barcode

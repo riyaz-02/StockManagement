@@ -2,11 +2,17 @@ class ContainerSlot {
   final int slotNumber;
   final String? itemId;
   final bool reserved;
+  final String? itemImage;
+  final String? itemBarcode;
+  final double? itemWeight;
 
   ContainerSlot({
     required this.slotNumber,
     this.itemId,
     this.reserved = false,
+    this.itemImage,
+    this.itemBarcode,
+    this.itemWeight,
   });
 
   factory ContainerSlot.fromJson(Map<String, dynamic> json) {
@@ -25,6 +31,9 @@ class ContainerSlot {
       slotNumber: json['slotNumber'] ?? 0,
       itemId: getItemId(),
       reserved: json['reserved'] == true || json['reserved'] == 'true',
+      itemImage: json['itemImage'],
+      itemBarcode: json['itemBarcode'],
+      itemWeight: json['itemWeight']?.toDouble(),
     );
   }
 
@@ -33,6 +42,9 @@ class ContainerSlot {
       'slotNumber': slotNumber,
       'itemId': itemId,
       'reserved': reserved,
+      'itemImage': itemImage,
+      'itemBarcode': itemBarcode,
+      'itemWeight': itemWeight,
     };
   }
 

@@ -5,7 +5,7 @@ class AppConstants {
   // Production API URL - AWS EC2 Mumbai
   static const String baseUrl = 'http://13.203.224.156/api';
   
-  // Development URL - localhost (comment above and uncomment this for local development)
+  // Development URL - localhost (uncomment below for local development)
   // static String get baseUrl {
   //   if (kIsWeb) {
   //     return 'http://localhost:5000/api';
@@ -65,6 +65,7 @@ class AppConstants {
     'in_repair',
     'temporarily_removed',
     'sold',
+    'no_sell',
   ];
   
   // Container Types

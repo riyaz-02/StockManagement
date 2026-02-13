@@ -368,9 +368,27 @@ exports.getContainer = async (req, res) => {
             });
         }
 
+        // Transform slots to include itemImage, itemBarcode, and itemWeight at slot level
+        const containerObj = container.toObject();
+        containerObj.slots = containerObj.slots.map(slot => {
+            if (slot.itemId && typeof slot.itemId === 'object') {
+                const itemImage = slot.itemId.images && slot.itemId.images.length > 0
+                    ? slot.itemId.images[0]
+                    : null;
+
+                return {
+                    ...slot,
+                    itemBarcode: slot.itemId.barcode || null,
+                    itemImage: itemImage,
+                    itemWeight: slot.itemId.netWeight || null
+                };
+            }
+            return slot;
+        });
+
         res.status(200).json({
             success: true,
-            data: { container }
+            data: { container: containerObj }
         });
     } catch (error) {
         console.error('Get container error:', error);

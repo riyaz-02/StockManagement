@@ -5,7 +5,8 @@ const {
     getItemsForTagPrinting,
     recordTagPrint,
     getTagPrintHistory,
-    generateTagsPDF
+    generateTagsPDF,
+    generateBlankTagsPDF
 } = require('../controllers/tagPrintController');
 
 // All routes require authentication
@@ -22,5 +23,8 @@ router.get('/history/:itemId', getTagPrintHistory);
 
 // Generate PDF for selected items
 router.post('/generate-pdf', generateTagsPDF);
+
+// Generate PDF for blank tags
+router.post('/generate-blank-tags-pdf', generateBlankTagsPDF);
 
 module.exports = router;
