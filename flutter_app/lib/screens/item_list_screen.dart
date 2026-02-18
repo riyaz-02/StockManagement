@@ -216,23 +216,96 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
             ),
           ),
           
-          // Status Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildFilterChip('All', 'all'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Active', 'active'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Booked', 'booked'),
-                const SizedBox(width: 8),
-                _buildFilterChip('In Repair', 'in_repair'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Sold', 'sold'),
-              ],
-            ),
+          // Status Filter Chips + Filter Button
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      _buildFilterChip('All', 'all'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Active', 'active'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Booked', 'booked'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('In Repair', 'in_repair'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Sold', 'sold'),
+                    ],
+                  ),
+                ),
+              ),
+              // Filter button — fixed on the right
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _showFilterMenu(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (_metalTypeFilter != null || _itemTypeFilter != null ||
+                                  _purityFilter != null || _certificationFilter != null ||
+                                  _minWeight != null || _maxWeight != null)
+                              ? const Color(0xFFE94560).withOpacity(0.1)
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: (_metalTypeFilter != null || _itemTypeFilter != null ||
+                                    _purityFilter != null || _certificationFilter != null ||
+                                    _minWeight != null || _maxWeight != null)
+                                ? const Color(0xFFE94560)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.tune,
+                          size: 20,
+                          color: (_metalTypeFilter != null || _itemTypeFilter != null ||
+                                  _purityFilter != null || _certificationFilter != null ||
+                                  _minWeight != null || _maxWeight != null)
+                              ? const Color(0xFFE94560)
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                    // Active filter count badge
+                    if ([_metalTypeFilter, _itemTypeFilter, _purityFilter, _certificationFilter]
+                            .where((f) => f != null)
+                            .length +
+                        (_minWeight != null || _maxWeight != null ? 1 : 0) >
+                        0)
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE94560),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${[_metalTypeFilter, _itemTypeFilter, _purityFilter, _certificationFilter].where((f) => f != null).length + (_minWeight != null || _maxWeight != null ? 1 : 0)}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
           
           // Additional Filters Row with Clear Button
@@ -362,8 +435,9 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
   }
 
   Widget _buildItemCard(BuildContext context, dynamic item, LanguageProvider languageProvider) {
-    Color statusColor = _getStatusColor(item.status);
-    
+    final Color statusColor = _getStatusColor(item.status);
+    final double netWeight = item.netWeight;
+
     // Construct Image URL
     String? imageUrl;
     if (item.images.isNotEmpty) {
@@ -371,208 +445,258 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
       if (path.startsWith('http')) {
         imageUrl = path;
       } else {
-        String cleanPath = path.replaceAll('\\', '/');
-        imageUrl = '${AppConstants.baseUrl}/$cleanPath'; 
+        final cleanPath = path.replaceAll('\\', '/');
+        imageUrl = '${AppConstants.baseUrl}/$cleanPath';
       }
     }
+
+    // Weight colour: gold ≥10g, green 3–10g, blue <3g
+    final Color weightColor = netWeight >= 10
+        ? const Color(0xFFB8860B)
+        : netWeight >= 3
+            ? const Color(0xFF2E7D32)
+            : const Color(0xFF0277BD);
 
     return Stack(
       children: [
         Card(
           elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.only(bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shadowColor: statusColor.withOpacity(0.15),
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => ItemDetailsScreen(item: item),
-                ),
+                MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: item)),
               ).then((_) => _loadItems());
             },
             onLongPress: () => _showItemOptions(context, item),
             child: Padding(
-              padding: const EdgeInsets.all(8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Item Image (no badge here anymore)
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
-                ),
-                child: ClipRRect(
-                   borderRadius: BorderRadius.circular(12),
-                   child: imageUrl != null 
-                       ? CachedNetworkImage(
-                           imageUrl: imageUrl,
-                           fit: BoxFit.cover,
-                           memCacheWidth: 200,
-                           maxWidthDiskCache: 400,
-                           placeholder: (context, url) => Center(
-                             child: CircularProgressIndicator(
-                               strokeWidth: 2,
-                               valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                             ),
-                           ),
-                           errorWidget: (context, url, error) => Icon(
-                             Icons.broken_image,
-                             color: statusColor,
-                           ),
-                         )
-                       : Icon(Icons.diamond_outlined, size: 30, color: statusColor),
-                ),
-              ),
-              const SizedBox(width: 16),
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // ── Image ──────────────────────────────────────────────
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: statusColor.withOpacity(0.22), width: 1.5),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 200,
+                              maxWidthDiskCache: 400,
+                              placeholder: (context, url) => Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  Icon(Icons.broken_image, color: statusColor, size: 30),
+                            )
+                          : Icon(Icons.diamond_outlined, size: 32, color: statusColor),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
 
-              // 2. Details Column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name & Type
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // ── Details ────────────────────────────────────────────
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
+                        // Name + status badge
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
                                 _formatText(item.name),
                                 style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.2,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.barcode,
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: statusColor.withOpacity(0.35)),
+                              ),
+                              child: Text(
+                                languageProvider.translate(item.status),
                                 style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.w500,
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        // Status Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
-                          ),
-                          child: Text(
-                            languageProvider.translate(item.status),
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        // Barcode
+                        Text(
+                          item.barcode ?? '',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            letterSpacing: 0.4,
                           ),
+                        ),
+                        const SizedBox(height: 6),
+
+                        // ── Weight badge + spec pills ──────────────────
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 3,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // Weight — prominent
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: weightColor.withOpacity(0.09),
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(color: weightColor.withOpacity(0.28)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Icon(Icons.scale, size: 11, color: weightColor.withOpacity(0.8)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    netWeight.toStringAsFixed(2),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: weightColor,
+                                      height: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 1),
+                                  Text(
+                                    'g',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: weightColor.withOpacity(0.75),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _buildSpecPill(Icons.diamond_outlined, _formatText(item.metalType), Colors.purple),
+                            _buildSpecPill(Icons.category_outlined, _formatText(item.itemType), Colors.teal),
+                            _buildSpecPill(Icons.verified_outlined, _formatText(item.purity), const Color(0xFFB8860B)),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
 
-                    // Specs Grid
-                    Row(
-                      children: [
-                        _buildCompactSpec(Icons.scale, '${item.netWeight}g'),
-                        const SizedBox(width: 12),
-                        _buildCompactSpec(Icons.category, _formatText(item.itemType)),
-                        const SizedBox(width: 12),
-                         _buildCompactSpec(Icons.diamond, _formatText(item.metalType)),
-                      ],
+        // ── Certification stamp (unchanged) ────────────────────────────
+        if (item.certificationType == 'hallmarked' || item.certificationType == 'huid')
+          Positioned(
+            top: 46,
+            right: 8,
+            child: Transform.rotate(
+              angle: -0.35,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: item.certificationType == 'hallmarked'
+                      ? const Color(0xFFFFD700).withOpacity(0.18)
+                      : const Color(0xFF2196F3).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: item.certificationType == 'hallmarked'
+                        ? const Color(0xFFB8860B).withOpacity(0.35)
+                        : const Color(0xFF0D47A1).withOpacity(0.35),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.certificationType == 'hallmarked'
+                          ? Icons.verified_rounded
+                          : Icons.qr_code_2_rounded,
+                      size: 16,
+                      color: item.certificationType == 'hallmarked'
+                          ? const Color(0xFFB8860B).withOpacity(0.75)
+                          : const Color(0xFF0D47A1).withOpacity(0.75),
                     ),
-                    
-                    if (item.weightCategory != null && item.weightCategory!.isNotEmpty) ...[
-                       const SizedBox(height: 6),
-                       Container(
-                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                         decoration: BoxDecoration(
-                           color: Colors.grey[100],
-                           borderRadius: BorderRadius.circular(4),
-                         ),
-                         child: Text(
-                           item.weightCategory!,
-                           style: TextStyle(fontSize: 10, color: Colors.grey[700]),
-                         ),
-                       ),
-                    ],
+                    const SizedBox(width: 4),
+                    Text(
+                      item.certificationType == 'hallmarked' ? '916' : 'HUID',
+                      style: TextStyle(
+                        color: item.certificationType == 'hallmarked'
+                            ? const Color(0xFFB8860B).withOpacity(0.85)
+                            : const Color(0xFF0D47A1).withOpacity(0.85),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    // Certification Badge Overlay (positioned absolutely, doesn't take up space)
-    if (item.certificationType == 'hallmarked' || item.certificationType == 'huid')
-      Positioned(
-        top: 46, // More margin below status badge
-        right: 8,
-        child: Transform.rotate(
-          angle: -0.35, // Increased rotation for stamp effect
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: item.certificationType == 'hallmarked'
-                  ? const Color(0xFFFFD700).withOpacity(0.18)
-                  : const Color(0xFF2196F3).withOpacity(0.18),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: item.certificationType == 'hallmarked'
-                    ? const Color(0xFFB8860B).withOpacity(0.35)
-                    : const Color(0xFF0D47A1).withOpacity(0.35),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  item.certificationType == 'hallmarked'
-                      ? Icons.verified_rounded
-                      : Icons.qr_code_2_rounded,
-                  size: 16,
-                  color: item.certificationType == 'hallmarked'
-                      ? const Color(0xFFB8860B).withOpacity(0.75)
-                      : const Color(0xFF0D47A1).withOpacity(0.75),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  item.certificationType == 'hallmarked' ? '916' : 'HUID',
-                  style: TextStyle(
-                    color: item.certificationType == 'hallmarked'
-                        ? const Color(0xFFB8860B).withOpacity(0.85)
-                        : const Color(0xFF0D47A1).withOpacity(0.85),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ],
             ),
           ),
-        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecPill(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
-  ],
-);
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color.withOpacity(0.8)),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color.withOpacity(0.9),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showItemOptions(BuildContext context, dynamic item) {
@@ -674,12 +798,13 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
 
   Widget _buildCompactSpec(IconData icon, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: Colors.grey[600]),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -794,12 +919,56 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
 
   void _showFilterMenu(BuildContext context) {
     // Get dynamic filter options from provider
-    final filterOptions = Provider.of<ItemProvider>(context, listen: false).filterOptions;
+    final itemProvider = Provider.of<ItemProvider>(context, listen: false);
+    final filterOptions = itemProvider.filterOptions;
+    final allLoadedItems = itemProvider.items;
+
     final metalTypes = (filterOptions?['metalTypes'] as List?)?.cast<String>() ?? ['Gold', 'Silver', 'Platinum'];
     final itemTypes = (filterOptions?['itemTypes'] as List?)?.cast<String>() ?? ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Pendant', 'Chain', 'Bangle'];
     final purityOptions = (filterOptions?['purities'] as List?)?.cast<String>() ?? ['18k', '22k', '24k', '916', '999'];
-    final weightRange = filterOptions?['weightRange'];
-    
+    final globalWeightRange = filterOptions?['weightRange'];
+
+    // Global absolute bounds (never go outside these)
+    final globalMin = (globalWeightRange?['minWeight'] ?? 0).toDouble();
+    final globalMax = (globalWeightRange?['maxWeight'] ?? 100).toDouble();
+
+    // In-modal filter state (mirrors the screen state, starts from current values)
+    String? modalMetal = _metalTypeFilter;
+    String? modalItemType = _itemTypeFilter;
+    String? modalPurity = _purityFilter;
+    String? modalCert = _certificationFilter;
+    RangeValues? modalWeightRange = _weightRange;
+
+    /// Compute the weight range for items matching the current in-modal filters.
+    /// Returns {min, max} clamped to global bounds.
+    Map<String, double> computeDynamicRange(
+        String? metal, String? itemType, String? purity) {
+      // If no items loaded yet, fall back to global range
+      if (allLoadedItems.isEmpty) {
+        return {'min': globalMin, 'max': globalMax};
+      }
+
+      final matching = allLoadedItems.where((item) {
+        if (metal != null &&
+            item.metalType.toLowerCase() != metal.toLowerCase()) return false;
+        if (itemType != null &&
+            item.itemType.toLowerCase() != itemType.toLowerCase()) return false;
+        if (purity != null &&
+            item.purity.toLowerCase() != purity.toLowerCase()) return false;
+        return true;
+      }).toList();
+
+      if (matching.isEmpty) {
+        return {'min': globalMin, 'max': globalMax};
+      }
+
+      final weights = matching.map((i) => i.netWeight).toList();
+      return {
+        'min': weights.reduce((a, b) => a < b ? a : b),
+        'max': weights.reduce((a, b) => a > b ? a : b),
+      };
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -809,6 +978,49 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Compute dynamic weight bounds from in-modal selections
+            final dynamic = computeDynamicRange(modalMetal, modalItemType, modalPurity);
+            final dynMin = dynamic['min']!;
+            final dynMax = dynamic['max']!;
+
+            // Count matching items for the hint label
+            final matchCount = allLoadedItems.where((item) {
+              if (modalMetal != null &&
+                  item.metalType.toLowerCase() != modalMetal!.toLowerCase()) return false;
+              if (modalItemType != null &&
+                  item.itemType.toLowerCase() != modalItemType!.toLowerCase()) return false;
+              if (modalPurity != null &&
+                  item.purity.toLowerCase() != modalPurity!.toLowerCase()) return false;
+              return true;
+            }).length;
+
+            // Clamp current weight range to new dynamic bounds
+            final effectiveRange = modalWeightRange == null
+                ? RangeValues(dynMin, dynMax)
+                : RangeValues(
+                    modalWeightRange!.start.clamp(dynMin, dynMax).toDouble(),
+                    modalWeightRange!.end.clamp(dynMin, dynMax).toDouble(),
+                  );
+
+            // Helper: update a filter and reset weight range to new dynamic bounds
+            void updateFilter({
+              String? metal,
+              String? itemType,
+              String? purity,
+              bool clearMetal = false,
+              bool clearItemType = false,
+              bool clearPurity = false,
+            }) {
+              setModalState(() {
+                if (clearMetal) modalMetal = null; else if (metal != null) modalMetal = metal;
+                if (clearItemType) modalItemType = null; else if (itemType != null) modalItemType = itemType;
+                if (clearPurity) modalPurity = null; else if (purity != null) modalPurity = purity;
+                // Reset weight range to the new dynamic bounds
+                final newDyn = computeDynamicRange(modalMetal, modalItemType, modalPurity);
+                modalWeightRange = RangeValues(newDyn['min']!, newDyn['max']!);
+              });
+            }
+
             return Container(
               padding: const EdgeInsets.all(20),
               constraints: BoxConstraints(
@@ -842,15 +1054,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     Wrap(
                       spacing: 8,
                       children: metalTypes.map((metal) {
-                        final isSelected = _metalTypeFilter == metal;
+                        final isSelected = modalMetal == metal;
                         return FilterChip(
                           label: Text(metal),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setState(() {
-                              _metalTypeFilter = selected ? metal : null;
-                            });
-                            setModalState(() {});
+                            updateFilter(
+                              metal: selected ? metal : null,
+                              clearMetal: !selected,
+                            );
                           },
                           selectedColor: const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
@@ -865,15 +1077,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     Wrap(
                       spacing: 8,
                       children: itemTypes.map((type) {
-                        final isSelected = _itemTypeFilter == type;
+                        final isSelected = modalItemType == type;
                         return FilterChip(
                           label: Text(type),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setState(() {
-                              _itemTypeFilter = selected ? type : null;
-                            });
-                            setModalState(() {});
+                            updateFilter(
+                              itemType: selected ? type : null,
+                              clearItemType: !selected,
+                            );
                           },
                           selectedColor: const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
@@ -888,15 +1100,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     Wrap(
                       spacing: 8,
                       children: purityOptions.map((purity) {
-                        final isSelected = _purityFilter == purity;
+                        final isSelected = modalPurity == purity;
                         return FilterChip(
                           label: Text(purity),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setState(() {
-                              _purityFilter = selected ? purity : null;
-                            });
-                            setModalState(() {});
+                            updateFilter(
+                              purity: selected ? purity : null,
+                              clearPurity: !selected,
+                            );
                           },
                           selectedColor: const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
@@ -911,15 +1123,14 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     Wrap(
                       spacing: 8,
                       children: ['hallmarked', 'huid', 'none'].map((cert) {
-                        final isSelected = _certificationFilter == cert;
+                        final isSelected = modalCert == cert;
                         return FilterChip(
                           label: Text(cert == 'none' ? 'Non-certified' : cert.toUpperCase()),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setState(() {
-                              _certificationFilter = selected ? cert : null;
+                            setModalState(() {
+                              modalCert = selected ? cert : null;
                             });
-                            setModalState(() {});
                           },
                           selectedColor: const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
@@ -928,45 +1139,82 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     ),
                     const SizedBox(height: 16),
                     
-                    // Weight Range Filter
-                    if (weightRange != null) ...[
-                      const Text('Weight Range (grams)', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      RangeSlider(
-                        values: _weightRange ?? RangeValues(
-                          (weightRange['minWeight'] ?? 0).toDouble(),
-                          (weightRange['maxWeight'] ?? 100).toDouble(),
-                        ),
-                        min: (weightRange['minWeight'] ?? 0).toDouble(),
-                        max: (weightRange['maxWeight'] ?? 100).toDouble(),
-                        divisions: 100,
-                        labels: RangeLabels(
-                          (_weightRange?.start ?? weightRange['minWeight']).toStringAsFixed(2),
-                          (_weightRange?.end ?? weightRange['maxWeight']).toStringAsFixed(2),
-                        ),
-                        activeColor: const Color(0xFFE94560),
-                        inactiveColor: const Color(0xFFE94560).withOpacity(0.2),
-                        onChanged: (RangeValues values) {
-                          setState(() {
-                            _weightRange = values;
-                            _minWeight = values.start;
-                            _maxWeight = values.end;
-                          });
-                          setModalState(() {});
-                        },
+                    // Weight Range Filter — dynamic bounds
+                    if (globalWeightRange != null || allLoadedItems.isNotEmpty) ...[ 
+                      Row(
+                        children: [
+                          const Text('Weight Range (grams)',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          // Hint: how many items are in this range
+                          if (allLoadedItems.isNotEmpty)
+                            Text(
+                              '$matchCount item${matchCount == 1 ? '' : 's'} in range',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[500]),
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
+                      // Dynamic bounds label
+                      if (dynMin != globalMin || dynMax != globalMax)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Icon(Icons.tune, size: 13, color: const Color(0xFFE94560)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Adjusted for selected filters',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: const Color(0xFFE94560),
+                                    fontStyle: FontStyle.italic),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // Guard: if dynMin == dynMax (only one weight value), skip slider
+                      if (dynMin < dynMax)
+                        RangeSlider(
+                          values: effectiveRange,
+                          min: dynMin,
+                          max: dynMax,
+                          divisions: ((dynMax - dynMin) * 10).round().clamp(1, 200),
+                          labels: RangeLabels(
+                            '${effectiveRange.start.toStringAsFixed(2)}g',
+                            '${effectiveRange.end.toStringAsFixed(2)}g',
+                          ),
+                          activeColor: const Color(0xFFE94560),
+                          inactiveColor: const Color(0xFFE94560).withOpacity(0.2),
+                          onChanged: (RangeValues values) {
+                            setModalState(() {
+                              modalWeightRange = values;
+                            });
+                          },
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'All items weigh ${dynMin.toStringAsFixed(2)}g',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          ),
+                        ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${_minWeight?.toStringAsFixed(2) ?? weightRange['minWeight']}g',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              '${effectiveRange.start.toStringAsFixed(2)}g',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500),
                             ),
                             Text(
-                              '${_maxWeight?.toStringAsFixed(2) ?? weightRange['maxWeight']}g',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              '${effectiveRange.end.toStringAsFixed(2)}g',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
@@ -980,6 +1228,16 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
+                          // Commit modal state back to screen state
+                          setState(() {
+                            _metalTypeFilter = modalMetal;
+                            _itemTypeFilter = modalItemType;
+                            _purityFilter = modalPurity;
+                            _certificationFilter = modalCert;
+                            _weightRange = modalWeightRange;
+                            _minWeight = effectiveRange.start == dynMin ? null : effectiveRange.start;
+                            _maxWeight = effectiveRange.end == dynMax ? null : effectiveRange.end;
+                          });
                           Navigator.pop(sheetContext);
                           _loadItems();
                         },
@@ -990,7 +1248,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16, color: Colors.white)),
+                        child: const Text('Apply Filters',
+                            style: TextStyle(fontSize: 16, color: Colors.white)),
                       ),
                     ),
                   ],

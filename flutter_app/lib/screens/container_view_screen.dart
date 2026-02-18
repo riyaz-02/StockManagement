@@ -765,12 +765,12 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     Align(
                       alignment: Alignment.topLeft,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
                           color: slot.isOccupied 
                               ? Colors.white.withOpacity(0.95)
                               : Colors.black.withOpacity(0.75),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.15),
@@ -784,7 +784,7 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                           style: TextStyle(
                             color: slot.isOccupied ? Colors.black87 : Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 11,
                           ),
                         ),
                       ),
@@ -843,10 +843,10 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     // Bottom: Weight for occupied slots
                     if (slot.isOccupied && slot.itemWeight != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.95),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.15),
@@ -855,25 +855,14 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                             ),
                           ],
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.scale,
-                              size: 12,
-                              color: Colors.black54,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${slot.itemWeight!.toStringAsFixed(3)}g',
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          '${slot.itemWeight!.toStringAsFixed(2)}g',
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                   ],

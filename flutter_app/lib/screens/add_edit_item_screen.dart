@@ -16,6 +16,7 @@ import '../providers/settings_provider.dart';
 import '../utils/app_constants.dart';
 import '../utils/app_colors.dart';
 import '../services/api_service.dart';
+import 'barcode_scanner_for_assignment.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final Item? item; // Add this
@@ -293,36 +294,82 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   }
 
 
-  Future<void> _checkBarcodeExists(String barcode) async {
+  /// Checks if [barcode] is already assigned to another item.
+  /// In edit mode, [excludeItemId] is the current item's id so its own barcode
+  /// is not treated as a duplicate.
+  Future<void> _checkBarcodeExists(String barcode, {String? excludeItemId}) async {
     try {
       final apiService = ApiService();
       final response = await apiService.getItems(queryParams: {'barcode': barcode});
-      
+
       if (response['success'] && response['data'] != null && (response['data'] as List).isNotEmpty) {
-        // Barcode exists
-        final existingItem = response['data'][0];
-        if (mounted) {
-          _showBarcodeExistsDialog(existingItem);
+        final items = response['data'] as List;
+        // Filter out the current item itself (edit mode)
+        final conflicts = items.where((item) {
+          final id = item['_id']?.toString() ?? '';
+          return excludeItemId == null || id != excludeItemId;
+        }).toList();
+
+        if (conflicts.isNotEmpty) {
+          // Barcode belongs to a different item
+          if (mounted) _showBarcodeExistsDialog(conflicts[0]);
+          return;
         }
-      } else {
-        // Barcode is unique
-        setState(() {
-          _barcodeController.text = barcode;
-          _generatedBarcode = barcode;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Barcode assigned successfully'), backgroundColor: Colors.green),
-          );
-        }
+      }
+
+      // Barcode is unique (or belongs to this item in edit mode) — assign it
+      setState(() {
+        _barcodeController.text = barcode;
+        _generatedBarcode = barcode;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Barcode assigned successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error checking barcode: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error checking barcode: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
+  }
+
+  /// Opens the barcode scanner and assigns the scanned barcode after
+  /// verifying it is not already in use by another item.
+  Future<void> _scanBarcode() async {
+    if (kIsWeb) {
+      // Camera scanning not supported on web — inform user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Camera scanning is not supported on web. Please enter the barcode manually.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final scanned = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const BarcodeScannerForAssignment(),
+      ),
+    );
+
+    if (scanned == null || scanned.isEmpty) return; // user cancelled
+
+    // Check uniqueness — pass current item id in edit mode to allow its own barcode
+    await _checkBarcodeExists(
+      scanned,
+      excludeItemId: widget.item?.id,
+    );
   }
 
   void _showBarcodeExistsDialog(Map<String, dynamic> existingItem) {
@@ -1304,12 +1351,26 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       height: 40,
                       width: 1,
                       color: Colors.grey[300],
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
                     ),
+                    // Scan button — hidden on web
+                    if (!kIsWeb)
+                      IconButton(
+                        onPressed: _scanBarcode,
+                        icon: const Icon(Icons.qr_code_scanner, color: Color(0xFFE94560)),
+                        tooltip: 'Scan blank tag barcode',
+                      ),
+                    if (!kIsWeb)
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: Colors.grey[300],
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
                     IconButton(
                       onPressed: _generateBarcode,
                       icon: const Icon(Icons.refresh, color: Colors.blue),
-                      tooltip: 'Generate New',
+                      tooltip: 'Generate New Barcode',
                     ),
                   ],
                 ),

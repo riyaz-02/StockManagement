@@ -111,7 +111,7 @@ exports.getContainers = async (req, res) => {
 // @access  Private/Admin
 exports.updateContainer = async (req, res) => {
     try {
-        const { name, type, allowedItemTypes, weightCategory, layoutType, isActive, qrCode, capacity, isDeleted, image } = req.body;
+        const { name, type, allowedItemTypes, weightCategory, layoutType, isActive, qrCode, capacity, isDeleted, image, metalType, purity } = req.body;
 
         const container = await Container.findById(req.params.id);
 
@@ -128,6 +128,8 @@ exports.updateContainer = async (req, res) => {
         if (allowedItemTypes) container.allowedItemTypes = allowedItemTypes;
         if (weightCategory) container.weightCategory = weightCategory;
         if (layoutType) container.layoutType = layoutType;
+        if (metalType) container.metalType = metalType;
+        if (purity) container.purity = purity;
         if (isActive !== undefined) container.isActive = isActive;
         if (qrCode !== undefined) container.qrCode = qrCode;
         if (image !== undefined) {
