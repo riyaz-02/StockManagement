@@ -6,7 +6,7 @@ import '../services/storage_service.dart';
 class LanguageProvider with ChangeNotifier {
   final StorageService _storage = StorageService();
   
-  String _currentLanguage = 'en';
+  String _currentLanguage = 'bn';
   Map<String, dynamic> _translations = {};
   bool _isLoaded = false;
 

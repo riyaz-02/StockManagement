@@ -302,18 +302,30 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       final apiService = ApiService();
       final response = await apiService.getItems(queryParams: {'barcode': barcode});
 
-      if (response['success'] && response['data'] != null && (response['data'] as List).isNotEmpty) {
-        final items = response['data'] as List;
-        // Filter out the current item itself (edit mode)
-        final conflicts = items.where((item) {
-          final id = item['_id']?.toString() ?? '';
-          return excludeItemId == null || id != excludeItemId;
-        }).toList();
+      if (response['success'] && response['data'] != null) {
+        // API can return data as a List directly OR as a paginated Map {items: [...]}
+        List items;
+        final data = response['data'];
+        if (data is List) {
+          items = data;
+        } else if (data is Map && data['items'] is List) {
+          items = data['items'] as List;
+        } else {
+          items = [];
+        }
 
-        if (conflicts.isNotEmpty) {
-          // Barcode belongs to a different item
-          if (mounted) _showBarcodeExistsDialog(conflicts[0]);
-          return;
+        if (items.isNotEmpty) {
+          // Filter out the current item itself (edit mode)
+          final conflicts = items.where((item) {
+            final id = item['_id']?.toString() ?? '';
+            return excludeItemId == null || id != excludeItemId;
+          }).toList();
+
+          if (conflicts.isNotEmpty) {
+            // Barcode belongs to a different item
+            if (mounted) _showBarcodeExistsDialog(conflicts[0]);
+            return;
+          }
         }
       }
 

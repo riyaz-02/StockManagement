@@ -164,7 +164,7 @@ class SettingsMenuScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 12), // Reduced from 16
+          const SizedBox(height: 12),
           _buildSettingCard(
             context,
             languageProvider: languageProvider,
@@ -179,6 +179,20 @@ class SettingsMenuScreen extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: 24),
+          // Copyright footer
+          Text(
+            '© Laltu Guinea Palace',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Version 1.2.0',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

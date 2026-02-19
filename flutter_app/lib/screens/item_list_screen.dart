@@ -563,51 +563,32 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                         ),
                         const SizedBox(height: 6),
 
-                        // ── Weight badge + spec pills ──────────────────
-                        Wrap(
+                         Wrap(
                           spacing: 4,
                           runSpacing: 3,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             // Weight — prominent
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
                                 color: weightColor.withOpacity(0.09),
-                                borderRadius: BorderRadius.circular(7),
+                                borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: weightColor.withOpacity(0.28)),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Icon(Icons.scale, size: 11, color: weightColor.withOpacity(0.8)),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    netWeight.toStringAsFixed(2),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: weightColor,
-                                      height: 1,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 1),
-                                  Text(
-                                    'g',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: weightColor.withOpacity(0.75),
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                '${netWeight.toStringAsFixed(2)}g',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: weightColor,
+                                  height: 1.2,
+                                ),
                               ),
                             ),
-                            _buildSpecPill(Icons.diamond_outlined, _formatText(item.metalType), Colors.purple),
-                            _buildSpecPill(Icons.category_outlined, _formatText(item.itemType), Colors.teal),
-                            _buildSpecPill(Icons.verified_outlined, _formatText(item.purity), const Color(0xFFB8860B)),
+                            _buildSpecPill(_formatText(item.metalType), Colors.purple),
+                            _buildSpecPill(_formatText(item.itemType), Colors.teal),
+                            _buildSpecPill(_formatText(item.purity), const Color(0xFFB8860B)),
                           ],
                         ),
                       ],
@@ -673,28 +654,21 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildSpecPill(IconData icon, String label, Color color) {
+  Widget _buildSpecPill(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.22)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: color.withOpacity(0.8)),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: color.withOpacity(0.9),
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: color.withOpacity(0.9),
+        ),
       ),
     );
   }

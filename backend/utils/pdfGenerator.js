@@ -66,14 +66,33 @@ class PDFGenerator {
             // Replace placeholder
             const finalHTML = htmlTemplate.replace('{{TAGS_CONTENT}}', tagsHTML);
 
-            // Launch browser
+            // Use system Chromium on Linux (EC2/Ubuntu) to avoid missing library issues
+            const fs_sync = require('fs');
+            const chromiumPaths = [
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/google-chrome',
+            ];
+            const systemChrome = process.platform === 'linux'
+                ? chromiumPaths.find(p => fs_sync.existsSync(p))
+                : null;
+
+            if (systemChrome) {
+                console.log(`[PDF] Using system Chrome: ${systemChrome}`);
+            } else {
+                console.log('[PDF] Using Puppeteer bundled Chrome');
+            }
+
             browser = await puppeteer.launch({
                 headless: 'new',
+                executablePath: systemChrome || undefined,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--single-process',
                 ]
             });
 

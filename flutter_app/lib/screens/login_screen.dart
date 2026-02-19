@@ -187,15 +187,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       _LanguageButton(
-                                        label: 'English',
-                                        isSelected: languageProvider.currentLanguage == 'en',
-                                        onTap: () => languageProvider.changeLanguage('en'),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      _LanguageButton(
                                         label: 'বাংলা',
                                         isSelected: languageProvider.currentLanguage == 'bn',
                                         onTap: () => languageProvider.changeLanguage('bn'),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      _LanguageButton(
+                                        label: 'English',
+                                        isSelected: languageProvider.currentLanguage == 'en',
+                                        onTap: () => languageProvider.changeLanguage('en'),
                                       ),
                                     ],
                                   ),
@@ -378,6 +378,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  // Copyright footer
+                  Text(
+                    '© Laltu Guinea Palace',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                  Text(
+                    'Version 1.2.0',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
