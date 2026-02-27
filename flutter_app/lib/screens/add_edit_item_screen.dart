@@ -295,41 +295,33 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
 
   /// Checks if [barcode] is already assigned to another item.
+  /// Uses the dedicated /items/barcode/:code endpoint for exact match lookup.
   /// In edit mode, [excludeItemId] is the current item's id so its own barcode
   /// is not treated as a duplicate.
   Future<void> _checkBarcodeExists(String barcode, {String? excludeItemId}) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.getItems(queryParams: {'barcode': barcode});
+      // Use getItemByBarcode — exact match on /items/barcode/:code
+      // 404 → barcode is free; 200 → barcode belongs to an existing item
+      final response = await apiService.getItemByBarcode(barcode);
 
-      if (response['success'] && response['data'] != null) {
-        // API can return data as a List directly OR as a paginated Map {items: [...]}
-        List items;
-        final data = response['data'];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['items'] is List) {
-          items = data['items'] as List;
-        } else {
-          items = [];
-        }
-
-        if (items.isNotEmpty) {
-          // Filter out the current item itself (edit mode)
-          final conflicts = items.where((item) {
-            final id = item['_id']?.toString() ?? '';
-            return excludeItemId == null || id != excludeItemId;
-          }).toList();
-
-          if (conflicts.isNotEmpty) {
-            // Barcode belongs to a different item
-            if (mounted) _showBarcodeExistsDialog(conflicts[0]);
+      if (response['success'] == true && response['data'] != null) {
+        // An item with this exact barcode exists
+        final existingItem = response['data']['item'] as Map<String, dynamic>?;
+        if (existingItem != null) {
+          final existingId = existingItem['_id']?.toString() ?? '';
+          // In edit mode: allow if this IS the current item's own barcode
+          if (excludeItemId != null && existingId == excludeItemId) {
+            // It's the same item — treat as free
+          } else {
+            if (mounted) _showBarcodeExistsDialog(existingItem);
             return;
           }
         }
       }
+      // response['success'] == false (404) means barcode is unused — fall through
 
-      // Barcode is unique (or belongs to this item in edit mode) — assign it
+      // Barcode is free (or belongs to this item in edit mode) — assign it
       setState(() {
         _barcodeController.text = barcode;
         _generatedBarcode = barcode;
@@ -343,6 +335,26 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         );
       }
     } catch (e) {
+      // _handleResponse throws an exception for 404 (barcode not found = barcode is free).
+      // The 404 message from the backend is "Item not found".
+      // Treat that as a free barcode and assign it.
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('item not found') || msg.contains('not found')) {
+        setState(() {
+          _barcodeController.text = barcode;
+          _generatedBarcode = barcode;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Barcode assigned successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
+      // Genuine network / server error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
