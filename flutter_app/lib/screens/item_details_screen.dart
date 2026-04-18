@@ -9,7 +9,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'create_booking_screen.dart';
 import 'send_to_repair_screen.dart';
-import 'add_edit_item_screen.dart';
+import 'quick_add_item_screen.dart';
 import 'container_view_screen.dart';
 
 import '../services/api_service.dart';
@@ -105,7 +105,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
               final shouldRefresh = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AddEditItemScreen(item: _item),
+                  builder: (_) => QuickAddItemScreen(item: _item),
                 ),
               );
               

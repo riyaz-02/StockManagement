@@ -2,8 +2,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
-  // Production API URL - AWS EC2 Mumbai
-  static const String baseUrl = 'http://13.203.224.156/api';
+  // Production API URL - AWS EC2 Mumbai (Elastic IP - permanent, never changes)
+  static const String baseUrl = 'http://13.235.125.127/api';
+
+  // Lambda Function URL to start the EC2 instance (from AWS Lambda → StartShopEC2 → Configuration → Function URL)
+  static const String lambdaStartUrl = 'https://45skg376c6xml6yifrzyct75rm0isktv.lambda-url.ap-south-1.on.aws/';
+
+  // Server connectivity check — any 200/401 response means server is up
+  static const String healthCheckUrl = 'http://13.235.125.127/api/auth/me';
   
   // Development URL - localhost (uncomment below for local development)
   // static String get baseUrl {
@@ -36,6 +42,7 @@ class AppConstants {
     'pendant',
     'chain',
     'bangle',
+    'other',
   ];
   
   // Metal Types
@@ -66,6 +73,7 @@ class AppConstants {
     'temporarily_removed',
     'sold',
     'no_sell',
+    'action_needed',
   ];
   
   // Container Types

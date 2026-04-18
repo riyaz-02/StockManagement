@@ -14,6 +14,10 @@ import 'screens/splash_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'utils/app_colors.dart';
 
+/// Global route observer — used by scanner screens to stop/start the camera
+/// when navigating away and returning.
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -115,6 +119,7 @@ class MyApp extends StatelessWidget {
               ),
             ),
             home: const SplashScreen(),
+            navigatorObservers: [routeObserver],
           );
         },
       ),

@@ -345,21 +345,31 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       body: Stack(
         children: [
           // Camera preview with scan window restriction
-          MobileScanner(
-            controller: cameraController,
-            scanWindow: Rect.fromCenter(
-              center: MediaQuery.of(context).size.center(Offset.zero),
-              width: 300,
-              height: 300,
-            ),
-            onDetect: (capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              for (final barcode in barcodes) {
-                if (barcode.rawValue != null && !_isProcessing) {
-                  _processScan(barcode.rawValue!);
-                  break;
-                }
-              }
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              const boxSize = 270.0;
+              final scanWindow = Rect.fromCenter(
+                center: Offset(w / 2, h / 2),
+                width: boxSize,
+                height: boxSize,
+              );
+              return Stack(children: [
+                MobileScanner(
+                  controller: cameraController,
+                  scanWindow: scanWindow,
+                  onDetect: (capture) {
+                    for (final barcode in capture.barcodes) {
+                      if (barcode.rawValue != null && !_isProcessing) {
+                        _processScan(barcode.rawValue!);
+                        break;
+                      }
+                    }
+                  },
+                ),
+                _LiveScanOverlay(scanWindow: scanWindow, isProcessing: _isProcessing),
+              ]);
             },
           ),
 
@@ -530,29 +540,6 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
             ),
           ),
 
-          // Scanning frame - this is the active detection area
-          Center(
-            child: Container(
-              width: 300,
-            ),
-          ),
-
-          // Scanner overlay - fixed centered box that doesn't move with keyboard
-          Positioned(
-            left: (MediaQuery.of(context).size.width - 280) / 2,
-            top: (MediaQuery.of(context).size.height - 280) / 2,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: _isProcessing ? Colors.green : Colors.white,
-                  width: 3,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
 
           // Enhanced scan result feedback at bottom
           if (_lastResult != null)
@@ -638,4 +625,66 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       ),
     );
   }
+}
+
+// ── Scan overlay ──────────────────────────────────────────────────────────────
+class _LiveScanOverlay extends StatelessWidget {
+  final Rect scanWindow;
+  final bool isProcessing;
+  const _LiveScanOverlay({required this.scanWindow, required this.isProcessing});
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.infinite,
+    painter: _LiveScanPainter(scanWindow: scanWindow, isProcessing: isProcessing),
+  );
+}
+
+class _LiveScanPainter extends CustomPainter {
+  final Rect scanWindow;
+  final bool isProcessing;
+  _LiveScanPainter({required this.scanWindow, required this.isProcessing});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final mask = Paint()..color = const Color(0xBB000000);
+    const r = Radius.circular(18);
+    final rrect = RRect.fromRectAndRadius(scanWindow, r);
+    final path = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..addRRect(rrect)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, mask);
+
+    final color = isProcessing ? const Color(0xFF4CAF50) : Colors.white;
+    final p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round;
+
+    const cl = 26.0;
+    const cr = 16.0;
+    final l = scanWindow.left;
+    final t = scanWindow.top;
+    final ri = scanWindow.right;
+    final b = scanWindow.bottom;
+
+    canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
+    canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
+    canvas.drawArc(Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
+    canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
+    canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
+    canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
+    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
+    canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0, 3.14159 / 2, false, p);
+  }
+
+  @override
+  bool shouldRepaint(_LiveScanPainter old) =>
+      old.isProcessing != isProcessing || old.scanWindow != scanWindow;
 }

@@ -10,6 +10,7 @@ import 'tag_printing_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'account_settings_screen.dart';
 import 'manage_users_screen.dart';
+import 'action_needed_items_screen.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
   const SettingsMenuScreen({super.key});
@@ -99,6 +100,26 @@ class SettingsMenuScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
+                );
+              },
+            ),
+          if (authProvider.user?.role == 'admin')
+            const SizedBox(height: 12),
+          
+          // Action Needed Items (Admin Only)
+          if (authProvider.user?.role == 'admin')
+            _buildSettingCard(
+              context,
+              languageProvider: languageProvider,
+              title: 'Action Needed Items',
+              subtitle: 'Review items added via quick-scan',
+              icon: Icons.pending_actions_rounded,
+              color: const Color(0xFFFF6B35),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ActionNeededItemsScreen()),
                 );
               },
             ),

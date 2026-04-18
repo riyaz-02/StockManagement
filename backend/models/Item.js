@@ -63,7 +63,7 @@ const itemSchema = new mongoose.Schema({
     }],
     status: {
         type: String,
-        enum: ['active', 'booked', 'repair', 'in_repair', 'temporarily_removed', 'sold', 'deleted', 'UNDER_REPAIR', 'WITH_CUSTOMER', 'WITH_AGENT', 'no_sell'],
+        enum: ['active', 'booked', 'repair', 'in_repair', 'temporarily_removed', 'sold', 'deleted', 'UNDER_REPAIR', 'WITH_CUSTOMER', 'WITH_AGENT', 'no_sell', 'action_needed'],
         default: 'active',
         index: true
     },

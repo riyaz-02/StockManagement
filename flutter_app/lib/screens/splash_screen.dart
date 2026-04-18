@@ -1,10 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:jewellery_stock_app/providers/auth_provider.dart';
 import 'package:jewellery_stock_app/providers/language_provider.dart';
 import 'package:jewellery_stock_app/screens/login_screen.dart';
 import 'package:jewellery_stock_app/screens/main_navigation_screen.dart';
+import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
+import 'package:jewellery_stock_app/utils/app_constants.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,30 +24,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    
-    // Initialize animations
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutBack,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
     );
-    
-    // Start animation
     _animationController.forward();
-    
     _initialize();
   }
 
@@ -54,35 +44,60 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  /// Returns true if the server is reachable (any HTTP response code < 500).
+  Future<bool> _isServerOnline() async {
+    try {
+      final response = await http
+          .get(Uri.parse(AppConstants.healthCheckUrl))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode < 500;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _initialize() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
 
-    // Initialize providers
-    await Future.wait([
-      authProvider.initialize(),
-      languageProvider.initialize(),
+    // Initialize language (local, fast) and check server in parallel with splash delay
+    await languageProvider.initialize();
+
+    final results = await Future.wait([
+      _isServerOnline(),
+      Future.delayed(const Duration(milliseconds: 1500)),
     ]);
 
-    // Wait a bit for splash effect
-    await Future.delayed(const Duration(milliseconds: 1500));
+    final serverOnline = results[0] as bool;
 
-    // Fade out animation
+    // Fade out splash
     await _animationController.reverse();
 
-    // Navigate based on auth status
-    if (mounted) {
-      if (authProvider.isAuthenticated) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
+    if (!mounted) return;
+
+    if (!serverOnline) {
+      // EC2 is stopped — show Bengali startup screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ServerStartupScreen()),
+      );
+      return;
+    }
+
+    // Server is online — check auth token
+    await authProvider.initialize();
+    if (!mounted) return;
+
+    if (authProvider.isAuthenticated) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

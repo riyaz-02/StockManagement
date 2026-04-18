@@ -10,8 +10,8 @@ import '../providers/item_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'item_details_screen.dart';
+import 'quick_add_item_screen.dart';
 import 'edit_container_screen.dart';
-import 'add_edit_item_screen.dart';
 import '../utils/app_constants.dart';
 
 class ContainerViewScreen extends StatefulWidget {
@@ -628,7 +628,7 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => AddEditItemScreen(
+                builder: (_) => QuickAddItemScreen(
                   initialContainerId: container.id,
                   initialSlotNumber: slot.slotNumber,
                 ),

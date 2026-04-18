@@ -9,7 +9,8 @@ import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'item_details_screen.dart';
-import 'add_edit_item_screen.dart';
+import 'add_edit_item_screen.dart'; // keep for potential direct use
+import 'quick_add_item_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'moved_out_items_screen.dart';
 
@@ -165,9 +166,9 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         ),
         child: FloatingActionButton(
           onPressed: () {
-            Navigator.push(
+          Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
+              MaterialPageRoute(builder: (_) => const QuickAddItemScreen()),
             ).then((_) => _loadItems());
           },
           backgroundColor: Colors.transparent,
@@ -425,7 +426,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
+                MaterialPageRoute(builder: (_) => const QuickAddItemScreen()),
               ).then((_) => _loadItems());
             },
           ),
@@ -716,7 +717,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => AddEditItemScreen(item: item),
+                      builder: (_) => QuickAddItemScreen(item: item),
                     ),
                   ).then((_) => _loadItems());
                 },

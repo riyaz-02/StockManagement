@@ -147,6 +147,7 @@ class Item {
   bool get isSold => status == 'sold';
   bool get isInStock => status == 'active' || status == 'booked';
   bool get isInTally => status == 'active' || status == 'booked';
+  bool get isActionNeeded => status == 'action_needed';
 
   Item copyWith({
     String? id,

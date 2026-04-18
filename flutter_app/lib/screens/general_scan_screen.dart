@@ -10,6 +10,8 @@ import '../models/item_model.dart';
 import '../models/container_model.dart' as models;
 import 'item_details_screen.dart';
 import 'container_view_screen.dart';
+import 'quick_add_item_screen.dart';
+import '../main.dart' show routeObserver;
 
 class GeneralScanScreen extends StatefulWidget {
   const GeneralScanScreen({super.key});
@@ -18,8 +20,11 @@ class GeneralScanScreen extends StatefulWidget {
   State<GeneralScanScreen> createState() => _GeneralScanScreenState();
 }
 
-class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindingObserver {
-  final MobileScannerController cameraController = MobileScannerController();
+class _GeneralScanScreenState extends State<GeneralScanScreen>
+    with WidgetsBindingObserver, RouteAware {
+  final MobileScannerController cameraController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.normal,
+  );
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
   final ApiService _apiService = ApiService();
@@ -30,6 +35,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
   String? _feedbackMessage;
   Color _feedbackColor = Colors.green;
   bool _isProcessing = false;
+  String? _unknownBarcode; // Set when a barcode is scanned but not found in DB
 
   final Duration _cooldownDuration = const Duration(seconds: 2);
   bool _isInitializing = true;
@@ -39,19 +45,46 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Start initialization after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Subscribe to route changes so camera stops/starts automatically
+      final route = ModalRoute.of(context);
+      if (route != null) routeObserver.subscribe(this, route);
       _startCameraWithDelay();
     });
   }
 
+  // Route-aware: this screen is being covered by a new route
+  @override
+  void didPushNext() {
+    _stopCamera();
+  }
+
+  // Route-aware: the route on top was popped, we are visible again
+  @override
+  void didPopNext() {
+    _startCamera();
+  }
+
+  void _stopCamera() {
+    try { cameraController.stop(); } catch (_) {}
+  }
+
+  void _startCamera() {
+    if (!mounted) return;
+    try { cameraController.start(); } catch (_) {}
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app lifecycle changes (background/foreground)
     if (state == AppLifecycleState.resumed) {
       if (!_hasInitialized) {
         _startCameraWithDelay();
+      } else {
+        _startCamera();
       }
+    } else if (state == AppLifecycleState.paused ||
+               state == AppLifecycleState.inactive) {
+      _stopCamera();
     }
   }
 
@@ -75,6 +108,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     cameraController.dispose();
     _barcodeController.dispose();
@@ -151,23 +185,27 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
         if (!mounted) return;
 
         if (type == 'item') {
-          // Convert to Item model
           final item = Item.fromJson(data);
-          Navigator.pushReplacement(
+          _stopCamera(); // stop before navigating
+          if (!mounted) return;
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => ItemDetailsScreen(item: item),
             ),
           );
+          // camera restarts via didPopNext
         } else if (type == 'container') {
-          // Convert to Container model
           final container = models.ItemContainer.fromJson(data);
-          Navigator.pushReplacement(
+          _stopCamera(); // stop before navigating
+          if (!mounted) return;
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => ContainerViewScreen(container: container),
             ),
           );
+          // camera restarts via didPopNext
         }
       } else {
         // Not found
@@ -187,16 +225,22 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
     _playSound('error');
     HapticFeedback.vibrate();
 
+    // Detect "not found" responses to offer Add Item
+    final isNotFound = message.toLowerCase().contains('not found') ||
+        message.toLowerCase().contains('barcode not found');
+
     setState(() {
-      _feedbackMessage = message;
+      _feedbackMessage = isNotFound ? 'No item found for this barcode' : message;
       _feedbackColor = Colors.red;
+      _unknownBarcode = isNotFound ? _lastScannedBarcode : null;
     });
 
-    // Auto-dismiss error after 5 seconds
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _feedbackMessage == message) {
+    // Auto-dismiss after 8 seconds (longer to give time to tap Add Item)
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _feedbackMessage != null) {
         setState(() {
           _feedbackMessage = null;
+          _unknownBarcode = null;
         });
       }
     });
@@ -207,10 +251,27 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
     return Scaffold(
       body: Stack(
         children: [
-          // Camera preview
-          MobileScanner(
-            controller: cameraController,
-            onDetect: _onBarcodeDetected,
+          // Camera preview full-screen
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              const boxSize = 270.0;
+              final scanWindow = Rect.fromCenter(
+                center: Offset(w / 2, h / 2),
+                width: boxSize,
+                height: boxSize,
+              );
+              return Stack(children: [
+                MobileScanner(
+                  controller: cameraController,
+                  scanWindow: scanWindow,
+                  onDetect: _onBarcodeDetected,
+                ),
+                // Dark overlay outside scan box
+                _ScanOverlay(scanWindow: scanWindow, isProcessing: _isProcessing),
+              ]);
+            },
           ),
 
           // Camera initialization overlay
@@ -286,20 +347,6 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
             ),
           ),
 
-          // Scanner box overlay
-          Center(
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: _isProcessing ? Colors.green : Colors.white,
-                  width: 3,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
 
           // Manual input at bottom
           Positioned(
@@ -419,49 +466,151 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
             ),
           ),
 
-          // Feedback overlay
+          // ── Feedback overlay ─────────────────────────────────────────
           if (_feedbackMessage != null)
             Positioned(
               bottom: 120,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _feedbackColor.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _feedbackColor.withOpacity(0.5),
-                        blurRadius: 20,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _feedbackColor == Colors.green ? Icons.check_circle : Icons.error,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _feedbackMessage!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              left: 16,
+              right: 16,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+                decoration: BoxDecoration(
+                  color: _unknownBarcode != null
+                      ? Colors.black.withOpacity(0.88)
+                      : _feedbackColor.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_unknownBarcode != null
+                              ? Colors.black
+                              : _feedbackColor)
+                          .withOpacity(0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _unknownBarcode != null
+                    // ── Unknown barcode: single Add Item row ──
+                    ? InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () async {
+                          final barcode = _unknownBarcode!;
+                          setState(() {
+                            _feedbackMessage = null;
+                            _unknownBarcode = null;
+                          });
+                          // Stop camera to save battery while user fills the form
+                          await cameraController.stop();
+                          if (!mounted) return;
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  QuickAddItemScreen(barcode: barcode),
+                            ),
+                          );
+                          // Restart camera when returning to scanner
+                          if (mounted) cameraController.start();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.25),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.search_off_rounded,
+                                    color: Colors.redAccent, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'No item exists',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Barcode: $_unknownBarcode',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.6),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE94560),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle_outline_rounded,
+                                        color: Colors.white, size: 16),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Add Item',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    // ── Normal success / error chip ──
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 14),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _feedbackColor == Colors.green
+                                  ? Icons.check_circle
+                                  : Icons.error,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                _feedbackMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ),
             ),
+
 
           // Processing indicator
           if (_isProcessing)
@@ -474,4 +623,74 @@ class _GeneralScanScreenState extends State<GeneralScanScreen> with WidgetsBindi
       ),
     );
   }
+}
+
+// ── Scan overlay ──────────────────────────────────────────────────────────────
+class _ScanOverlay extends StatelessWidget {
+  final Rect scanWindow;
+  final bool isProcessing;
+  const _ScanOverlay({required this.scanWindow, required this.isProcessing});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.infinite,
+      painter: _ScanPainter(scanWindow: scanWindow, isProcessing: isProcessing),
+    );
+  }
+}
+
+class _ScanPainter extends CustomPainter {
+  final Rect scanWindow;
+  final bool isProcessing;
+  _ScanPainter({required this.scanWindow, required this.isProcessing});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Dark mask outside the scan box
+    final mask = Paint()..color = const Color(0xBB000000);
+    const r = Radius.circular(18);
+    final rrect = RRect.fromRectAndRadius(scanWindow, r);
+    final path = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..addRRect(rrect)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, mask);
+
+    // Corner brackets
+    final color = isProcessing ? const Color(0xFF4CAF50) : Colors.white;
+    final p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round;
+
+    const cl = 26.0; // bracket arm length
+    const cr = 16.0; // corner radius
+    final l = scanWindow.left;
+    final t = scanWindow.top;
+    final ri = scanWindow.right;
+    final b = scanWindow.bottom;
+
+    // Top-left corner
+    canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
+    canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
+    canvas.drawArc(Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
+    // Top-right corner
+    canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
+    canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2, 3.14159 / 2, false, p);
+    // Bottom-left corner
+    canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
+    canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
+    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2, 3.14159 / 2, false, p);
+    // Bottom-right corner
+    canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
+    canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0, 3.14159 / 2, false, p);
+  }
+
+  @override
+  bool shouldRepaint(_ScanPainter old) =>
+      old.isProcessing != isProcessing || old.scanWindow != scanWindow;
 }
