@@ -42,7 +42,8 @@ exports.createItem = async (req, res) => {
             huidNumber,
             images,
             containerId,
-            slotNumber
+            slotNumber,
+            status
         } = req.body;
 
         // Helper to extract images
@@ -87,10 +88,11 @@ exports.createItem = async (req, res) => {
             });
         }
 
-        let assignedContainerId = containerId;
-        let assignedSlotNumber = slotNumber;
+        let assignedContainerId = containerId || null;
+        let assignedSlotNumber = slotNumber || null;
 
-        // Auto-assign container and slot if not provided
+        // Try to auto-assign a container only when one hasn't been explicitly provided
+        // This is best-effort: if no container is available the item is saved without one
         if (!containerId || !slotNumber) {
             const containers = await Container.find({
                 isActive: true,
@@ -100,10 +102,10 @@ exports.createItem = async (req, res) => {
                 ]
             });
 
-            // Determine weight category
-            let weightCategory = 'light';
-            if (netWeight > 10) weightCategory = 'heavy';
-            else if (netWeight > 5) weightCategory = 'medium';
+            // Determine weight category for matching
+            let wCat = 'light';
+            if (netWeight > 10) wCat = 'heavy';
+            else if (netWeight > 5) wCat = 'medium';
 
             let bestContainer = null;
             let bestSlot = null;
@@ -112,9 +114,8 @@ exports.createItem = async (req, res) => {
                 const availableSlot = container.slots.find(
                     slot => slot.itemId === null && !slot.reserved
                 );
-
                 if (availableSlot) {
-                    if (container.weightCategory === weightCategory || container.weightCategory === 'mixed') {
+                    if (container.weightCategory === wCat || container.weightCategory === 'mixed') {
                         bestContainer = container;
                         bestSlot = availableSlot;
                         break;
@@ -125,15 +126,12 @@ exports.createItem = async (req, res) => {
                 }
             }
 
-            if (!bestContainer) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No available slot found. Please create a new container.'
-                });
+            // Assign only if a suitable container was found — no hard error if not
+            if (bestContainer) {
+                assignedContainerId = bestContainer._id;
+                assignedSlotNumber = bestSlot.slotNumber;
             }
-
-            assignedContainerId = bestContainer._id;
-            assignedSlotNumber = bestSlot.slotNumber;
+            // else: item saves without a container (status can be set to action_needed by caller)
         }
 
         // Create item
@@ -153,7 +151,7 @@ exports.createItem = async (req, res) => {
             images: imagePaths,
             containerId: assignedContainerId,
             slotNumber: assignedSlotNumber,
-            status: 'active'
+            status: status || 'active'
         });
 
         // Update container slot
