@@ -28,6 +28,11 @@ const customerRoutes = require('./routes/customer.routes');
 const tagPrintRoutes = require('./routes/tagPrint.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const cloudinaryRoutes = require('./routes/cloudinary.routes');
+// Store management routes (shopmanage DB)
+const purchaseRoutes = require('./routes/purchase.routes');
+const stockRoutes    = require('./routes/stock.routes');
+const gstRoutes      = require('./routes/gst.routes');
+const invoiceRoutes  = require('./routes/invoice.routes');
 
 // Initialize express app
 const app = express();
@@ -147,48 +152,34 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 // DATABASE CONNECTION
 // ======================
 
-const mongoOptions = {
-  maxPoolSize: 20, // Increased from 10 for better concurrency
-  minPoolSize: 5,  // Increased from 2 for faster response
-  serverSelectionTimeoutMS: 30000, // Increased to 30 seconds for Railway
-  socketTimeoutMS: 45000,
-};
-
 // Enable query logging in development
 if (process.env.NODE_ENV !== 'production') {
   mongoose.set('debug', true);
 }
 
-// Log MongoDB URI (masked) for debugging
-const mongoUri = process.env.MONGODB_URI;
-if (!mongoUri) {
-  logger.error('❌ MONGODB_URI environment variable is not set!');
-  process.exit(1);
-}
-logger.info(`Connecting to MongoDB: ${mongoUri.substring(0, 20)}...`);
+// Dual-DB: jewellery_stock (primary) + shopmanage (store management)
+const { connectPrimary, connectShopmanage } = require('./config/db');
 
-mongoose.connect(process.env.MONGODB_URI, mongoOptions)
+Promise.all([connectPrimary(), connectShopmanage()])
   .then(() => {
-    logger.info('✅ MongoDB connected successfully');
-    logger.info(`Database: ${mongoose.connection.name}`);
+    logger.info('✅ All database connections established');
   })
   .catch((err) => {
-    logger.error('❌ MongoDB connection error:', err.message);
-    logger.error('Full error:', err);
+    logger.error('❌ Database connection error:', err.message);
     process.exit(1);
   });
 
-// MongoDB connection event listeners
+// Primary connection event listeners
 mongoose.connection.on('error', (err) => {
-  logger.error('MongoDB connection error:', err);
+  logger.error('MongoDB (jewellery_stock) error:', err);
 });
 
 mongoose.connection.on('disconnected', () => {
-  logger.warn('MongoDB disconnected');
+  logger.warn('MongoDB (jewellery_stock) disconnected');
 });
 
 mongoose.connection.on('reconnected', () => {
-  logger.info('MongoDB reconnected');
+  logger.info('MongoDB (jewellery_stock) reconnected');
 });
 
 // Initialize Cloudinary
@@ -230,6 +221,11 @@ app.use('/api/tag-print', require('./routes/tagPrint.routes'));
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', cloudinaryRoutes);
 app.use('/api/test', require('./routes/test.routes'));
+// Store management (shopmanage DB)
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/stock',     stockRoutes);
+app.use('/api/gst',       gstRoutes);
+app.use('/api/invoices',  invoiceRoutes);
 
 // ======================
 // ERROR HANDLING
@@ -266,11 +262,12 @@ process.on('uncaughtException', (err) => {
 });
 
 // Graceful shutdown
+const { closeAll } = require('./config/db');
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
+  server.close(async () => {
+    await closeAll();
     logger.info('Process terminated');
-    mongoose.connection.close();
   });
 });
 

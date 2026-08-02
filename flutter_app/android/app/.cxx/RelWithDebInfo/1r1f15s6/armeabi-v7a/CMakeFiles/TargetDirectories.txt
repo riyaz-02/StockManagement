@@ -1,0 +1,2 @@
+F:/StockManagement/flutter_app/android/app/.cxx/RelWithDebInfo/1r1f15s6/armeabi-v7a/CMakeFiles/edit_cache.dir
+F:/StockManagement/flutter_app/android/app/.cxx/RelWithDebInfo/1r1f15s6/armeabi-v7a/CMakeFiles/rebuild_cache.dir

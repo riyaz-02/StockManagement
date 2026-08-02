@@ -85,7 +85,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
       }
 
       // Fetch all items that are physically in the rack
-      final response = await apiService.getItems(queryParams: {'status': 'active,in_stock,booked,wishlisted'});
+      final response = await apiService.getItems(queryParams: {'status': 'active,action_needed,in_stock,booked,wishlisted'});
 
       if (response['success'] == true) {
         final List<dynamic> items = response['data']['items'] ?? [];

@@ -140,13 +140,14 @@ class Item {
     };
   }
 
-  bool get isActive => status == 'active';
-  bool get isBooked => status == 'booked';
-  bool get isInRepair => status == 'in_repair';
+  // action_needed items are physically in-shop (quick-added, details pending)
+  bool get isActive       => status == 'active' || status == 'action_needed';
+  bool get isBooked       => status == 'booked';
+  bool get isInRepair     => status == 'in_repair';
   bool get isTemporarilyRemoved => status == 'temporarily_removed';
-  bool get isSold => status == 'sold';
-  bool get isInStock => status == 'active' || status == 'booked';
-  bool get isInTally => status == 'active' || status == 'booked';
+  bool get isSold         => status == 'sold';
+  bool get isInStock      => status == 'active' || status == 'action_needed' || status == 'booked';
+  bool get isInTally      => status == 'active' || status == 'action_needed' || status == 'booked';
   bool get isActionNeeded => status == 'action_needed';
 
   Item copyWith({

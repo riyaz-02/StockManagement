@@ -1,0 +1,1 @@
+F:\StockManagement\flutter_app\build\app\intermediates\cxx\RelWithDebInfo\1r1f15s6\obj\x86_64

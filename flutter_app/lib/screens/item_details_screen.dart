@@ -1169,15 +1169,175 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     );
   }
 
-  // Note: Item restore functionality has been moved to the Recycle Bin screen
-  // with proper container validation. Restore is no longer available from item details.
-  void _showRestoreConfirmation(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please restore items from the Recycle Bin screen'),
-        backgroundColor: Colors.orange,
+  // Restore an item from item details — mirrors logic in recycle_bin_screen.dart
+  Future<void> _showRestoreConfirmation(BuildContext context) async {
+    try {
+      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+      await containerProvider.fetchContainers();
+      final containers = containerProvider.containers;
+
+      // Try to restore to the previous container if it is still valid
+      if (_item.containerId != null && _item.containerId!.isNotEmpty) {
+        final previousContainer =
+            containers.where((c) => c.id == _item.containerId).firstOrNull;
+
+        if (previousContainer != null &&
+            previousContainer.isActive &&
+            !previousContainer.isLocked &&
+            previousContainer.availableSlots > 0) {
+          await _restoreItemToContainer(_item, _item.containerId!, _item.slotNumber);
+          return;
+        }
+      }
+
+      // Previous container unavailable — let the user pick one
+      await _showContainerSelectionDialog(_item);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error checking containers: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showContainerSelectionDialog(Item item) async {
+    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    final containers = containerProvider.containers;
+
+    // Filter containers compatible with this item
+    final assignableContainers = containers.where((c) {
+      return c.isActive &&
+          !c.isLocked &&
+          c.availableSlots > 0 &&
+          c.metalType.any((m) => m.toLowerCase() == item.metalType.toLowerCase()) &&
+          c.allowedItemTypes.any((t) => t.toLowerCase() == item.itemType.toLowerCase());
+    }).toList();
+
+    if (assignableContainers.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No valid containers available for this item. '
+              'Please create or unlock a suitable container first.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    String? selectedContainerId;
+    int? selectedSlotNumber;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Select Container'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Previous container is not available. '
+                'Please select a new container for "${item.name}".',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Container',
+                  border: OutlineInputBorder(),
+                ),
+                items: assignableContainers.map((container) {
+                  return DropdownMenuItem(
+                    value: container.id,
+                    child: Text(
+                      '${container.name} (${container.availableSlots}/${container.capacity} slots)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  selectedContainerId = value;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Slot Number (Optional)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Leave empty for auto-assign',
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  selectedSlotNumber = int.tryParse(value);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (selectedContainerId != null) {
+                _restoreItemToContainer(item, selectedContainerId!, selectedSlotNumber);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Restore'),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _restoreItemToContainer(Item item, String containerId, int? slotNumber) async {
+    try {
+      final response = await _apiService.restoreItem(item.id, containerId, slotNumber);
+
+      if (mounted) {
+        if (response['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${item.name} restored successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Pop back to the previous screen (recycle bin or item list)
+          Navigator.pop(context, true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Failed to restore item'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error restoring item: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showPermanentDeleteConfirmation(BuildContext context) {

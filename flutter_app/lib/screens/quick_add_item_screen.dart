@@ -403,23 +403,23 @@ class _QuickAddItemScreenState extends State<QuickAddItemScreen> {
                   child: Column(children: [
 
                     // 1. Photos
-                    _section(label: 'ছবি', icon: Icons.camera_alt_outlined,
+                    _section(label: 'ছবি  (Photos)', icon: Icons.camera_alt_outlined,
                         child: _buildImages()),
 
                     // 2. Metal
-                    _section(label: 'ধাতুর ধরন', icon: Icons.toll_outlined,
+                    _section(label: 'ধাতুর ধরন  (Metal)', icon: Icons.toll_outlined,
                         required: _metalType == null, child: _buildMetalChips()),
 
                     // 3. Purity
-                    _section(label: 'বিশুদ্ধতা', icon: Icons.star_outline_rounded,
+                    _section(label: 'বিশুদ্ধতা  (Purity)', icon: Icons.star_outline_rounded,
                         required: _purity == null, child: _buildPurityChips()),
 
                     // 4. Weight
-                    _section(label: 'নিট ওজন (গ্রাম)', icon: Icons.scale_outlined,
+                    _section(label: 'নিট ওজন  (Weight gm.)', icon: Icons.scale_outlined,
                         required: _weightCtrl.text.isEmpty, child: _buildWeightRow()),
 
                     // 5. Certification
-                    _section(label: 'সার্টিফিকেশন', icon: Icons.verified_outlined,
+                    _section(label: 'সার্টিফিকেশন  (Certification)', icon: Icons.verified_outlined,
                         child: _buildCert()),
 
                     // More info
@@ -524,12 +524,6 @@ class _QuickAddItemScreenState extends State<QuickAddItemScreen> {
               fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.2,
               color: required ? _T.accent : _T.text2,
             )),
-            if (required) Container(
-              margin: const EdgeInsets.only(left: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: _T.accent, borderRadius: BorderRadius.circular(8)),
-              child: const Text('আবশ্যক', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
           ]),
         ),
         const Padding(

@@ -17,8 +17,8 @@ exports.getDailySummary = async (req, res) => {
         const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
-        // Total items by status
-        const activeItems = await Item.countDocuments({ status: 'active' });
+        // active + action_needed are both physically in-shop (action_needed = quick-add pending details)
+        const activeItems = await Item.countDocuments({ status: { $in: ['active', 'action_needed'] } });
         const bookedItems = await Item.countDocuments({ status: 'booked' });
         const inRepairItems = await Item.countDocuments({ status: { $in: ['repair', 'in_repair'] } });
         const tempRemovedItems = await Item.countDocuments({ status: 'temporarily_removed' });
@@ -29,9 +29,9 @@ exports.getDailySummary = async (req, res) => {
             updatedAt: { $gte: startOfDay, $lte: endOfDay }
         });
 
-        // Total weight by metal type (active + booked only)
+        // Total weight by metal type (active + action_needed + booked — all physically in-shop)
         const weightData = await Item.getTotalWeight({
-            status: { $in: ['active', 'booked'] }
+            status: { $in: ['active', 'action_needed', 'booked'] }
         });
 
         // Bookings today

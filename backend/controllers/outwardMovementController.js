@@ -44,8 +44,9 @@ exports.createOutwardMovement = async (req, res) => {
             });
         }
 
-        // Check if item is available for movement
-        if (!['active', 'booked'].includes(item.status)) {
+        // Check if item is available for movement.
+        // action_needed items are physically in-shop, so they can be moved out.
+        if (!['active', 'action_needed', 'booked'].includes(item.status)) {
             return res.status(400).json({
                 success: false,
                 message: `Item cannot be moved out. Current status: ${item.status}`
@@ -196,7 +197,11 @@ exports.returnItem = async (req, res) => {
         const item = await Item.findById(movement.itemId);
         if (item) {
             // Restore to previous status or default to active
-            item.status = movement.previousItemStatus === 'booked' ? 'booked' : 'active';
+            item.status = movement.previousItemStatus === 'booked'
+                ? 'booked'
+                : movement.previousItemStatus === 'action_needed'
+                    ? 'action_needed'
+                    : 'active';
             await item.save();
         }
 

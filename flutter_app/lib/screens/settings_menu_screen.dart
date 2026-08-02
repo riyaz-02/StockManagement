@@ -11,6 +11,7 @@ import 'recycle_bin_screen.dart';
 import 'account_settings_screen.dart';
 import 'manage_users_screen.dart';
 import 'action_needed_items_screen.dart';
+import 'gst_config_screen.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
   const SettingsMenuScreen({super.key});
@@ -186,6 +187,25 @@ class SettingsMenuScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 12),
+          // GST Configuration (Admin Only)
+          if (authProvider.user?.role == 'admin')
+            _buildSettingCard(
+              context,
+              languageProvider: languageProvider,
+              title: 'GST Configuration',
+              subtitle: 'GSTIN, PAN, HSN code and tax rates',
+              icon: Icons.percent_rounded,
+              color: const Color(0xFF059669),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const GstConfigScreen()),
+                );
+              },
+            ),
+          if (authProvider.user?.role == 'admin')
+            const SizedBox(height: 12),
           _buildSettingCard(
             context,
             languageProvider: languageProvider,
@@ -194,7 +214,6 @@ class SettingsMenuScreen extends StatelessWidget {
             icon: Icons.settings,
             color: Colors.purple,
             onTap: () {
-              // TODO: Navigate to system settings
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Coming soon!')),
               );

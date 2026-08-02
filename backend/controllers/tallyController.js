@@ -41,11 +41,10 @@ exports.createTally = async (req, res) => {
         console.log('[TALLY CREATE DEBUG] Total items in DB:', totalItems);
         console.log('[TALLY CREATE DEBUG] Items by status:', statusCounts);
 
-        // Fetch all items that are physically in the rack
-        // Include: active (legacy), in_stock, booked, wishlisted
-        // Exclude: sold, repair, with_customer, with_agent, temporarily_removed
+        // Fetch all items that are physically in the rack.
+        // action_needed items are quick-adds that are physically present but details pending.
         const allItems = await Item.find({
-            status: { $in: ['active', 'in_stock', 'booked', 'wishlisted'] }
+            status: { $in: ['active', 'action_needed', 'in_stock', 'booked', 'wishlisted'] }
         })
             .select('barcode metalType netWeight status')
             .lean();
@@ -307,18 +306,19 @@ exports.scanItem = async (req, res) => {
             });
         }
 
-        // **CHECK 4**: Validate item status - REJECT out-of-stock items
-        const allowedStatuses = ['active', 'in_stock', 'booked', 'wishlisted'];
+        // **CHECK 4**: Validate item status — reject out-of-shop items
+        // action_needed items are physically in the rack (quick-added), treat same as active.
+        const allowedStatuses = ['active', 'action_needed', 'in_stock', 'booked', 'wishlisted'];
         if (!allowedStatuses.includes(item.status)) {
             console.log(`[SCAN] REJECTED: Item ${item._id} has invalid status: ${item.status}`);
 
-            // User-friendly status messages
             const statusMessages = {
-                'sold': 'Item already sold',
-                'repair': 'Item is under repair',
-                'with_customer': 'Item is with customer',
-                'out_of_stock': 'Item is out of stock',
-                'deleted': 'Item has been deleted'
+                'sold':              'Item already sold',
+                'repair':            'Item is under repair',
+                'in_repair':         'Item is under repair',
+                'with_customer':     'Item is with customer',
+                'out_of_stock':      'Item is out of stock',
+                'deleted':           'Item has been deleted',
             };
 
             const friendlyMessage = statusMessages[item.status] || `Item status: ${item.status}`;

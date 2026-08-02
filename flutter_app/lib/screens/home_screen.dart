@@ -14,6 +14,8 @@ import 'booking_list_screen.dart';
 import 'reports_screen.dart';
 import 'settings_menu_screen.dart';
 import 'login_screen.dart';
+import 'store_management_screen.dart';
+import 'invoice_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -371,6 +373,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: _ElegantCard(
+                          icon: Icons.store_rounded,
+                          title: 'Store',
+                          description: 'Stock, GST & purchases',
+                          primaryColor: const Color(0xFF059669),
+                          secondaryColor: const Color(0xFF34D399),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const StoreManagementScreen()),
+                          ),
+                        ),
+                      ),
+                      // ── GST Invoice card ───────────────────────────────
+                      SizedBox(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        child: _ElegantCard(
+                          icon: Icons.receipt_outlined,
+                          title: 'GST Invoice',
+                          description: 'Sales billing',
+                          primaryColor: const Color(0xFFD97706),
+                          secondaryColor: const Color(0xFFF59E0B),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const InvoiceScreen()),
                           ),
                         ),
                       ),

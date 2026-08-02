@@ -37,7 +37,8 @@ exports.createBooking = async (req, res) => {
             });
         }
 
-        if (!['active'].includes(item.status)) {
+        // action_needed items are physically in-shop (quick-added, details pending) — bookable.
+        if (!['active', 'action_needed'].includes(item.status)) {
             return res.status(400).json({
                 success: false,
                 message: `Item is ${item.status} and cannot be booked`

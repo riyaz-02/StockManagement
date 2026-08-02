@@ -5,7 +5,7 @@ const PDFGenerator = require('../utils/pdfGenerator');
 exports.getItemsForTagPrinting = async (req, res) => {
     try {
         const items = await Item.find({
-            status: { $in: ['active', 'booked', 'in_stock'] }
+            status: { $in: ['active', 'action_needed', 'booked', 'in_stock'] }
         })
             .populate('containerId', 'name qrCode')
             .populate('lastPrintedBy', 'name')

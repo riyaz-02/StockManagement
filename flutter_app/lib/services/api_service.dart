@@ -985,4 +985,310 @@ class ApiService {
       rethrow;
     }
   }
+
+  // ==================== STORE MANAGEMENT APIs ====================
+
+  // ── Stock Dashboard & Bulk Weights ──────────────────────────────────────
+
+  Future<Map<String, dynamic>> getStockDashboard() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/stock/dashboard'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getBulkWeights({String? metalType}) async {
+    var uri = Uri.parse('${AppConstants.baseUrl}/stock/bulk-weights');
+    if (metalType != null) {
+      uri = uri.replace(queryParameters: {'metalType': metalType});
+    }
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> addBulkWeight(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/stock/bulk-weights'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateBulkWeight(
+      String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/stock/bulk-weights/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> deleteBulkWeight(String id) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/stock/bulk-weights/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getStockDailySummary({
+    String? startDate,
+    String? endDate,
+    String? metalType,
+  }) async {
+    final params = <String, String>{};
+    if (startDate != null) params['startDate'] = startDate;
+    if (endDate != null) params['endDate'] = endDate;
+    if (metalType != null) params['metalType'] = metalType;
+    final uri = Uri.parse('${AppConstants.baseUrl}/stock/daily-summary')
+        .replace(queryParameters: params.isNotEmpty ? params : null);
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getStockReconciliation() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/stock/reconciliation'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // ── Purchases ───────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getPurchases({
+    String? metalType,
+    String? biller,
+    String? startDate,
+    String? endDate,
+    int page = 1,
+    int limit = 20,
+    String sort = 'date_desc',
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      'sort': sort,
+    };
+    if (metalType != null) params['metalType'] = metalType;
+    if (biller != null) params['biller'] = biller;
+    if (startDate != null) params['startDate'] = startDate;
+    if (endDate != null) params['endDate'] = endDate;
+
+    final uri = Uri.parse('${AppConstants.baseUrl}/purchases')
+        .replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+
+  Future<Map<String, dynamic>> getPurchase(String id) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/purchases/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createPurchase(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/purchases'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updatePurchase(
+      String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/purchases/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> deletePurchase(String id) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/purchases/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> previewPurchaseGst({
+    required double totalAmount,
+    String transactionType = 'intra-state',
+  }) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/purchases/preview-gst')
+        .replace(queryParameters: {
+      'totalAmount': totalAmount.toString(),
+      'transactionType': transactionType,
+    });
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  // ── GST ─────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getGstConfig() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/gst/config'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateGstConfig(Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/gst/config'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> calculateGst({
+    required double baseAmount,
+    String transactionType = 'intra-state',
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/gst/calculate'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'baseAmount': baseAmount,
+        'transactionType': transactionType,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> validateGstin(String gstin) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/gst/validate-gstin'),
+      headers: await _getHeaders(),
+      body: json.encode({'gstin': gstin}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> validatePan(String pan) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/gst/validate-pan'),
+      headers: await _getHeaders(),
+      body: json.encode({'pan': pan}),
+    );
+    return _handleResponse(response);
+  }
+
+  // ── Purchase Bill Attachment Upload ─────────────────────────────────────────
+
+  /// Uploads a single purchase bill (image or PDF) to Cloudinary via the backend.
+  /// [filePath] absolute path to the file on device.
+  /// [mimeType] e.g. 'image/jpeg' or 'application/pdf'.
+  /// Returns { url, publicId, originalName, format }
+  Future<Map<String, dynamic>> uploadPurchaseBill({
+    required String filePath,
+    required String mimeType,
+    required String originalName,
+  }) async {
+    final token = await _storage.getToken();
+    final uri = Uri.parse('${AppConstants.baseUrl}/purchases/upload-bill');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath(
+        'attachment',
+        filePath,
+        contentType: MediaType.parse(mimeType),
+      ));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    return _handleResponse(response);
+  }
+
+  /// Deletes a Cloudinary purchase bill attachment by its publicId.
+  Future<Map<String, dynamic>> deletePurchaseBillAttachment(String publicId) async {
+    // Replace / with -- so it's URL-safe (same as main upload routes)
+    final safeId = publicId.replaceAll('/', '--');
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/purchases/attachment/$safeId'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Fetches autocomplete suggestions (suppliers, GSTINs, descriptions).
+  Future<Map<String, dynamic>> getPurchaseSuggestions() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/purchases/suggestions'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Fetches quarterly ITC summary for a financial year.
+  /// [fy] — e.g. '2025-26'. Defaults to current FY on backend.
+  Future<Map<String, dynamic>> getItcSummary({String? fy}) async {
+    final params = fy != null ? '?fy=$fy' : '';
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/purchases/itc-summary$params'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // ── Invoice (GST Sales) ────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getNextInvoiceNumber() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/invoices/next-number'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/invoices'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateInvoiceById(
+      String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/invoices/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> deleteInvoiceById(String id) async {
+    final response = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/invoices/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getInvoices({
+    Map<String, String>? queryParams,
+  }) async {
+    var uri = Uri.parse('${AppConstants.baseUrl}/invoices');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      uri = uri.replace(queryParameters: queryParams);
+    }
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
 }
+
+

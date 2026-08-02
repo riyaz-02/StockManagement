@@ -2,28 +2,50 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
-  // Production API URL - AWS EC2 Mumbai (Elastic IP - permanent, never changes)
-  static const String baseUrl = 'http://13.235.125.127/api';
+  // ── Environment Switch ──────────────────────────────────────────────────
+  // Set to true for local development, false for production.
+  static const bool _useLocalBackend = true;
 
-  // Lambda Function URL to start the EC2 instance (from AWS Lambda → StartShopEC2 → Configuration → Function URL)
-  static const String lambdaStartUrl = 'https://45skg376c6xml6yifrzyct75rm0isktv.lambda-url.ap-south-1.on.aws/';
+  // ── Production URL ──────────────────────────────────────────────────────
+  // Production API domain. Point api.laltuguineapalace.com to the EC2 public IP
+  // from the wake Lambda instead of keeping a paid Elastic IP allocated.
+  static const String _productionUrl = 'https://api.laltuguineapalace.com/api';
+  static String? _runtimeProductionUrl;
 
-  // Server connectivity check — any 200/401 response means server is up
-  static const String healthCheckUrl = 'http://13.235.125.127/api/auth/me';
-  
-  // Development URL - localhost (uncomment below for local development)
-  // static String get baseUrl {
-  //   if (kIsWeb) {
-  //     return 'http://localhost:5000/api';
-  //   } else if (Platform.isAndroid) {
-  //     const String physicalDeviceIP = '192.168.0.116';
-  //     return 'http://$physicalDeviceIP:5000/api';
-  //   } else if (Platform.isIOS) {
-  //     return 'http://localhost:5000/api';
-  //   } else {
-  //     return 'http://localhost:5000/api';
-  //   }
-  // }
+  // Lambda Function URL to wake the EC2 instance when sleeping
+  static const String lambdaStartUrl =
+      'https://45skg376c6xml6yifrzyct75rm0isktv.lambda-url.ap-south-1.on.aws/';
+
+  // ── Local Development URL ───────────────────────────────────────────────
+  // Android physical device: use your PC's LAN IP (run `ipconfig` → Wi-Fi IPv4)
+  // Android emulator       : 10.0.2.2 maps to the host machine's localhost
+  // iOS simulator / macOS  : localhost works directly
+  static String get _localUrl {
+    if (kIsWeb) return 'http://localhost:5000/api';
+    if (Platform.isAndroid) {
+      // Physical device — Wi-Fi IPv4 (run `ipconfig` to refresh if it changes)
+      return 'http://192.168.0.114:5000/api';
+      // Emulator fallback (uncomment if using Android emulator instead):
+      // return 'http://10.0.2.2:5000/api';
+    }
+    return 'http://localhost:5000/api';
+  }
+
+  // ── Active baseUrl ──────────────────────────────────────────────────────
+  static String get baseUrl =>
+      _useLocalBackend ? _localUrl : (_runtimeProductionUrl ?? _productionUrl);
+
+  static void setRuntimeProductionUrl(String url) {
+    final trimmedUrl = url.trim();
+    if (trimmedUrl.isEmpty) return;
+
+    _runtimeProductionUrl = trimmedUrl.endsWith('/api')
+        ? trimmedUrl
+        : '${trimmedUrl.replaceAll(RegExp(r'/+$'), '')}/api';
+  }
+
+  // Health-check — same host as baseUrl
+  static String get healthCheckUrl => '${baseUrl.replaceAll('/api', '')}/api/auth/me';
   
   static const int connectionTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;
