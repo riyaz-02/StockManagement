@@ -9,9 +9,11 @@ const storage = new CloudinaryStorage({
         // Determine folder based on query parameter, referer, or path
         let folder = 'jewelry-stock/items'; // Default to items
 
-        // Check query parameter first (e.g., ?folder=containers)
+        // Check query parameter first (e.g., ?folder=containers, ?folder=users)
         if (req.query.folder === 'containers') {
             folder = 'jewelry-stock/containers';
+        } else if (req.query.folder === 'users') {
+            folder = 'jewelry-stock/users';
         }
         // Fallback: check referer header for 'container' keyword
         else if (req.headers.referer && req.headers.referer.includes('container')) {

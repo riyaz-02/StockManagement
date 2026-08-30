@@ -9,9 +9,19 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'staff', 'viewer'],
+        enum: ['admin', 'owner', 'manager', 'staff', 'viewer'],
         default: 'staff',
         required: true
+    },
+    // Explicit per-user permission overrides (only ever populated for
+    // manager/staff/viewer accounts — admin/owner always bypass every
+    // check and never have overrides). Sparse: only keys that differ from
+    // the role's default grid (see config/permissions.js) need to be set.
+    // Plain Mixed object, not a Mongoose Map — Map keys can't contain "."
+    // and every permission key here is dot-namespaced (e.g. "items.delete").
+    permissionOverrides: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
     },
     language: {
         type: String,

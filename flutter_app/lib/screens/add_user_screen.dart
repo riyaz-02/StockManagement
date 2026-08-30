@@ -308,6 +308,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
               ),
               items: const [
                 DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                DropdownMenuItem(value: 'owner', child: Text('Owner')),
+                DropdownMenuItem(value: 'manager', child: Text('Manager')),
                 DropdownMenuItem(value: 'staff', child: Text('Staff')),
                 DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
               ],
@@ -346,9 +348,10 @@ class _AddUserScreenState extends State<AddUserScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _buildRoleInfo(
-                      'Admin', 'Full access to all features and settings'),
-                  _buildRoleInfo('Staff', 'Can manage items and containers'),
+                  _buildRoleInfo('Admin / Owner',
+                      'Full access to all features and settings'),
+                  _buildRoleInfo('Manager / Staff',
+                      'Broad access, configurable via Roles & Permissions'),
                   _buildRoleInfo('Viewer', 'Read-only access to view data'),
                 ],
               ),

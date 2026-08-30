@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/cloudinaryUpload');
 const cloudinary = require('../config/cloudinary');
-const { protect } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 // @route   POST /api/upload/single
 // @desc    Upload single image to Cloudinary
 // @access  Private
-router.post('/single', protect, upload.single('image'), async (req, res) => {
+router.post('/single', protect, requirePermission('media.upload'), upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -39,7 +39,7 @@ router.post('/single', protect, upload.single('image'), async (req, res) => {
 // @route   POST /api/upload/multiple
 // @desc    Upload multiple images to Cloudinary
 // @access  Private
-router.post('/multiple', protect, upload.array('images', 5), async (req, res) => {
+router.post('/multiple', protect, requirePermission('media.upload'), upload.array('images', 5), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({
@@ -73,7 +73,7 @@ router.post('/multiple', protect, upload.array('images', 5), async (req, res) =>
 // @route   DELETE /api/upload/:publicId
 // @desc    Delete image from Cloudinary
 // @access  Private
-router.delete('/:publicId', protect, async (req, res) => {
+router.delete('/:publicId', protect, requirePermission('media.upload'), async (req, res) => {
     try {
         const publicId = req.params.publicId.replace(/--/g, '/'); // Convert -- back to /
 

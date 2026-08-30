@@ -6,17 +6,15 @@ const {
     getRepairItems,
     getRepairHistory
 } = require('../controllers/repairController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(protect);
 
-// Public (authenticated) routes
-router.get('/', getRepairItems);
-router.get('/history/:itemId', getRepairHistory);
+router.get('/', requirePermission('repair.view'), getRepairItems);
+router.get('/history/:itemId', requirePermission('repair.view'), getRepairHistory);
 
-// Staff and Admin routes
-router.post('/send', authorize('admin', 'staff'), sendToRepair);
-router.post('/return', authorize('admin', 'staff'), returnFromRepair);
+router.post('/send', requirePermission('repair.send'), sendToRepair);
+router.post('/return', requirePermission('repair.return'), returnFromRepair);
 
 module.exports = router;

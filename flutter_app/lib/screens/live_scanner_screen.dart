@@ -6,9 +6,11 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../providers/tally_provider.dart';
+import '../models/item_model.dart';
 import '../utils/app_colors.dart';
-import '../widgets/weight_verification_dialog.dart';
 import '../utils/app_toast.dart';
+import '../widgets/weight_verification_dialog.dart';
+import 'quick_add_item_screen.dart';
 
 class LiveScannerScreen extends StatefulWidget {
   final String tallyId;
@@ -187,6 +189,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
         }
 
         final isOutOfStock = result['isOutOfStock'] ?? false;
+        final scannedItemData = result['data']?['item'];
+        final needsDetails = scannedItemData?['status'] == 'action_needed';
 
         // Play success sound and vibration
         _playSound('success');
@@ -234,12 +238,21 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
           }
         }
 
+        // If this item was a quick-add with pending details, offer to
+        // complete/activate it right here instead of leaving it for later.
+        if (needsDetails && scannedItemData != null && mounted) {
+          await _offerCompleteDetails(scannedItemData);
+        }
+
         // Resume scanning after brief delay (reduced for faster workflow)
         await Future.delayed(const Duration(milliseconds: 500));
       } else {
         // API returned error or null
         print('[SCAN] ✗ API returned error/null for barcode: $barcode');
         print('[SCAN] Provider error: ${tallyProvider.error}');
+
+        final isNotFound =
+            tallyProvider.error?.toLowerCase().contains('not found') == true;
 
         // Check if it's an out-of-stock item (warning) or other error
         final isOutOfStockWarning =
@@ -250,7 +263,7 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                 tallyProvider.error?.contains('deleted') == true;
 
         // Play appropriate sound
-        if (isOutOfStockWarning) {
+        if (isOutOfStockWarning || isNotFound) {
           _playSound('error'); // Could add a separate warning sound
           HapticFeedback.mediumImpact();
         } else {
@@ -262,7 +275,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
           _lastScannedBarcode = barcode;
           _lastResult =
               tallyProvider.error ?? '✗ Scan failed - please try again';
-          _resultColor = isOutOfStockWarning ? Colors.orange : Colors.red;
+          _resultColor =
+              (isOutOfStockWarning || isNotFound) ? Colors.orange : Colors.red;
         });
 
         // Auto-dismiss error after 10 seconds
@@ -275,8 +289,11 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
           }
         });
 
-        // Show error snackbar
-        if (mounted) {
+        if (isNotFound && mounted) {
+          // Barcode isn't registered at all — offer to add it on the spot
+          // instead of just failing the scan.
+          await _offerAddMissingItem(barcode);
+        } else if (mounted) {
           showAppSnackBar(
             context,
             SnackBar(
@@ -318,6 +335,113 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
     }
 
     setState(() => _isProcessing = false);
+  }
+
+  // ── Barcode not found — offer to add it as a new item ─────────────────────
+  Future<void> _offerAddMissingItem(String barcode) async {
+    final shouldAdd = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Item Not Found'),
+        content: Text(
+          'No item with barcode "$barcode" exists yet. Add it to stock now '
+          'and count it in this tally?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Add Item'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldAdd != true || !mounted) return;
+
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+          builder: (context) => QuickAddItemScreen(barcode: barcode)),
+    );
+
+    if (created != true || !mounted) return;
+
+    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+    final success = await tallyProvider.addItemToTally(widget.tallyId, barcode);
+
+    if (!mounted) return;
+
+    if (success) {
+      _playSound('success');
+      HapticFeedback.lightImpact();
+      setState(() {
+        _scannedCount++;
+        _lastScannedBarcode = barcode;
+        _lastResult = '✓ Item added and counted';
+        _resultColor = Colors.green;
+      });
+      await _loadTallyInfo();
+      tallyProvider.notifyListeners();
+    } else {
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(tallyProvider.error ??
+              'Item created, but failed to add to tally'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ── Scanned item still has pending "action needed" details ────────────────
+  Future<void> _offerCompleteDetails(Map<String, dynamic> itemData) async {
+    final shouldEdit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Details Pending'),
+        content: Text(
+          '"${itemData['barcode'] ?? 'This item'}" was quick-added and still '
+          'needs its full details filled in. Complete them now?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Edit Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldEdit != true || !mounted) return;
+
+    try {
+      final item = Item.fromJson(itemData);
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => QuickAddItemScreen(item: item)),
+      );
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(
+              content: Text('Could not open item: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    if (mounted) await _loadTallyInfo();
   }
 
   void _showCompletionDialog() {

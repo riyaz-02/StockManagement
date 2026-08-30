@@ -15,28 +15,25 @@ const {
     addItemToTally,
     updateInventory
 } = require('../controllers/tallyController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(protect);
 
-// Public (authenticated) routes
-router.get('/', getTallySessions);
-router.get('/:id', getTallySession);
-router.get('/:id/report', getTallyReport);
-router.get('/:id/items', getTallyItems);
+router.get('/', requirePermission('tally.view'), getTallySessions);
+router.get('/:id', requirePermission('tally.view'), getTallySession);
+router.get('/:id/report', requirePermission('tally.view'), getTallyReport);
+router.get('/:id/items', requirePermission('tally.view'), getTallyItems);
 
-// Staff and Admin routes
-router.post('/', authorize('admin', 'staff'), createTally);
-router.put('/:id/scan', authorize('admin', 'staff'), scanItem);
-router.put('/:id/verify-weight', authorize('admin', 'staff'), verifyWeight);
-router.put('/:id/lock', authorize('admin', 'staff'), lockTally);
-router.post('/:id/add-item', authorize('admin', 'staff'), addItemToTally);
-router.post('/:id/update-inventory', authorize('admin', 'staff'), updateInventory);
-router.delete('/:id', authorize('admin'), deleteTally);
+router.post('/', requirePermission('tally.create'), createTally);
+router.put('/:id/scan', requirePermission('tally.scan'), scanItem);
+router.put('/:id/verify-weight', requirePermission('tally.scan'), verifyWeight);
+router.put('/:id/lock', requirePermission('tally.lock'), lockTally);
+router.post('/:id/add-item', requirePermission('tally.addItem'), addItemToTally);
+router.post('/:id/update-inventory', requirePermission('tally.updateInventory'), updateInventory);
+router.delete('/:id', requirePermission('tally.deleteSession'), deleteTally);
 
-// Admin-only cleanup routes (deleting stock is a bigger deal than scanning it)
-router.put('/:id/remove-item', authorize('admin'), removeUnscannedItem);
-router.put('/:id/remove-unscanned', authorize('admin'), removeAllUnscannedItems);
+router.put('/:id/remove-item', requirePermission('tally.removeItem'), removeUnscannedItem);
+router.put('/:id/remove-unscanned', requirePermission('tally.removeItem'), removeAllUnscannedItems);
 
 module.exports = router;

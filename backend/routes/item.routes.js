@@ -15,29 +15,27 @@ const {
     markAsNoSell,
     markAsActive
 } = require('../controllers/itemController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 const cloudinaryUpload = require('../middleware/cloudinaryUpload');
 
 // All routes require authentication
 router.use(protect);
 
 // Public (authenticated) routes
-router.get('/', getItems);
-router.get('/filter-options', getFilterOptions);
-router.get('/barcode/:code', getItemByBarcode);
-router.get('/:id', getItem);
+router.get('/', requirePermission('items.view'), getItems);
+router.get('/filter-options', requirePermission('items.view'), getFilterOptions);
+router.get('/barcode/:code', requirePermission('items.view'), getItemByBarcode);
+router.get('/:id', requirePermission('items.view'), getItem);
 
-// Staff and Admin routes
-router.post('/', authorize('admin', 'staff'), cloudinaryUpload.array('images', 5), createItem);
-router.put('/:id', authorize('admin', 'staff'), cloudinaryUpload.array('images', 5), updateItem);
-router.put('/:id/sell', authorize('admin', 'staff'), sellItem);
-router.put('/:id/remove-temporarily', authorize('admin', 'staff'), removeTemporarily);
-router.put('/:id/mark-no-sell', authorize('admin', 'staff'), markAsNoSell);
-router.put('/:id/mark-active', authorize('admin', 'staff'), markAsActive);
+router.post('/', requirePermission('items.create'), cloudinaryUpload.array('images', 5), createItem);
+router.put('/:id', requirePermission('items.edit'), cloudinaryUpload.array('images', 5), updateItem);
+router.put('/:id/sell', requirePermission('items.sell'), sellItem);
+router.put('/:id/remove-temporarily', requirePermission('items.edit'), removeTemporarily);
+router.put('/:id/mark-no-sell', requirePermission('items.edit'), markAsNoSell);
+router.put('/:id/mark-active', requirePermission('items.edit'), markAsActive);
 
-// Admin only routes
-router.delete('/:id', authorize('admin'), deleteItem);
-router.put('/:id/restore', authorize('admin'), restoreItem);
-router.delete('/:id/permanent', authorize('admin'), permanentDeleteItem);
+router.delete('/:id', requirePermission('items.delete'), deleteItem);
+router.put('/:id/restore', requirePermission('items.restore'), restoreItem);
+router.delete('/:id/permanent', requirePermission('items.permanentDelete'), permanentDeleteItem);
 
 module.exports = router;

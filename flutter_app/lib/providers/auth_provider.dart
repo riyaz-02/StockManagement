@@ -11,12 +11,39 @@ class AuthProvider with ChangeNotifier {
   String? _token;
   bool _isLoading = false;
   String? _error;
+  Map<String, bool> _permissions = {};
 
   User? get user => _user;
   String? get token => _token;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null && _token != null;
+
+  // Admin/Owner always pass; everyone else is checked against the fetched
+  // effective permission map (role defaults merged with any per-user
+  // overrides, computed server-side by GET /api/permissions/me).
+  bool can(String key) {
+    if (_user?.hasFullAccess == true) return true;
+    return _permissions[key] ?? false;
+  }
+
+  Future<void> _fetchPermissions() async {
+    try {
+      final response = await _apiService.getMyPermissions();
+      if (response['success'] == true) {
+        final data = response['data'];
+        if (data['all'] == true) {
+          _permissions = {};
+        } else {
+          final raw = Map<String, dynamic>.from(data['permissions'] ?? {});
+          _permissions = raw.map((k, v) => MapEntry(k, v == true));
+        }
+      }
+    } catch (_) {
+      // Non-fatal — admin/owner don't need this, and everyone else just
+      // falls back to "no extra permissions" until the next successful fetch.
+    }
+  }
 
   // Initialize - check if user is already logged in
   Future<void> initialize() async {
@@ -29,6 +56,7 @@ class AuthProvider with ChangeNotifier {
         final userData = await _storage.getUser();
         if (userData != null) {
           _user = User.fromJson(userData);
+          await _fetchPermissions();
         }
       }
     } catch (e) {
@@ -47,7 +75,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await _apiService.login(mobile, password);
-      
+
       if (response['success'] == true) {
         _token = response['data']['token'];
         _user = User.fromJson(response['data']['user']);
@@ -55,6 +83,7 @@ class AuthProvider with ChangeNotifier {
         // Save to storage
         await _storage.saveToken(_token!);
         await _storage.saveUser(response['data']['user']);
+        await _fetchPermissions();
 
         _isLoading = false;
         notifyListeners();
@@ -77,6 +106,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     _user = null;
     _token = null;
+    _permissions = {};
     await _storage.clearAll();
     notifyListeners();
   }
@@ -107,12 +137,13 @@ class AuthProvider with ChangeNotifier {
   // Refresh user data from server
   Future<bool> refreshUser() async {
     if (_user == null) return false;
-    
+
     try {
       final response = await _apiService.getUser(_user!.id);
       if (response['success'] == true) {
         _user = User.fromJson(response['data']['user']);
         await _storage.saveUser(response['data']['user']);
+        await _fetchPermissions();
         notifyListeners();
         return true;
       }

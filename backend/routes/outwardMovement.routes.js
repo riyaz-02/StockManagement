@@ -7,16 +7,15 @@ const {
     getOutwardMovements,
     getOutwardMovement
 } = require('../controllers/outwardMovementController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(protect);
 
-// Staff and Admin routes
-router.post('/', authorize('admin', 'staff'), createOutwardMovement);
-router.get('/', authorize('admin', 'staff'), getOutwardMovements);
-router.get('/:id', authorize('admin', 'staff'), getOutwardMovement);
-router.get('/item/:itemId', authorize('admin', 'staff'), getItemMovements);
-router.put('/:id/return', authorize('admin', 'staff'), returnItem);
+router.post('/', requirePermission('repair.send'), createOutwardMovement);
+router.get('/', requirePermission('repair.view'), getOutwardMovements);
+router.get('/:id', requirePermission('repair.view'), getOutwardMovement);
+router.get('/item/:itemId', requirePermission('repair.view'), getItemMovements);
+router.put('/:id/return', requirePermission('repair.return'), returnItem);
 
 module.exports = router;

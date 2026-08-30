@@ -14,6 +14,7 @@ import 'action_needed_items_screen.dart';
 import 'gst_config_screen.dart';
 import 'app_update_settings_screen.dart';
 import 'send_notification_screen.dart';
+import 'role_permission_manager_screen.dart';
 import '../utils/app_toast.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
@@ -25,7 +26,7 @@ class SettingsMenuScreen extends StatelessWidget {
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     // Check if user is admin
-    if (authProvider.user?.role != 'admin') {
+    if (authProvider.user?.hasFullAccess != true) {
       return Scaffold(
         appBar: AppBar(title: Text(languageProvider.t('settings'))),
         body: const Center(
@@ -94,7 +95,7 @@ class SettingsMenuScreen extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Manage Users (Admin Only)
-          if (authProvider.user?.role == 'admin')
+          if (authProvider.user?.hasFullAccess == true)
             _buildSettingCard(
               context,
               languageProvider: languageProvider,
@@ -108,10 +109,31 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
+
+          // Roles & Permissions (Admin Only)
+          if (authProvider.user?.hasFullAccess == true)
+            _buildSettingCard(
+              context,
+              languageProvider: languageProvider,
+              title: 'Roles & Permissions',
+              subtitle: 'Configure what each role can do',
+              icon: Icons.admin_panel_settings_outlined,
+              color: Colors.deepPurple,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RolePermissionManagerScreen()),
+                );
+              },
+            ),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
 
           // Action Needed Items (Admin Only)
-          if (authProvider.user?.role == 'admin')
+          if (authProvider.user?.hasFullAccess == true)
             _buildSettingCard(
               context,
               languageProvider: languageProvider,
@@ -127,7 +149,8 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
 
           _buildSettingCard(
             context,
@@ -191,7 +214,7 @@ class SettingsMenuScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // GST Configuration (Admin Only)
-          if (authProvider.user?.role == 'admin')
+          if (authProvider.user?.hasFullAccess == true)
             _buildSettingCard(
               context,
               languageProvider: languageProvider,
@@ -206,10 +229,11 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
 
           // Send Notification (Admin Only)
-          if (authProvider.user?.role == 'admin')
+          if (authProvider.user?.hasFullAccess == true)
             _buildSettingCard(
               context,
               languageProvider: languageProvider,
@@ -225,10 +249,11 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
 
           // App Update Settings (Admin Only)
-          if (authProvider.user?.role == 'admin')
+          if (authProvider.user?.hasFullAccess == true)
             _buildSettingCard(
               context,
               languageProvider: languageProvider,
@@ -244,7 +269,8 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+          if (authProvider.user?.hasFullAccess == true)
+            const SizedBox(height: 12),
           _buildSettingCard(
             context,
             languageProvider: languageProvider,

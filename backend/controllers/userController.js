@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const cloudinaryHelper = require('../utils/cloudinaryHelper');
+const { hasPermission } = require('../middleware/auth');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -106,7 +107,7 @@ exports.createUser = async (req, res) => {
 // @access  Private
 exports.updateUser = async (req, res) => {
     try {
-        const { name, mobile, profileImage, language } = req.body;
+        const { name, mobile, profileImage, language, role, isActive } = req.body;
 
         const user = await User.findById(req.params.id);
 
@@ -117,8 +118,8 @@ exports.updateUser = async (req, res) => {
             });
         }
 
-        // Check if user is updating their own profile or is admin
-        if (req.user.id !== req.params.id && req.user.role !== 'admin') {
+        // Must be updating your own profile, or have user-management permission
+        if (req.user.id !== req.params.id && !(await hasPermission(req.user, 'users.manage'))) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to update this user'
@@ -150,6 +151,18 @@ exports.updateUser = async (req, res) => {
             user.profileImage = profileImage;
         }
         if (language) user.language = language;
+
+        // Role and active-status changes require user-management permission,
+        // and nobody can demote/deactivate their own account this way (avoids
+        // locking everyone out if there's only one admin).
+        if (
+            req.user.id !== req.params.id &&
+            (await hasPermission(req.user, 'users.manage'))
+        ) {
+            if (role) user.role = role;
+            if (isActive !== undefined) user.isActive = isActive;
+        }
+
         user.updatedAt = Date.now();
 
         await user.save();
@@ -320,6 +333,53 @@ exports.registerFcmToken = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while registering device'
+        });
+    }
+};
+
+// @desc    Admin reset of another user's password (no current password needed)
+// @route   PUT /api/users/:id/reset-password
+// @access  Private/Admin
+exports.resetPassword = async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+
+        if (!newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide newPassword'
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password must be at least 6 characters'
+            });
+        }
+
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        user.password = newPassword;
+        user.updatedAt = Date.now();
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset successfully'
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while resetting password'
         });
     }
 };

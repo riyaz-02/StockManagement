@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 const {
     getItemsForTagPrinting,
     recordTagPrint,
@@ -12,19 +12,10 @@ const {
 // All routes require authentication
 router.use(protect);
 
-// Get all items for tag printing
-router.get('/items', getItemsForTagPrinting);
-
-// Record tag print event
-router.post('/record', recordTagPrint);
-
-// Get tag print history for an item
-router.get('/history/:itemId', getTagPrintHistory);
-
-// Generate PDF for selected items
-router.post('/generate-pdf', generateTagsPDF);
-
-// Generate PDF for blank tags
-router.post('/generate-blank-tags-pdf', generateBlankTagsPDF);
+router.get('/items', requirePermission('tags.print'), getItemsForTagPrinting);
+router.post('/record', requirePermission('tags.print'), recordTagPrint);
+router.get('/history/:itemId', requirePermission('tags.print'), getTagPrintHistory);
+router.post('/generate-pdf', requirePermission('tags.print'), generateTagsPDF);
+router.post('/generate-blank-tags-pdf', requirePermission('tags.print'), generateBlankTagsPDF);
 
 module.exports = router;

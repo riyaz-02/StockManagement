@@ -229,6 +229,7 @@ app.use('/api/upload', cloudinaryRoutes);
 app.use('/api/inventory-snapshots', require('./routes/inventory.routes'));
 app.use('/api/app-version', require('./routes/appVersion.routes'));
 app.use('/api/notifications', require('./routes/notification.routes'));
+app.use('/api/permissions', require('./routes/permission.routes'));
 app.use('/api/test', require('./routes/test.routes'));
 // Store management (shopmanage DB)
 app.use('/api/purchases', purchaseRoutes);

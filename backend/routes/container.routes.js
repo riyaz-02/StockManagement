@@ -9,25 +9,21 @@ const {
     findBestSlot,
     uploadImage
 } = require('../controllers/containerController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 const cloudinaryUpload = require('../middleware/cloudinaryUpload');
 
 // All routes require authentication
 router.use(protect);
 
-// Upload route
-router.post('/upload', authorize('admin', 'staff'), cloudinaryUpload.single('image'), uploadImage);
+router.post('/upload', requirePermission('containers.edit'), cloudinaryUpload.single('image'), uploadImage);
 
-// Public (authenticated) routes
-router.get('/', getContainers);
-router.get('/:id', getContainer);
-router.post('/find-slot', findBestSlot);
+router.get('/', requirePermission('containers.view'), getContainers);
+router.get('/:id', requirePermission('containers.view'), getContainer);
+router.post('/find-slot', requirePermission('items.edit'), findBestSlot);
 
-// Admin/Staff routes
-router.post('/', authorize('admin', 'staff'), createContainer);
-router.put('/:id', authorize('admin', 'staff'), updateContainer);
+router.post('/', requirePermission('containers.create'), createContainer);
+router.put('/:id', requirePermission('containers.edit'), updateContainer);
 
-// Admin only routes
-router.delete('/:id', authorize('admin'), deleteContainer);
+router.delete('/:id', requirePermission('containers.delete'), deleteContainer);
 
 module.exports = router;

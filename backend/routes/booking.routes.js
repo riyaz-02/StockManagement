@@ -8,19 +8,19 @@ const {
     cancelBooking,
     completeBooking
 } = require('../controllers/bookingController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 router.use(protect);
 
 router.route('/')
-    .get(getBookings)
-    .post(authorize('admin', 'staff'), createBooking);
+    .get(requirePermission('bookings.view'), getBookings)
+    .post(requirePermission('bookings.create'), createBooking);
 
 router.route('/:id')
-    .get(getBooking)
-    .put(authorize('admin', 'staff'), updateBooking);
+    .get(requirePermission('bookings.view'), getBooking)
+    .put(requirePermission('bookings.edit'), updateBooking);
 
-router.put('/:id/cancel', authorize('admin', 'staff'), cancelBooking);
-router.put('/:id/complete', authorize('admin', 'staff'), completeBooking);
+router.put('/:id/cancel', requirePermission('bookings.cancel'), cancelBooking);
+router.put('/:id/complete', requirePermission('bookings.complete'), completeBooking);
 
 module.exports = router;

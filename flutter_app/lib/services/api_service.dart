@@ -1017,6 +1017,67 @@ class ApiService {
     }
   }
 
+  // Admin reset of another user's password (no current password needed)
+  Future<Map<String, dynamic>> resetPassword(
+      String userId, String newPassword) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/users/$userId/reset-password'),
+      headers: await _getHeaders(),
+      body: json.encode({'newPassword': newPassword}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Set/clear one user's individual permission overrides (admin only)
+  Future<Map<String, dynamic>> updateUserPermissionOverrides(
+      String userId, Map<String, bool?> overrides) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/users/$userId/permission-overrides'),
+      headers: await _getHeaders(),
+      body: json.encode({'overrides': overrides}),
+    );
+    return _handleResponse(response);
+  }
+
+  // ── Roles & Permissions ─────────────────────────────────────────────────────
+  // The full permission taxonomy (groups + keys + labels)
+  Future<Map<String, dynamic>> getPermissionDefinitions() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/permissions/definitions'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // The caller's own effective permission map
+  Future<Map<String, dynamic>> getMyPermissions() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/permissions/me'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // All role permission grids (admin only)
+  Future<Map<String, dynamic>> getRolePermissionGrids() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/permissions/roles'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Update one role's permission grid (admin only)
+  Future<Map<String, dynamic>> updateRolePermissionGrid(
+      String role, Map<String, bool> permissions) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/permissions/roles/$role'),
+      headers: await _getHeaders(),
+      body: json.encode({'permissions': permissions}),
+    );
+    return _handleResponse(response);
+  }
+
   // Tag Settings
   Future<Map<String, dynamic>> getTagSettings() async {
     final response = await http.get(

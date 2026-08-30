@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('./models/User');
 const Container = require('./models/Container');
+const RolePermission = require('./models/RolePermission');
+const { DEFAULT_GRIDS, CONFIGURABLE_ROLES } = require('./config/permissions');
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +96,21 @@ const seedDatabase = async () => {
             console.log('✅ Sample containers created');
         } else {
             console.log('ℹ️  Containers already exist');
+        }
+
+        // Create default RolePermission grids for manager/staff/viewer
+        // (the permission cache already falls back to these defaults in
+        // memory even without this step, but persisting them lets the
+        // admin see/edit real documents right away in the Permission
+        // Manager screen instead of implicit defaults).
+        for (const role of CONFIGURABLE_ROLES) {
+            const exists = await RolePermission.findOne({ role });
+            if (!exists) {
+                await RolePermission.create({ role, permissions: DEFAULT_GRIDS[role] });
+                console.log(`✅ Default permissions seeded for role: ${role}`);
+            } else {
+                console.log(`ℹ️  Permissions for role "${role}" already exist`);
+            }
         }
 
         console.log('🎉 Database seeding completed!');

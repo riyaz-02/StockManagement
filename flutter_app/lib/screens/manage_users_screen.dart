@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'add_user_screen.dart';
+import 'edit_user_screen.dart';
 import '../utils/app_toast.dart';
 
 class ManageUsersScreen extends StatefulWidget {
@@ -303,15 +304,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                               ),
                               trailing: PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert),
-                                onSelected: (value) {
+                                onSelected: (value) async {
                                   if (value == 'edit') {
-                                    // TODO: Navigate to edit user screen
-                                    showAppSnackBar(
+                                    final result = await Navigator.push(
                                       context,
-                                      const SnackBar(
-                                          content:
-                                              Text('Edit user coming soon!')),
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            EditUserScreen(user: user),
+                                      ),
                                     );
+                                    if (result == true) {
+                                      _loadUsers();
+                                    }
                                   } else if (value == 'delete' &&
                                       !isCurrentUser) {
                                     _deleteUser(user['_id'], user['name']);
@@ -356,6 +360,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     switch (role) {
       case 'admin':
         return Colors.red;
+      case 'owner':
+        return Colors.deepOrange;
+      case 'manager':
+        return Colors.indigo;
       case 'staff':
         return Colors.blue;
       case 'viewer':

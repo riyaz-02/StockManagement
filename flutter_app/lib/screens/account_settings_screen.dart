@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
@@ -50,36 +51,72 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
         if (updateResult['success'] == true) {
           // Update local user data
-          await authProvider.refreshUser();
+          final refreshed = await authProvider.refreshUser();
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showMaterialBanner(
-              MaterialBanner(
-                content: const Text('Profile image updated successfully'),
-                backgroundColor: Colors.green.shade100,
-                leading: const Icon(Icons.check_circle, color: Colors.green),
-                actions: [
-                  TextButton(
-                    onPressed: () => ScaffoldMessenger.of(context)
-                        .hideCurrentMaterialBanner(),
-                    child: const Text('DISMISS'),
-                  ),
-                ],
-              ),
-            );
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-              }
-            });
+            if (refreshed) {
+              ScaffoldMessenger.of(context).showMaterialBanner(
+                MaterialBanner(
+                  content: const Text('Profile image updated successfully'),
+                  backgroundColor: Colors.green.shade100,
+                  leading: const Icon(Icons.check_circle, color: Colors.green),
+                  actions: [
+                    TextButton(
+                      onPressed: () => ScaffoldMessenger.of(context)
+                          .hideCurrentMaterialBanner(),
+                      child: const Text('DISMISS'),
+                    ),
+                  ],
+                ),
+              );
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                }
+              });
+            } else {
+              showAppSnackBar(
+                context,
+                const SnackBar(
+                  content: Text(
+                      'Image saved, but failed to refresh your profile — pull to refresh or re-open this screen'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
           }
+        } else if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(
+              content: Text(
+                  updateResult['message'] ?? 'Failed to save profile image'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
+      } else if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to upload image'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
 
       setState(() => _isUploadingImage = false);
     } catch (e) {
       setState(() => _isUploadingImage = false);
-      print('[UPLOAD] Error: $e');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

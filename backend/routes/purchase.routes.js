@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 const purchaseBillUpload = require('../middleware/purchaseBillUpload');
 const cloudinary = require('../config/cloudinary');
 const ctrl = require('../controllers/purchaseController');
@@ -12,7 +12,7 @@ router.use(protect);
 // POST /api/purchases/upload-bill
 // Field name: 'attachment' (single file — image or PDF)
 // Returns: { url, publicId, originalName, format }
-router.post('/upload-bill', purchaseBillUpload.single('attachment'), async (req, res) => {
+router.post('/upload-bill', requirePermission('purchases.create'), purchaseBillUpload.single('attachment'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -38,7 +38,7 @@ router.post('/upload-bill', purchaseBillUpload.single('attachment'), async (req,
 
 // ── Delete a bill attachment from Cloudinary ──────────────────────────────────
 // DELETE /api/purchases/attachment/:publicId
-router.delete('/attachment/:publicId', async (req, res) => {
+router.delete('/attachment/:publicId', requirePermission('purchases.edit'), async (req, res) => {
     try {
         // publicId uses -- for / (same convention as main upload routes)
         const publicId = req.params.publicId.replace(/--/g, '/');
@@ -51,16 +51,16 @@ router.delete('/attachment/:publicId', async (req, res) => {
 });
 
 // ── ITC Summary for GST filing ────────────────────────────────────────────────
-router.get('/itc-summary',  ctrl.getItcSummary);
+router.get('/itc-summary', requirePermission('purchases.view'), ctrl.getItcSummary);
 // ── Autocomplete suggestions from existing records ───────────────────────────
-router.get('/suggestions',  ctrl.getPurchaseSuggestions);
+router.get('/suggestions', requirePermission('purchases.view'), ctrl.getPurchaseSuggestions);
 
 // ── Standard CRUD ─────────────────────────────────────────────────────────────
-router.get('/preview-gst', ctrl.previewGst);
-router.get('/', ctrl.getPurchases);
-router.get('/:id', ctrl.getPurchase);
-router.post('/', ctrl.createPurchase);
-router.put('/:id', ctrl.updatePurchase);
-router.delete('/:id', ctrl.deletePurchase);
+router.get('/preview-gst', requirePermission('purchases.view'), ctrl.previewGst);
+router.get('/', requirePermission('purchases.view'), ctrl.getPurchases);
+router.get('/:id', requirePermission('purchases.view'), ctrl.getPurchase);
+router.post('/', requirePermission('purchases.create'), ctrl.createPurchase);
+router.put('/:id', requirePermission('purchases.edit'), ctrl.updatePurchase);
+router.delete('/:id', requirePermission('purchases.delete'), ctrl.deletePurchase);
 
 module.exports = router;

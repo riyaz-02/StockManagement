@@ -276,7 +276,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
 
   bool get _isAdmin {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    return auth.user?.isAdmin ?? false;
+    return auth.user?.hasFullAccess ?? false;
   }
 
   Future<void> _deleteUnscannedItem(TallyItem item) async {
@@ -1525,7 +1525,11 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                                           borderRadius:
                                               BorderRadius.circular(8),
                                           child: Image.network(
-                                            '${AppConstants.baseUrl}/${itemData['images'][0]}',
+                                            (itemData['images'][0] as String)
+                                                    .startsWith('http')
+                                                ? itemData['images'][0]
+                                                    as String
+                                                : '${AppConstants.baseUrl}/${itemData['images'][0]}',
                                             height: 110,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
@@ -1613,7 +1617,12 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                                           borderRadius:
                                               BorderRadius.circular(8),
                                           child: Image.network(
-                                            '${AppConstants.baseUrl}${itemData['containerId']['image']}',
+                                            (itemData['containerId']['image']
+                                                        as String)
+                                                    .startsWith('http')
+                                                ? itemData['containerId']
+                                                    ['image'] as String
+                                                : '${AppConstants.baseUrl}${itemData['containerId']['image']}',
                                             height: 110,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
