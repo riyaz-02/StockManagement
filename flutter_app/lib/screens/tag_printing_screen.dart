@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../utils/container_tag_pdf_generator.dart';
 import 'tag_print_preview_screen.dart';
 import 'tag_settings_screen.dart';
+import '../utils/app_toast.dart';
 
 class TagPrintingScreen extends StatefulWidget {
   const TagPrintingScreen({super.key});
@@ -59,7 +60,8 @@ class _TagPrintingScreenState extends State<TagPrintingScreen>
           labelColor: const Color(0xFFE94560),
           unselectedLabelColor: Colors.grey[600],
           indicatorColor: const Color(0xFFE94560),
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           tabs: const [
             Tab(icon: Icon(Icons.label_outline), text: 'Item Tags'),
             Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Container Tags'),
@@ -131,19 +133,36 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
         _filteredItems = items;
         _isLoading = false;
         // Build dynamic filter options from data
-        _itemTypes = items.map((i) => i.itemType).toSet()
-            .where((s) => s.isNotEmpty).toList()..sort();
-        _metalTypes = items.map((i) => i.metalType).toSet()
-            .where((s) => s.isNotEmpty).toList()..sort();
-        _purities = items.map((i) => i.purity).toSet()
-            .where((s) => s.isNotEmpty).toList()..sort();
-        _weightCategories = items.map((i) => i.weightCategory).toSet()
-            .where((s) => s.isNotEmpty).toList()..sort();
+        _itemTypes = items
+            .map((i) => i.itemType)
+            .toSet()
+            .where((s) => s.isNotEmpty)
+            .toList()
+          ..sort();
+        _metalTypes = items
+            .map((i) => i.metalType)
+            .toSet()
+            .where((s) => s.isNotEmpty)
+            .toList()
+          ..sort();
+        _purities = items
+            .map((i) => i.purity)
+            .toSet()
+            .where((s) => s.isNotEmpty)
+            .toList()
+          ..sort();
+        _weightCategories = items
+            .map((i) => i.weightCategory)
+            .toSet()
+            .where((s) => s.isNotEmpty)
+            .toList()
+          ..sort();
       });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text('Error loading items: $e')),
         );
       }
@@ -160,22 +179,29 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
               !item.barcode.toLowerCase().contains(q)) return false;
         }
         // Item Type
-        if (_filterItemType != null && item.itemType != _filterItemType) return false;
+        if (_filterItemType != null && item.itemType != _filterItemType)
+          return false;
         // Metal Type
-        if (_filterMetalType != null && item.metalType != _filterMetalType) return false;
+        if (_filterMetalType != null && item.metalType != _filterMetalType)
+          return false;
         // Purity
         if (_filterPurity != null && item.purity != _filterPurity) return false;
         // Weight Category
-        if (_filterWeightCategory != null && item.weightCategory != _filterWeightCategory) return false;
+        if (_filterWeightCategory != null &&
+            item.weightCategory != _filterWeightCategory) return false;
         // Certification
         if (_filterCertification != null) {
-          if (_filterCertification == 'huid' && item.certificationType != 'huid') return false;
-          if (_filterCertification == 'hallmarked' && item.certificationType != 'hallmarked') return false;
-          if (_filterCertification == 'none' && item.certificationType != 'none') return false;
+          if (_filterCertification == 'huid' &&
+              item.certificationType != 'huid') return false;
+          if (_filterCertification == 'hallmarked' &&
+              item.certificationType != 'hallmarked') return false;
+          if (_filterCertification == 'none' &&
+              item.certificationType != 'none') return false;
         }
         // Print status
         if (_filterPrintStatus == 'printed' && !item.tagsPrinted) return false;
-        if (_filterPrintStatus == 'not_printed' && item.tagsPrinted) return false;
+        if (_filterPrintStatus == 'not_printed' && item.tagsPrinted)
+          return false;
         return true;
       }).toList();
     });
@@ -195,9 +221,13 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
   }
 
   int get _activeFilterCount => [
-    _filterItemType, _filterMetalType, _filterPurity,
-    _filterWeightCategory, _filterCertification, _filterPrintStatus,
-  ].where((f) => f != null).length;
+        _filterItemType,
+        _filterMetalType,
+        _filterPurity,
+        _filterWeightCategory,
+        _filterCertification,
+        _filterPrintStatus,
+      ].where((f) => f != null).length;
 
   void _toggleSelection(String itemId) {
     setState(() {
@@ -224,7 +254,8 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
         _allItems.where((item) => _selectedItemIds.contains(item.id)).toList();
 
     if (selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(content: Text('Please select at least one item')),
       );
       return;
@@ -474,8 +505,7 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
                       Text(
                         '${_filteredItems.length} item${_filteredItems.length == 1 ? '' : 's'}'
                         '${_activeFilterCount > 0 ? ' (filtered)' : ''}',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       const Spacer(),
                       if (_filteredItems.isNotEmpty)
@@ -522,8 +552,7 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
                       padding: const EdgeInsets.all(8),
                       itemBuilder: (context, index) {
                         final item = _filteredItems[index];
-                        final isSelected =
-                            _selectedItemIds.contains(item.id);
+                        final isSelected = _selectedItemIds.contains(item.id);
                         final hasHUID = item.certificationType == 'huid';
 
                         return Card(
@@ -578,14 +607,10 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
                               padding: const EdgeInsets.only(top: 8),
                               child: Row(
                                 children: [
-                                  _buildInfoChip(
-                                      '${item.netWeight}g',
-                                      Icons.scale,
-                                      Colors.blue),
+                                  _buildInfoChip('${item.netWeight}g',
+                                      Icons.scale, Colors.blue),
                                   const SizedBox(width: 8),
-                                  _buildInfoChip(
-                                      item.purity,
-                                      Icons.diamond,
+                                  _buildInfoChip(item.purity, Icons.diamond,
                                       Colors.purple),
                                   const SizedBox(width: 8),
                                   // Item type chip
@@ -596,7 +621,7 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
                                       Colors.teal,
                                     ),
                                   // HUID badge — only shown when certified
-                                  if (hasHUID) ...[ 
+                                  if (hasHUID) ...[
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
@@ -634,17 +659,14 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
                                           horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.green[50],
-                                        borderRadius:
-                                            BorderRadius.circular(6),
-                                        border:
-                                            Border.all(color: Colors.green),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.green),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           const Icon(Icons.print,
-                                              size: 12,
-                                              color: Colors.green),
+                                              size: 12, color: Colors.green),
                                           const SizedBox(width: 4),
                                           Text(
                                             '×${item.tagPrintCount}',
@@ -731,8 +753,7 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
         prefixIcon: Icon(icon, size: 16, color: Colors.grey[500]),
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -747,7 +768,8 @@ class _ItemTagsTabState extends State<_ItemTagsTab>
         ),
       ),
       style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
-      hint: Text('All', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+      hint:
+          Text('All', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
       items: [
         const DropdownMenuItem<String>(value: null, child: Text('All')),
         ...items.map((v) => DropdownMenuItem<String>(
@@ -819,8 +841,7 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
   Future<void> _loadContainers() async {
     setState(() => _isLoading = true);
     try {
-      final provider =
-          Provider.of<ContainerProvider>(context, listen: false);
+      final provider = Provider.of<ContainerProvider>(context, listen: false);
       await provider.fetchContainers();
       if (mounted) {
         setState(() {
@@ -833,7 +854,8 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text('Error loading containers: $e')),
         );
       }
@@ -871,12 +893,12 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
   void _clearSelection() => setState(() => _selectedIds.clear());
 
   Future<void> _printTags() async {
-    final selected = _allContainers
-        .where((c) => _selectedIds.contains(c.id))
-        .toList();
+    final selected =
+        _allContainers.where((c) => _selectedIds.contains(c.id)).toList();
 
     if (selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(
           content: Text('Please select at least one container'),
           backgroundColor: Colors.orange,
@@ -886,9 +908,6 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
     }
 
     setState(() => _isPrinting = true);
-
-    // Capture messenger before async gap to avoid use_build_context_synchronously
-    final messenger = ScaffoldMessenger.of(context);
 
     try {
       final pdf = await ContainerTagPdfGenerator.generateTags(selected);
@@ -900,7 +919,8 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
           filename:
               'container-tags-${DateTime.now().millisecondsSinceEpoch}.pdf',
         );
-        messenger.showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('✓ ${selected.length} container tags ready'),
             backgroundColor: Colors.green,
@@ -909,7 +929,8 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error generating PDF: $e'),
             backgroundColor: Colors.red,
@@ -1022,12 +1043,10 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
                                   // Checkbox
                                   Checkbox(
                                     value: isSelected,
-                                    onChanged: (_) =>
-                                        _toggleSelection(c.id),
+                                    onChanged: (_) => _toggleSelection(c.id),
                                     activeColor: const Color(0xFFE94560),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(4),
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1038,10 +1057,9 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
                                     height: 44,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[100],
-                                      borderRadius:
-                                          BorderRadius.circular(8),
-                                      border: Border.all(
-                                          color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
                                     ),
                                     child: Icon(
                                       Icons.inventory_2_outlined,
@@ -1077,15 +1095,13 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
                                               decoration: BoxDecoration(
                                                 color: Colors.black,
                                                 borderRadius:
-                                                    BorderRadius.circular(
-                                                        5),
+                                                    BorderRadius.circular(5),
                                               ),
                                               child: Text(
                                                 code,
                                                 style: const TextStyle(
                                                   fontSize: 11,
-                                                  fontWeight:
-                                                      FontWeight.bold,
+                                                  fontWeight: FontWeight.bold,
                                                   color: Colors.white,
                                                   fontFamily: 'monospace',
                                                 ),
@@ -1101,11 +1117,9 @@ class _ContainerTagsTabState extends State<_ContainerTagsTab>
                                               decoration: BoxDecoration(
                                                 color: Colors.grey[100],
                                                 borderRadius:
-                                                    BorderRadius.circular(
-                                                        5),
+                                                    BorderRadius.circular(5),
                                                 border: Border.all(
-                                                    color:
-                                                        Colors.grey[300]!),
+                                                    color: Colors.grey[300]!),
                                               ),
                                               child: Text(
                                                 c.type,

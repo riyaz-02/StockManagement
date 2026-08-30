@@ -4,6 +4,7 @@ import '../models/item_model.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class SendToRepairScreen extends StatefulWidget {
   final Item item;
@@ -18,7 +19,7 @@ class _SendToRepairScreenState extends State<SendToRepairScreen> {
   final _formKey = GlobalKey<FormState>();
   final _sentToController = TextEditingController();
   final _remarksController = TextEditingController();
-  
+
   String _repairType = 'polishing';
   bool _slotReserved = true;
   DateTime _expectedReturnDate = DateTime.now().add(const Duration(days: 7));
@@ -55,7 +56,8 @@ class _SendToRepairScreenState extends State<SendToRepairScreen> {
         });
 
         if (mounted && response['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(
                 'Item sent to repair. Slot ${_slotReserved ? 'reserved' : 'freed'}.',
@@ -68,9 +70,11 @@ class _SendToRepairScreenState extends State<SendToRepairScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+              content:
+                  Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -149,8 +153,9 @@ class _SendToRepairScreenState extends State<SendToRepairScreen> {
                 prefixIcon: const Icon(Icons.business),
                 hintText: 'Workshop/Vendor name',
               ),
-              validator: (value) =>
-                  value?.isEmpty ?? true ? languageProvider.translate('required_field') : null,
+              validator: (value) => value?.isEmpty ?? true
+                  ? languageProvider.translate('required_field')
+                  : null,
             ),
             const SizedBox(height: 16),
 

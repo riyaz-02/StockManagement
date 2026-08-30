@@ -38,6 +38,12 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    // Push notification device tokens (one account can have multiple devices)
+    fcmTokens: [{
+        token: { type: String, required: true },
+        platform: { type: String, default: 'android' },
+        updatedAt: { type: Date, default: Date.now }
+    }],
     createdAt: {
         type: Date,
         default: Date.now

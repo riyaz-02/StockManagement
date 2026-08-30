@@ -1,6 +1,8 @@
 const TallySession = require('../models/TallySession');
 const Item = require('../models/Item');
 const Container = require('../models/Container');
+const InventorySnapshot = require('../models/InventorySnapshot');
+const { softDeleteItemDoc } = require('./itemController');
 
 // @desc    Create new tally session
 // @route   POST /api/tally
@@ -811,6 +813,408 @@ exports.deleteTally = async (req, res) => {
             success: false,
             message: 'Error deleting tally session',
             error: error.message
+        });
+    }
+};
+
+// @desc    Remove a single unscanned item from stock + this tally (soft-delete)
+// @route   PUT /api/tally/:id/remove-item
+// @access  Private/Admin
+exports.removeUnscannedItem = async (req, res) => {
+    try {
+        const { itemId } = req.body;
+
+        if (!itemId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide itemId'
+            });
+        }
+
+        const tallySession = await TallySession.findById(req.params.id);
+
+        if (!tallySession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        if (tallySession.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tally session is not active'
+            });
+        }
+
+        if (tallySession.isItemScanned(itemId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item already scanned in this tally session, cannot remove'
+            });
+        }
+
+        const itemInTally = tallySession.items.find(
+            i => i.itemId.toString() === itemId.toString()
+        );
+
+        if (!itemInTally) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item is not part of this tally session'
+            });
+        }
+
+        if (itemInTally.status === 'removed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Item already removed from this tally'
+            });
+        }
+
+        const item = await Item.findById(itemId);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        if (item.status === 'deleted') {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is already deleted'
+            });
+        }
+
+        await softDeleteItemDoc(item);
+        applyUnscannedItemRemoval(tallySession, itemInTally, item);
+
+        await tallySession.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Item removed from stock and tally',
+            data: {
+                tallySession,
+                progress: tallySession.getProgress()
+            }
+        });
+    } catch (error) {
+        console.error('Remove unscanned item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while removing item'
+        });
+    }
+};
+
+// @desc    Remove all (or a specified subset of) unscanned items from stock + this tally
+// @route   PUT /api/tally/:id/remove-unscanned
+// @access  Private/Admin
+exports.removeAllUnscannedItems = async (req, res) => {
+    try {
+        const { itemIds } = req.body || {};
+
+        const tallySession = await TallySession.findById(req.params.id);
+
+        if (!tallySession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        if (tallySession.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tally session is not active'
+            });
+        }
+
+        // Default: every currently-unscanned, not-yet-removed item in the session
+        let targets = tallySession.items.filter(i => !i.isScanned && i.status !== 'removed');
+
+        if (Array.isArray(itemIds) && itemIds.length > 0) {
+            const idSet = new Set(itemIds.map(String));
+            targets = targets.filter(i => idSet.has(i.itemId.toString()));
+        }
+
+        let removedCount = 0;
+
+        for (const itemInTally of targets) {
+            const item = await Item.findById(itemInTally.itemId);
+            if (!item || item.status === 'deleted') continue;
+
+            await softDeleteItemDoc(item);
+            applyUnscannedItemRemoval(tallySession, itemInTally, item);
+            removedCount += 1;
+        }
+
+        await tallySession.save();
+
+        res.status(200).json({
+            success: true,
+            message: `${removedCount} item(s) removed from stock and tally`,
+            data: {
+                removedCount,
+                tallySession,
+                progress: tallySession.getProgress()
+            }
+        });
+    } catch (error) {
+        console.error('Remove all unscanned items error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while removing items'
+        });
+    }
+};
+
+// Shared bookkeeping for both single and bulk unscanned-item removal.
+// Marks the tally-items[] entry removed and shrinks expected counts/weights
+// (metalData + legacy gold/silver fields) so a removed item stops being
+// counted as "missing" once the tally is locked.
+function applyUnscannedItemRemoval(tallySession, itemInTally, item) {
+    itemInTally.status = 'removed';
+
+    tallySession.expectedItems = Math.max(0, tallySession.expectedItems - 1);
+
+    const metalType = (item.metalType || '').toLowerCase();
+    const weight = item.netWeight || 0;
+
+    const metalDataEntry = tallySession.metalData.find(
+        md => md.metalType.toLowerCase() === metalType
+    );
+    if (metalDataEntry) {
+        metalDataEntry.expectedItemCount = Math.max(0, metalDataEntry.expectedItemCount - 1);
+        metalDataEntry.expectedWeight = Math.max(0, metalDataEntry.expectedWeight - weight);
+    }
+
+    if (metalType === 'gold') {
+        tallySession.expectedGoldWeight = Math.max(0, tallySession.expectedGoldWeight - weight);
+    } else if (metalType === 'silver') {
+        tallySession.expectedSilverWeight = Math.max(0, tallySession.expectedSilverWeight - weight);
+    }
+}
+
+// @desc    Add a just-created item (forgotten during initial stock entry) into an active tally
+// @route   POST /api/tally/:id/add-item
+// @access  Private/Staff/Admin
+exports.addItemToTally = async (req, res) => {
+    try {
+        const { barcode } = req.body;
+
+        if (!barcode) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide barcode'
+            });
+        }
+
+        const tallySession = await TallySession.findById(req.params.id);
+
+        if (!tallySession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        if (tallySession.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tally session is not active'
+            });
+        }
+
+        const item = await Item.findOne({ barcode });
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found with this barcode'
+            });
+        }
+
+        if (tallySession.isItemScanned(item._id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item already scanned in this tally session',
+                isDuplicate: true
+            });
+        }
+
+        const weight = item.netWeight || 0;
+        const metalType = (item.metalType || '').toLowerCase();
+
+        tallySession.items.push({
+            itemId: item._id,
+            barcode: item.barcode,
+            metalType: item.metalType,
+            weight,
+            isScanned: true,
+            scannedAt: new Date(),
+            scannedBy: req.user.id,
+            status: 'in_stock'
+        });
+
+        tallySession.expectedItems += 1;
+
+        let metalDataEntry = tallySession.metalData.find(
+            md => md.metalType.toLowerCase() === metalType
+        );
+        if (!metalDataEntry) {
+            tallySession.metalData.push({
+                metalType: item.metalType,
+                expectedWeight: 0,
+                expectedItemCount: 0,
+                scannedWeight: 0,
+                scannedItemCount: 0
+            });
+            metalDataEntry = tallySession.metalData[tallySession.metalData.length - 1];
+        }
+        metalDataEntry.expectedItemCount += 1;
+        metalDataEntry.expectedWeight += weight;
+        metalDataEntry.scannedItemCount += 1;
+        metalDataEntry.scannedWeight += weight;
+
+        tallySession.scannedItemIds.push(item._id);
+        tallySession.scannedItemDetails.push({
+            itemId: item._id,
+            scannedAt: new Date(),
+            scannedBy: req.user.id,
+            status: 'in_stock',
+            weight,
+            metalType: item.metalType
+        });
+
+        tallySession.scannedItemsCount += 1;
+
+        if (metalType === 'gold') {
+            tallySession.expectedGoldWeight += weight;
+            tallySession.scannedGoldWeight += weight;
+        } else if (metalType === 'silver') {
+            tallySession.expectedSilverWeight += weight;
+            tallySession.scannedSilverWeight += weight;
+        }
+
+        await tallySession.save();
+
+        const progress = tallySession.getProgress();
+
+        res.status(200).json({
+            success: true,
+            message: 'Item added to tally',
+            data: {
+                item,
+                tallySession,
+                scannedCount: tallySession.scannedItemsCount,
+                expectedCount: tallySession.expectedItems,
+                progress
+            }
+        });
+    } catch (error) {
+        console.error('Add item to tally error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while adding item to tally'
+        });
+    }
+};
+
+// @desc    Generate a saved inventory snapshot from a locked tally
+// @route   POST /api/tally/:id/update-inventory
+// @access  Private/Staff/Admin
+exports.updateInventory = async (req, res) => {
+    try {
+        const tallySession = await TallySession.findById(req.params.id);
+
+        if (!tallySession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tally session not found'
+            });
+        }
+
+        if (tallySession.status !== 'locked' && tallySession.status !== 'force_locked') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tally must be locked before updating inventory'
+            });
+        }
+
+        if (tallySession.inventoryUpdated) {
+            return res.status(400).json({
+                success: false,
+                message: 'Inventory already updated for this tally',
+                data: { inventorySnapshotId: tallySession.inventorySnapshotId }
+            });
+        }
+
+        // Live, post-cleanup inventory: whatever is confirmed in stock right now
+        const items = await Item.find({ status: { $in: ['active', 'booked'] } })
+            .populate('containerId', 'name')
+            .select('barcode name metalType netWeight status containerId slotNumber')
+            .lean();
+
+        const byMetalMap = {};
+        const containerIds = new Set();
+
+        const snapshotItems = items.map(item => {
+            const metalType = (item.metalType || 'other').toLowerCase();
+            if (!byMetalMap[metalType]) {
+                byMetalMap[metalType] = { metalType, totalWeight: 0, itemCount: 0 };
+            }
+            byMetalMap[metalType].totalWeight += item.netWeight || 0;
+            byMetalMap[metalType].itemCount += 1;
+
+            if (item.containerId?._id) {
+                containerIds.add(item.containerId._id.toString());
+            }
+
+            return {
+                itemId: item._id,
+                barcode: item.barcode,
+                name: item.name,
+                metalType: item.metalType,
+                netWeight: item.netWeight,
+                containerId: item.containerId?._id || null,
+                containerName: item.containerId?.name || null,
+                slotNumber: item.slotNumber,
+                status: item.status
+            };
+        });
+
+        const snapshot = await InventorySnapshot.create({
+            tallySessionId: tallySession._id,
+            date: new Date(),
+            createdBy: req.user.id,
+            totalItems: snapshotItems.length,
+            totalContainers: containerIds.size,
+            byMetal: Object.values(byMetalMap).map(m => ({
+                ...m,
+                totalWeight: parseFloat(m.totalWeight.toFixed(3))
+            })),
+            items: snapshotItems
+        });
+
+        tallySession.inventoryUpdated = true;
+        tallySession.inventoryUpdatedAt = new Date();
+        tallySession.inventorySnapshotId = snapshot._id;
+        await tallySession.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Inventory updated successfully',
+            data: { snapshot, tallySession }
+        });
+    } catch (error) {
+        console.error('Update inventory error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while updating inventory'
         });
     }
 };

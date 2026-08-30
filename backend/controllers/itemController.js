@@ -497,6 +497,32 @@ exports.updateItem = async (req, res) => {
 // @desc    Delete item (Soft Delete)
 // @route   DELETE /api/items/:id
 // @access  Private/Admin
+// Soft-delete an already-fetched Item document: frees its container slot,
+// sets status to 'deleted', and clears its location. Shared by the item
+// recycle-bin flow and the tally "remove unscanned item" flow.
+const softDeleteItemDoc = async (item) => {
+    if (item.containerId && item.slotNumber) {
+        const container = await Container.findById(item.containerId);
+        if (container) {
+            const slot = container.slots.find(s => s.slotNumber === item.slotNumber);
+            if (slot) {
+                slot.itemId = null;
+                slot.reserved = false;
+                await container.save();
+            }
+        }
+    }
+
+    item.status = 'deleted';
+    item.containerId = null;
+    item.slotNumber = null;
+    await item.save();
+
+    return item;
+};
+
+exports.softDeleteItemDoc = softDeleteItemDoc;
+
 exports.deleteItem = async (req, res) => {
     try {
         const item = await Item.findById(req.params.id);
@@ -508,24 +534,7 @@ exports.deleteItem = async (req, res) => {
             });
         }
 
-        // Free up container slot
-        if (item.containerId && item.slotNumber) {
-            const container = await Container.findById(item.containerId);
-            if (container) {
-                const slot = container.slots.find(s => s.slotNumber === item.slotNumber);
-                if (slot) {
-                    slot.itemId = null;
-                    slot.reserved = false;
-                    await container.save();
-                }
-            }
-        }
-
-        // Soft delete: Set status to deleted and remove location
-        item.status = 'deleted';
-        item.containerId = null;
-        item.slotNumber = null;
-        await item.save();
+        await softDeleteItemDoc(item);
 
         res.status(200).json({
             success: true,

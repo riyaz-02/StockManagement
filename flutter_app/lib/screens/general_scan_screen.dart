@@ -66,12 +66,16 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
   }
 
   void _stopCamera() {
-    try { cameraController.stop(); } catch (_) {}
+    try {
+      cameraController.stop();
+    } catch (_) {}
   }
 
   void _startCamera() {
     if (!mounted) return;
-    try { cameraController.start(); } catch (_) {}
+    try {
+      cameraController.start();
+    } catch (_) {}
   }
 
   @override
@@ -83,21 +87,21 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
         _startCamera();
       }
     } else if (state == AppLifecycleState.paused ||
-               state == AppLifecycleState.inactive) {
+        state == AppLifecycleState.inactive) {
       _stopCamera();
     }
   }
 
   Future<void> _startCameraWithDelay() async {
     if (_hasInitialized) return;
-    
+
     setState(() {
       _isInitializing = true;
     });
 
     // Wait for camera to initialize
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (mounted) {
       setState(() {
         _isInitializing = false;
@@ -175,7 +179,8 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
 
         // Show success feedback
         setState(() {
-          _feedbackMessage = type == 'item' ? '✓ Item found' : '✓ Container found';
+          _feedbackMessage =
+              type == 'item' ? '✓ Item found' : '✓ Container found';
           _feedbackColor = Colors.green;
         });
 
@@ -230,7 +235,8 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
         message.toLowerCase().contains('barcode not found');
 
     setState(() {
-      _feedbackMessage = isNotFound ? 'No item found for this barcode' : message;
+      _feedbackMessage =
+          isNotFound ? 'No item found for this barcode' : message;
       _feedbackColor = Colors.red;
       _unknownBarcode = isNotFound ? _lastScannedBarcode : null;
     });
@@ -269,7 +275,8 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
                   onDetect: _onBarcodeDetected,
                 ),
                 // Dark overlay outside scan box
-                _ScanOverlay(scanWindow: scanWindow, isProcessing: _isProcessing),
+                _ScanOverlay(
+                    scanWindow: scanWindow, isProcessing: _isProcessing),
               ]);
             },
           ),
@@ -335,7 +342,9 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
                       ),
                       IconButton(
                         icon: Icon(
-                          cameraController.torchEnabled ? Icons.flash_on : Icons.flash_off,
+                          cameraController.torchEnabled
+                              ? Icons.flash_on
+                              : Icons.flash_off,
                           color: Colors.white,
                         ),
                         onPressed: () => cameraController.toggleTorch(),
@@ -346,7 +355,6 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
               ),
             ),
           ),
-
 
           // Manual input at bottom
           Positioned(
@@ -611,7 +619,6 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
               ),
             ),
 
-
           // Processing indicator
           if (_isProcessing)
             const Center(
@@ -675,19 +682,23 @@ class _ScanPainter extends CustomPainter {
     // Top-left corner
     canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
     canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
+    canvas.drawArc(
+        Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
     // Top-right corner
     canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
     canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2,
+        3.14159 / 2, false, p);
     // Bottom-left corner
     canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
     canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2,
+        3.14159 / 2, false, p);
     // Bottom-right corner
     canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
     canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0,
+        3.14159 / 2, false, p);
   }
 
   @override

@@ -20,10 +20,10 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   int _currentTab = 0;
 
   static const _tabs = [
-    _TabMeta(Icons.inventory_2_outlined, 'Stock',     'Live stock weight'),
-    _TabMeta(Icons.receipt_long_outlined,'Purchases', 'All purchase entries'),
-    _TabMeta(Icons.bar_chart_rounded,    'Summary',   'Daily in/out ledger'),
-    _TabMeta(Icons.balance_outlined,     'Reconcile', 'Balance check'),
+    _TabMeta(Icons.inventory_2_outlined, 'Stock', 'Live stock weight'),
+    _TabMeta(Icons.receipt_long_outlined, 'Purchases', 'All purchase entries'),
+    _TabMeta(Icons.bar_chart_rounded, 'Summary', 'Daily in/out ledger'),
+    _TabMeta(Icons.balance_outlined, 'Reconcile', 'Balance check'),
   ];
 
   @override
@@ -68,8 +68,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 shadowColor: Colors.black12,
                 surfaceTintColor: Colors.white,
                 flexibleSpace: FlexibleSpaceBar(
-                  titlePadding:
-                      const EdgeInsets.fromLTRB(16, 0, 16, 58),
+                  titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 58),
                   title: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,8 +99,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border(
-                        bottom: BorderSide(
-                            color: Colors.grey.shade100, width: 1),
+                        bottom:
+                            BorderSide(color: Colors.grey.shade100, width: 1),
                       ),
                     ),
                     child: TabBar(
@@ -158,7 +157,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
               width: 7,
               height: 7,
               decoration: const BoxDecoration(
-                color: Colors.red, shape: BoxShape.circle),
+                  color: Colors.red, shape: BoxShape.circle),
             ),
           ),
       ],

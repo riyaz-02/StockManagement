@@ -8,7 +8,7 @@ import 'storage_service.dart';
 
 class ApiService {
   final StorageService _storage = StorageService();
-  
+
   // Get headers with auth token
   Future<Map<String, String>> _getHeaders() async {
     final token = await _storage.getToken();
@@ -26,13 +26,15 @@ class ApiService {
       print('[API] ERROR: Received HTML response instead of JSON');
       print('[API] Status Code: ${response.statusCode}');
       print('[API] URL: ${response.request?.url}');
-      print('[API] Response preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
-      throw Exception('Server returned HTML instead of JSON. Status: ${response.statusCode}. This usually means the endpoint was not found or there\'s a server configuration issue.');
+      print(
+          '[API] Response preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+      throw Exception(
+          'Server returned HTML instead of JSON. Status: ${response.statusCode}. This usually means the endpoint was not found or there\'s a server configuration issue.');
     }
 
     try {
       final body = json.decode(response.body);
-      
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return body;
       } else {
@@ -76,12 +78,13 @@ class ApiService {
   }
 
   // Containers
-  Future<Map<String, dynamic>> getContainers({Map<String, String>? queryParams}) async {
+  Future<Map<String, dynamic>> getContainers(
+      {Map<String, String>? queryParams}) async {
     var uri = Uri.parse('${AppConstants.baseUrl}/containers');
     if (queryParams != null) {
       uri = uri.replace(queryParameters: queryParams);
     }
-    
+
     final response = await http.get(
       uri,
       headers: await _getHeaders(),
@@ -101,7 +104,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> createContainer(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> createContainer(
+      Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/containers'),
       headers: await _getHeaders(),
@@ -110,7 +114,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> updateContainer(String id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateContainer(
+      String id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/containers/$id'),
       headers: await _getHeaders(),
@@ -119,11 +124,12 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> deleteContainer(String id, {bool force = false}) async {
+  Future<Map<String, dynamic>> deleteContainer(String id,
+      {bool force = false}) async {
     final uri = Uri.parse('${AppConstants.baseUrl}/containers/$id').replace(
       queryParameters: force ? {'force': 'true'} : null,
     );
-    
+
     final response = await http.delete(
       uri,
       headers: await _getHeaders(),
@@ -134,7 +140,7 @@ class ApiService {
   Future<String?> uploadContainerImage(Uint8List bytes, String filename) async {
     final uri = Uri.parse('${AppConstants.baseUrl}/containers/upload');
     final request = http.MultipartRequest('POST', uri);
-    
+
     // Auth header only (MultipartRequest sets Content-Type automatically)
     final token = await _storage.getToken();
     if (token != null) {
@@ -150,7 +156,7 @@ class ApiService {
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
     final body = _handleResponse(response);
-    
+
     if (body['success'] == true) {
       return body['url'];
     }
@@ -158,7 +164,8 @@ class ApiService {
   }
 
   // Items
-  Future<Map<String, dynamic>> getItems({Map<String, String>? queryParams}) async {
+  Future<Map<String, dynamic>> getItems(
+      {Map<String, String>? queryParams}) async {
     var uri = Uri.parse('${AppConstants.baseUrl}/items');
     if (queryParams != null) {
       uri = uri.replace(queryParameters: queryParams);
@@ -182,7 +189,7 @@ class ApiService {
     );
     return _handleResponse(response);
   }
-  
+
   // Alias for getItem
   Future<Map<String, dynamic>> getItemById(String id) async {
     return getItem(id);
@@ -196,7 +203,6 @@ class ApiService {
     return _handleResponse(response);
   }
 
-
   Future<Map<String, dynamic>> createItem(Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/items'),
@@ -206,7 +212,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> updateItem(String id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateItem(
+      String id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/items/$id'),
       headers: await _getHeaders(),
@@ -223,12 +230,13 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> restoreItem(String id, String containerId, int? slotNumber) async {
+  Future<Map<String, dynamic>> restoreItem(
+      String id, String containerId, int? slotNumber) async {
     final body = {
       'containerId': containerId,
       if (slotNumber != null) 'slotNumber': slotNumber,
     };
-    
+
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/items/$id/restore'),
       headers: await _getHeaders(),
@@ -275,7 +283,8 @@ class ApiService {
   }
 
   // Outward Movements
-  Future<Map<String, dynamic>> createOutwardMovement(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> createOutwardMovement(
+      Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/outward-movements'),
       headers: await _getHeaders(),
@@ -300,13 +309,15 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> getOutwardMovements({String? status, String? movementType}) async {
+  Future<Map<String, dynamic>> getOutwardMovements(
+      {String? status, String? movementType}) async {
     String url = '${AppConstants.baseUrl}/outward-movements';
     final params = <String, String>{};
     if (status != null) params['status'] = status;
     if (movementType != null) params['movementType'] = movementType;
-    
-    final uri = Uri.parse(url).replace(queryParameters: params.isNotEmpty ? params : null);
+
+    final uri = Uri.parse(url)
+        .replace(queryParameters: params.isNotEmpty ? params : null);
     final response = await http.get(uri, headers: await _getHeaders());
     return _handleResponse(response);
   }
@@ -338,18 +349,18 @@ class ApiService {
     return _handleResponse(response);
   }
 
-
-  
-  Future<Map<String, dynamic>> updateBooking(String id, Map<String, dynamic> data) async {
-      final response = await http.put(
-        Uri.parse('${AppConstants.baseUrl}/bookings/$id'),
-        headers: await _getHeaders(),
-        body: json.encode(data),
-      );
-      return _handleResponse(response);
+  Future<Map<String, dynamic>> updateBooking(
+      String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/bookings/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> sellItem(String id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> sellItem(
+      String id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/items/$id/sell'),
       headers: await _getHeaders(),
@@ -374,14 +385,12 @@ class ApiService {
     return _handleResponse(response);
   }
 
-
-
   Future<Map<String, dynamic>> getDeletedItems() async {
-     final response = await http.get(
-       Uri.parse('${AppConstants.baseUrl}/items?status=deleted'),
-       headers: await _getHeaders(),
-     );
-     return _handleResponse(response);
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/items?status=deleted'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> getBookings({String? status}) async {
@@ -419,7 +428,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> removeFromWishlist(String mobile, String itemId) async {
+  Future<Map<String, dynamic>> removeFromWishlist(
+      String mobile, String itemId) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/customers/wishlist/remove'),
       headers: await _getHeaders(),
@@ -517,21 +527,26 @@ class ApiService {
   }
 
   // Create item with images (Multipart)
-  Future<Map<String, dynamic>> createItemWithImages(Map<String, String> fields, List<XFile> images) async {
+  Future<Map<String, dynamic>> createItemWithImages(
+      Map<String, String> fields, List<XFile> images) async {
     final uri = Uri.parse('${AppConstants.baseUrl}/items');
     final request = http.MultipartRequest('POST', uri);
     return _sendMultipartRequest(request, fields, images);
   }
 
   // Update item with images (Multipart)
-  Future<Map<String, dynamic>> updateItemWithImages(String id, Map<String, String> fields, List<XFile> images) async {
+  Future<Map<String, dynamic>> updateItemWithImages(
+      String id, Map<String, String> fields, List<XFile> images) async {
     final uri = Uri.parse('${AppConstants.baseUrl}/items/$id');
     final request = http.MultipartRequest('PUT', uri);
     return _sendMultipartRequest(request, fields, images);
   }
 
   // Helper for multipart requests
-  Future<Map<String, dynamic>> _sendMultipartRequest(http.MultipartRequest request, Map<String, String> fields, List<XFile> images) async {
+  Future<Map<String, dynamic>> _sendMultipartRequest(
+      http.MultipartRequest request,
+      Map<String, String> fields,
+      List<XFile> images) async {
     // Add headers
     final headers = await _getHeaders();
     request.headers.addAll(headers);
@@ -548,26 +563,26 @@ class ApiService {
     print('Sending API Request: ${request.method} ${request.url}');
     print('Fields: ${request.fields}');
 
-
     // Add images
     for (var image in images) {
-       final bytes = await image.readAsBytes();
-       
-       String? mimeType;
-       if (image.name.toLowerCase().endsWith('.jpg') || image.name.toLowerCase().endsWith('.jpeg')) {
-         mimeType = 'image/jpeg';
-       } else if (image.name.toLowerCase().endsWith('.png')) {
-         mimeType = 'image/png';
-       } else if (image.name.toLowerCase().endsWith('.webp')) {
-         mimeType = 'image/webp';
-       }
-       
-       request.files.add(http.MultipartFile.fromBytes(
-         'images', 
-         bytes,
-         filename: image.name,
-         contentType: mimeType != null ? MediaType.parse(mimeType) : null,
-       ));
+      final bytes = await image.readAsBytes();
+
+      String? mimeType;
+      if (image.name.toLowerCase().endsWith('.jpg') ||
+          image.name.toLowerCase().endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (image.name.toLowerCase().endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (image.name.toLowerCase().endsWith('.webp')) {
+        mimeType = 'image/webp';
+      }
+
+      request.files.add(http.MultipartFile.fromBytes(
+        'images',
+        bytes,
+        filename: image.name,
+        contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+      ));
     }
 
     // Send request
@@ -577,7 +592,7 @@ class ApiService {
   }
 
   // ==================== TALLY METHODS ====================
-  
+
   // Create new tally session
   Future<Map<String, dynamic>> createTally(Map<String, dynamic> data) async {
     final response = await http.post(
@@ -594,7 +609,7 @@ class ApiService {
     if (status != null) {
       uri = uri.replace(queryParameters: {'status': status});
     }
-    
+
     final response = await http.get(
       uri,
       headers: await _getHeaders(),
@@ -612,7 +627,8 @@ class ApiService {
   }
 
   // Scan item in tally
-  Future<Map<String, dynamic>> scanItemInTally(String tallyId, String barcode) async {
+  Future<Map<String, dynamic>> scanItemInTally(
+      String tallyId, String barcode) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/scan'),
       headers: await _getHeaders(),
@@ -622,7 +638,8 @@ class ApiService {
   }
 
   // Verify weight for approx/bulk items during tally
-  Future<Map<String, dynamic>> verifyTallyWeight(String tallyId, String itemId, double verifiedWeight) async {
+  Future<Map<String, dynamic>> verifyTallyWeight(
+      String tallyId, String itemId, double verifiedWeight) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/verify-weight'),
       headers: await _getHeaders(),
@@ -635,7 +652,8 @@ class ApiService {
   }
 
   // Lock tally session
-  Future<Map<String, dynamic>> lockTally(String tallyId, {String? remarks}) async {
+  Future<Map<String, dynamic>> lockTally(String tallyId,
+      {String? remarks}) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/lock'),
       headers: await _getHeaders(),
@@ -653,6 +671,66 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // Remove a single unscanned item from stock + tally (admin only)
+  Future<Map<String, dynamic>> removeUnscannedTallyItem(
+      String tallyId, String itemId) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/remove-item'),
+      headers: await _getHeaders(),
+      body: json.encode({'itemId': itemId}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Remove all (or a subset of) unscanned items from stock + tally (admin only)
+  Future<Map<String, dynamic>> removeAllUnscannedTallyItems(String tallyId,
+      {List<String>? itemIds}) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/remove-unscanned'),
+      headers: await _getHeaders(),
+      body: json.encode({if (itemIds != null) 'itemIds': itemIds}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Add a just-created item into an active tally (as expected + scanned)
+  Future<Map<String, dynamic>> addItemToTally(
+      String tallyId, String barcode) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/add-item'),
+      headers: await _getHeaders(),
+      body: json.encode({'barcode': barcode}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Generate a saved inventory snapshot from a locked tally
+  Future<Map<String, dynamic>> updateTallyInventory(String tallyId) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/tally/$tallyId/update-inventory'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get inventory snapshot history
+  Future<Map<String, dynamic>> getInventorySnapshots() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/inventory-snapshots'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Get single inventory snapshot
+  Future<Map<String, dynamic>> getInventorySnapshot(String id) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/inventory-snapshots/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
   // Delete tally session
   Future<Map<String, dynamic>> deleteTallySession(String id) async {
     final response = await http.delete(
@@ -663,7 +741,7 @@ class ApiService {
   }
 
   // Analytics APIs
-  
+
   // Get dashboard statistics
   Future<Map<String, dynamic>> getDashboardStats() async {
     final response = await http.get(
@@ -674,7 +752,7 @@ class ApiService {
   }
 
   // Tag Printing APIs
-  
+
   // Get all items for tag printing
   Future<List<Map<String, dynamic>>> getItemsForTagPrinting() async {
     final response = await http.get(
@@ -708,13 +786,13 @@ class ApiService {
   Future<Uint8List> generateTagsPDF(List<String> itemIds) async {
     try {
       final token = await _storage.getToken();
-      
+
       // Custom headers for PDF download - don't use _getHeaders()
       final headers = {
         'Content-Type': 'application/json', // For request body
         if (token != null) 'Authorization': 'Bearer $token',
       };
-      
+
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/tag-print/generate-pdf'),
         headers: headers,
@@ -734,7 +812,8 @@ class ApiService {
       } else {
         final errorBody = utf8.decode(response.bodyBytes);
         print('[API] Error response: $errorBody');
-        throw Exception('Failed to generate PDF: ${response.statusCode} - $errorBody');
+        throw Exception(
+            'Failed to generate PDF: ${response.statusCode} - $errorBody');
       }
     } catch (e) {
       print('[API] Exception generating PDF: $e');
@@ -746,15 +825,17 @@ class ApiService {
   /// Upload single image to Cloudinary
   /// [folder] - Optional folder name: 'items' (default) or 'containers'
   /// Returns: {success: bool, data: {url: String, publicId: String}}
-  Future<Map<String, dynamic>> uploadImage(XFile imageFile, {String folder = 'items'}) async {
+  Future<Map<String, dynamic>> uploadImage(XFile imageFile,
+      {String folder = 'items'}) async {
     try {
       final token = await _storage.getToken();
       // Add folder query parameter
-      final uri = Uri.parse('${AppConstants.baseUrl}/upload/single?folder=$folder');
-      
+      final uri =
+          Uri.parse('${AppConstants.baseUrl}/upload/single?folder=$folder');
+
       var request = http.MultipartRequest('POST', uri);
       request.headers['Authorization'] = 'Bearer $token';
-      
+
       // Add image file
       final bytes = await imageFile.readAsBytes();
       request.files.add(
@@ -765,11 +846,11 @@ class ApiService {
           contentType: MediaType('image', imageFile.name.split('.').last),
         ),
       );
-      
+
       print('[API] Uploading image to Cloudinary ($folder): ${imageFile.name}');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
-      
+
       return _handleResponse(response);
     } catch (e) {
       print('[API] Image upload error: $e');
@@ -786,7 +867,7 @@ class ApiService {
       // URL format: https://res.cloudinary.com/cloud-name/image/upload/v1234/folder/filename.jpg
       final urlParts = imageUrl.split('/');
       final uploadIndex = urlParts.indexOf('upload');
-      
+
       if (uploadIndex == -1) {
         print('[API] Not a Cloudinary URL, skipping deletion');
         return false;
@@ -795,16 +876,17 @@ class ApiService {
       // Get everything after 'upload/v123456/'
       final publicIdWithExt = urlParts.sublist(uploadIndex + 2).join('/');
       // Remove file extension
-      final publicId = publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
-      
+      final publicId =
+          publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
+
       // Replace / with -- for URL encoding
       final encodedPublicId = publicId.replaceAll('/', '--');
-      
+
       final response = await http.delete(
         Uri.parse('${AppConstants.baseUrl}/upload/$encodedPublicId'),
         headers: await _getHeaders(),
       );
-      
+
       if (response.statusCode == 200) {
         print('[API] ✅ Image deleted from Cloudinary: $publicId');
         return true;
@@ -875,7 +957,8 @@ class ApiService {
   }
 
   /// Update user profile
-  Future<Map<String, dynamic>> updateUser(String id, Map<String, dynamic> userData) async {
+  Future<Map<String, dynamic>> updateUser(
+      String id, Map<String, dynamic> userData) async {
     try {
       final token = await _storage.getToken();
       final response = await http.put(
@@ -912,7 +995,8 @@ class ApiService {
   }
 
   /// Change password
-  Future<Map<String, dynamic>> changePassword(String userId, String currentPassword, String newPassword) async {
+  Future<Map<String, dynamic>> changePassword(
+      String userId, String currentPassword, String newPassword) async {
     try {
       final token = await _storage.getToken();
       final response = await http.put(
@@ -942,7 +1026,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> updateTagSettings(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateTagSettings(
+      Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/tag-settings'),
       headers: await _getHeaders(),
@@ -955,13 +1040,13 @@ class ApiService {
   Future<Uint8List> generateBlankTagsPDF(Map<String, int> purityCounts) async {
     try {
       final token = await _storage.getToken();
-      
+
       // Custom headers for PDF download
       final headers = {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       };
-      
+
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/tag-print/generate-blank-tags-pdf'),
         headers: headers,
@@ -969,7 +1054,8 @@ class ApiService {
       );
 
       print('[API] Blank Tags PDF response status: ${response.statusCode}');
-      print('[API] Blank Tags PDF response length: ${response.bodyBytes.length}');
+      print(
+          '[API] Blank Tags PDF response length: ${response.bodyBytes.length}');
 
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
@@ -978,7 +1064,8 @@ class ApiService {
       } else {
         final errorBody = utf8.decode(response.bodyBytes);
         print('[API] Error response: $errorBody');
-        throw Exception('Failed to generate blank tags PDF: ${response.statusCode} - $errorBody');
+        throw Exception(
+            'Failed to generate blank tags PDF: ${response.statusCode} - $errorBody');
       }
     } catch (e) {
       print('[API] Exception generating blank tags PDF: $e');
@@ -1084,7 +1171,6 @@ class ApiService {
     return _handleResponse(response);
   }
 
-
   Future<Map<String, dynamic>> getPurchase(String id) async {
     final response = await http.get(
       Uri.parse('${AppConstants.baseUrl}/purchases/$id'),
@@ -1143,7 +1229,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> updateGstConfig(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateGstConfig(
+      Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/gst/config'),
       headers: await _getHeaders(),
@@ -1212,7 +1299,8 @@ class ApiService {
   }
 
   /// Deletes a Cloudinary purchase bill attachment by its publicId.
-  Future<Map<String, dynamic>> deletePurchaseBillAttachment(String publicId) async {
+  Future<Map<String, dynamic>> deletePurchaseBillAttachment(
+      String publicId) async {
     // Replace / with -- so it's URL-safe (same as main upload routes)
     final safeId = publicId.replaceAll('/', '--');
     final response = await http.delete(
@@ -1289,6 +1377,53 @@ class ApiService {
     final response = await http.get(uri, headers: await _getHeaders());
     return _handleResponse(response);
   }
+
+  // ── App Version (update nudge) ─────────────────────────────────────────────
+  // Public endpoint — checked at splash, before login is guaranteed.
+  Future<Map<String, dynamic>> getAppVersion() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/app-version'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateAppVersion(
+      Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/app-version'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  // ── Push Notifications ─────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> registerFcmToken(String token,
+      {String platform = 'android'}) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/users/fcm-token'),
+      headers: await _getHeaders(),
+      body: json.encode({'token': token, 'platform': platform}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> sendNotification(
+      Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/notifications/send'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getNotificationHistory() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/notifications'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
 }
-
-

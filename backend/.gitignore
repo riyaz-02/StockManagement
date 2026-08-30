@@ -44,3 +44,4 @@ tmp/
 # Sensitive files (credentials)
 add-admin.js
 deploy/DEPLOYMENT_GUIDE.md
+config/firebase-service-account.json

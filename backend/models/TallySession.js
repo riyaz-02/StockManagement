@@ -110,7 +110,7 @@ const tallySessionSchema = new mongoose.Schema({
         },
         status: {
             type: String,
-            enum: ['in_stock', 'out_of_stock', 'active', 'booked', 'wishlisted'],
+            enum: ['in_stock', 'out_of_stock', 'active', 'booked', 'wishlisted', 'removed'],
             default: 'in_stock'
         }
     }],
@@ -206,6 +206,21 @@ const tallySessionSchema = new mongoose.Schema({
     isForceLocked: {
         type: Boolean,
         default: false
+    },
+
+    // Inventory Snapshot
+    inventoryUpdated: {
+        type: Boolean,
+        default: false
+    },
+    inventoryUpdatedAt: {
+        type: Date,
+        default: null
+    },
+    inventorySnapshotId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InventorySnapshot',
+        default: null
     },
 
     // Timestamps

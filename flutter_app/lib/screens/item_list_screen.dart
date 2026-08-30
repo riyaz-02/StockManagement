@@ -13,17 +13,19 @@ import 'add_edit_item_screen.dart'; // keep for potential direct use
 import 'quick_add_item_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'moved_out_items_screen.dart';
+import '../utils/app_toast.dart';
 
 class ItemListScreen extends StatefulWidget {
   final String? initialStatus;
-  
+
   const ItemListScreen({super.key, this.initialStatus});
 
   @override
   State<ItemListScreen> createState() => _ItemListScreenState();
 }
 
-class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAliveClientMixin {
+class _ItemListScreenState extends State<ItemListScreen>
+    with AutomaticKeepAliveClientMixin {
   String _statusFilter = 'all';
   String _searchQuery = '';
   String? _metalTypeFilter;
@@ -33,7 +35,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
   double? _minWeight;
   double? _maxWeight;
   RangeValues? _weightRange;
-  
+
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
 
@@ -56,10 +58,10 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
 
   void _loadItems() {
     final itemProvider = Provider.of<ItemProvider>(context, listen: false);
-    
+
     // Build query parameters
     Map<String, String> queryParams = {};
-    
+
     if (_searchQuery.isNotEmpty) {
       queryParams['search'] = _searchQuery;
     }
@@ -81,14 +83,14 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
     if (_maxWeight != null) {
       queryParams['maxWeight'] = _maxWeight.toString();
     }
-    
+
     // Use existing fetchItems method with status and filters
     itemProvider.fetchItems(
       status: _statusFilter == 'all' ? null : _statusFilter,
       filters: queryParams.isEmpty ? null : queryParams,
     );
   }
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -99,7 +101,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     final languageProvider = Provider.of<LanguageProvider>(context);
     final itemProvider = Provider.of<ItemProvider>(context);
     final items = itemProvider.items;
@@ -127,9 +129,9 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
           builder: (context, languageProvider, child) => Text(
             languageProvider.t('items'),
             style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-          ),
+              fontWeight: FontWeight.w700,
+              fontSize: 20,
+            ),
           ),
         ),
         actions: [
@@ -166,7 +168,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         ),
         child: FloatingActionButton(
           onPressed: () {
-          Navigator.push(
+            Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const QuickAddItemScreen()),
             ).then((_) => _loadItems());
@@ -202,7 +204,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE94560), width: 2),
+                  borderSide:
+                      const BorderSide(color: Color(0xFFE94560), width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade50,
@@ -216,14 +219,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
               },
             ),
           ),
-          
+
           // Status Filter Chips + Filter Button
           Row(
             children: [
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       _buildFilterChip('All', 'all'),
@@ -251,16 +255,22 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (_metalTypeFilter != null || _itemTypeFilter != null ||
-                                  _purityFilter != null || _certificationFilter != null ||
-                                  _minWeight != null || _maxWeight != null)
+                          color: (_metalTypeFilter != null ||
+                                  _itemTypeFilter != null ||
+                                  _purityFilter != null ||
+                                  _certificationFilter != null ||
+                                  _minWeight != null ||
+                                  _maxWeight != null)
                               ? const Color(0xFFE94560).withOpacity(0.1)
                               : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: (_metalTypeFilter != null || _itemTypeFilter != null ||
-                                    _purityFilter != null || _certificationFilter != null ||
-                                    _minWeight != null || _maxWeight != null)
+                            color: (_metalTypeFilter != null ||
+                                    _itemTypeFilter != null ||
+                                    _purityFilter != null ||
+                                    _certificationFilter != null ||
+                                    _minWeight != null ||
+                                    _maxWeight != null)
                                 ? const Color(0xFFE94560)
                                 : Colors.grey.shade300,
                           ),
@@ -268,19 +278,25 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                         child: Icon(
                           Icons.tune,
                           size: 20,
-                          color: (_metalTypeFilter != null || _itemTypeFilter != null ||
-                                  _purityFilter != null || _certificationFilter != null ||
-                                  _minWeight != null || _maxWeight != null)
+                          color: (_metalTypeFilter != null ||
+                                  _itemTypeFilter != null ||
+                                  _purityFilter != null ||
+                                  _certificationFilter != null ||
+                                  _minWeight != null ||
+                                  _maxWeight != null)
                               ? const Color(0xFFE94560)
                               : Colors.grey[600],
                         ),
                       ),
                     ),
                     // Active filter count badge
-                    if ([_metalTypeFilter, _itemTypeFilter, _purityFilter, _certificationFilter]
-                            .where((f) => f != null)
-                            .length +
-                        (_minWeight != null || _maxWeight != null ? 1 : 0) >
+                    if ([
+                              _metalTypeFilter,
+                              _itemTypeFilter,
+                              _purityFilter,
+                              _certificationFilter
+                            ].where((f) => f != null).length +
+                            (_minWeight != null || _maxWeight != null ? 1 : 0) >
                         0)
                       Positioned(
                         top: -4,
@@ -294,7 +310,12 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                           ),
                           child: Center(
                             child: Text(
-                              '${[_metalTypeFilter, _itemTypeFilter, _purityFilter, _certificationFilter].where((f) => f != null).length + (_minWeight != null || _maxWeight != null ? 1 : 0)}',
+                              '${[
+                                    _metalTypeFilter,
+                                    _itemTypeFilter,
+                                    _purityFilter,
+                                    _certificationFilter
+                                  ].where((f) => f != null).length + (_minWeight != null || _maxWeight != null ? 1 : 0)}',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 9,
@@ -308,11 +329,14 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
               ),
             ],
           ),
-          
+
           // Additional Filters Row with Clear Button
-          if (_metalTypeFilter != null || _itemTypeFilter != null || 
-              _purityFilter != null || _certificationFilter != null ||
-              _minWeight != null || _maxWeight != null)
+          if (_metalTypeFilter != null ||
+              _itemTypeFilter != null ||
+              _purityFilter != null ||
+              _certificationFilter != null ||
+              _minWeight != null ||
+              _maxWeight != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
@@ -323,7 +347,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       runSpacing: 8,
                       children: [
                         if (_metalTypeFilter != null)
-                          _buildActiveFilterChip('Metal: $_metalTypeFilter', () {
+                          _buildActiveFilterChip('Metal: $_metalTypeFilter',
+                              () {
                             setState(() => _metalTypeFilter = null);
                             _loadItems();
                           }),
@@ -338,22 +363,22 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                             _loadItems();
                           }),
                         if (_certificationFilter != null)
-                          _buildActiveFilterChip('Cert: $_certificationFilter', () {
+                          _buildActiveFilterChip('Cert: $_certificationFilter',
+                              () {
                             setState(() => _certificationFilter = null);
                             _loadItems();
                           }),
                         if (_minWeight != null || _maxWeight != null)
                           _buildActiveFilterChip(
-                            'Weight: ${_minWeight?.toStringAsFixed(1) ?? '0'}-${_maxWeight?.toStringAsFixed(1) ?? '∞'}g',
-                            () {
-                              setState(() {
-                                _minWeight = null;
-                                _maxWeight = null;
-                                _weightRange = null;
-                              });
-                              _loadItems();
-                            }
-                          ),
+                              'Weight: ${_minWeight?.toStringAsFixed(1) ?? '0'}-${_maxWeight?.toStringAsFixed(1) ?? '∞'}g',
+                              () {
+                            setState(() {
+                              _minWeight = null;
+                              _maxWeight = null;
+                              _weightRange = null;
+                            });
+                            _loadItems();
+                          }),
                       ],
                     ),
                   ),
@@ -393,7 +418,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          return _buildItemCard(context, item, languageProvider);
+                          return _buildItemCard(
+                              context, item, languageProvider);
                         },
                       ),
           ),
@@ -410,19 +436,17 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
           Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            languageProvider.translate('no_data') == 'no_data' 
-                ? 'No items found' 
+            languageProvider.translate('no_data') == 'no_data'
+                ? 'No items found'
                 : languageProvider.translate('no_data'),
             style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             icon: const Icon(Icons.add),
-            label: Text(
-              languageProvider.translate('add_item') == 'add_item'
-                  ? 'Add Item'
-                  : languageProvider.translate('add_item')
-            ),
+            label: Text(languageProvider.translate('add_item') == 'add_item'
+                ? 'Add Item'
+                : languageProvider.translate('add_item')),
             onPressed: () {
               Navigator.push(
                 context,
@@ -435,7 +459,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildItemCard(BuildContext context, dynamic item, LanguageProvider languageProvider) {
+  Widget _buildItemCard(
+      BuildContext context, dynamic item, LanguageProvider languageProvider) {
     final Color statusColor = _getStatusColor(item.status);
     final double netWeight = item.netWeight;
 
@@ -463,14 +488,16 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           shadowColor: statusColor.withOpacity(0.15),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: item)),
+                MaterialPageRoute(
+                    builder: (_) => ItemDetailsScreen(item: item)),
               ).then((_) => _loadItems());
             },
             onLongPress: () => _showItemOptions(context, item),
@@ -486,7 +513,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.07),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: statusColor.withOpacity(0.22), width: 1.5),
+                      border: Border.all(
+                          color: statusColor.withOpacity(0.22), width: 1.5),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(11),
@@ -499,13 +527,17 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                               placeholder: (context, url) => Center(
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      statusColor),
                                 ),
                               ),
-                              errorWidget: (context, url, error) =>
-                                  Icon(Icons.broken_image, color: statusColor, size: 30),
+                              errorWidget: (context, url, error) => Icon(
+                                  Icons.broken_image,
+                                  color: statusColor,
+                                  size: 30),
                             )
-                          : Icon(Icons.diamond_outlined, size: 32, color: statusColor),
+                          : Icon(Icons.diamond_outlined,
+                              size: 32, color: statusColor),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -534,11 +566,13 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: statusColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: statusColor.withOpacity(0.35)),
+                                border: Border.all(
+                                    color: statusColor.withOpacity(0.35)),
                               ),
                               child: Text(
                                 languageProvider.translate(item.status),
@@ -564,18 +598,20 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                         ),
                         const SizedBox(height: 6),
 
-                         Wrap(
+                        Wrap(
                           spacing: 4,
                           runSpacing: 3,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             // Weight — prominent
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
                                 color: weightColor.withOpacity(0.09),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: weightColor.withOpacity(0.28)),
+                                border: Border.all(
+                                    color: weightColor.withOpacity(0.28)),
                               ),
                               child: Text(
                                 '${netWeight.toStringAsFixed(2)}g',
@@ -587,9 +623,12 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                                 ),
                               ),
                             ),
-                            _buildSpecPill(_formatText(item.metalType), Colors.purple),
-                            _buildSpecPill(_formatText(item.itemType), Colors.teal),
-                            _buildSpecPill(_formatText(item.purity), const Color(0xFFB8860B)),
+                            _buildSpecPill(
+                                _formatText(item.metalType), Colors.purple),
+                            _buildSpecPill(
+                                _formatText(item.itemType), Colors.teal),
+                            _buildSpecPill(_formatText(item.purity),
+                                const Color(0xFFB8860B)),
                           ],
                         ),
                       ],
@@ -602,7 +641,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         ),
 
         // ── Certification stamp (unchanged) ────────────────────────────
-        if (item.certificationType == 'hallmarked' || item.certificationType == 'huid')
+        if (item.certificationType == 'hallmarked' ||
+            item.certificationType == 'huid')
           Positioned(
             top: 46,
             right: 8,
@@ -688,11 +728,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
             children: [
               Text(
                 _formatText(item.name),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Text(
                 item.barcode,
-                style: TextStyle(fontSize: 14, color: Colors.grey[600], fontFamily: 'monospace'),
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontFamily: 'monospace'),
               ),
               const SizedBox(height: 8),
               const Divider(),
@@ -727,7 +771,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                 title: const Text('Delete'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
-                   _confirmDelete(context, item);
+                  _confirmDelete(context, item);
                 },
               ),
             ],
@@ -742,25 +786,34 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Item?'),
-        content: Text('Are you sure you want to delete "${item.name}"? This cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete "${item.name}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(ctx);
-              final provider = Provider.of<ItemProvider>(context, listen: false);
+              final provider =
+                  Provider.of<ItemProvider>(context, listen: false);
               final success = await provider.deleteItem(item.id);
               if (mounted) {
                 if (success) {
-                   ScaffoldMessenger.of(context).showSnackBar(
-                     const SnackBar(content: Text('Item deleted successfully'), backgroundColor: Colors.green),
-                   );
-                   _loadItems();
+                  showAppSnackBar(
+                    context,
+                    const SnackBar(
+                        content: Text('Item deleted successfully'),
+                        backgroundColor: Colors.green),
+                  );
+                  _loadItems();
                 } else {
-                   ScaffoldMessenger.of(context).showSnackBar(
-                     SnackBar(content: Text(provider.error ?? 'Failed to delete'), backgroundColor: Colors.red),
-                   );
+                  showAppSnackBar(
+                    context,
+                    SnackBar(
+                        content: Text(provider.error ?? 'Failed to delete'),
+                        backgroundColor: Colors.red),
+                  );
                 }
               }
             },
@@ -779,7 +832,10 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w500),
+          style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -805,7 +861,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
           color: isSelected ? null : Colors.grey[100],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
+            color:
+                isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -898,9 +955,22 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
     final filterOptions = itemProvider.filterOptions;
     final allLoadedItems = itemProvider.items;
 
-    final metalTypes = (filterOptions?['metalTypes'] as List?)?.cast<String>() ?? ['Gold', 'Silver', 'Platinum'];
-    final itemTypes = (filterOptions?['itemTypes'] as List?)?.cast<String>() ?? ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Pendant', 'Chain', 'Bangle'];
-    final purityOptions = (filterOptions?['purities'] as List?)?.cast<String>() ?? ['18k', '22k', '24k', '916', '999'];
+    final metalTypes =
+        (filterOptions?['metalTypes'] as List?)?.cast<String>() ??
+            ['Gold', 'Silver', 'Platinum'];
+    final itemTypes = (filterOptions?['itemTypes'] as List?)?.cast<String>() ??
+        [
+          'Ring',
+          'Necklace',
+          'Bracelet',
+          'Earring',
+          'Pendant',
+          'Chain',
+          'Bangle'
+        ];
+    final purityOptions =
+        (filterOptions?['purities'] as List?)?.cast<String>() ??
+            ['18k', '22k', '24k', '916', '999'];
     final globalWeightRange = filterOptions?['weightRange'];
 
     // Global absolute bounds (never go outside these)
@@ -928,8 +998,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
             item.metalType.toLowerCase() != metal.toLowerCase()) return false;
         if (itemType != null &&
             item.itemType.toLowerCase() != itemType.toLowerCase()) return false;
-        if (purity != null &&
-            item.purity.toLowerCase() != purity.toLowerCase()) return false;
+        if (purity != null && item.purity.toLowerCase() != purity.toLowerCase())
+          return false;
         return true;
       }).toList();
 
@@ -954,18 +1024,22 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
         return StatefulBuilder(
           builder: (context, setModalState) {
             // Compute dynamic weight bounds from in-modal selections
-            final dynamic = computeDynamicRange(modalMetal, modalItemType, modalPurity);
+            final dynamic =
+                computeDynamicRange(modalMetal, modalItemType, modalPurity);
             final dynMin = dynamic['min']!;
             final dynMax = dynamic['max']!;
 
             // Count matching items for the hint label
             final matchCount = allLoadedItems.where((item) {
               if (modalMetal != null &&
-                  item.metalType.toLowerCase() != modalMetal!.toLowerCase()) return false;
+                  item.metalType.toLowerCase() != modalMetal!.toLowerCase())
+                return false;
               if (modalItemType != null &&
-                  item.itemType.toLowerCase() != modalItemType!.toLowerCase()) return false;
+                  item.itemType.toLowerCase() != modalItemType!.toLowerCase())
+                return false;
               if (modalPurity != null &&
-                  item.purity.toLowerCase() != modalPurity!.toLowerCase()) return false;
+                  item.purity.toLowerCase() != modalPurity!.toLowerCase())
+                return false;
               return true;
             }).length;
 
@@ -987,11 +1061,18 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
               bool clearPurity = false,
             }) {
               setModalState(() {
-                if (clearMetal) modalMetal = null; else if (metal != null) modalMetal = metal;
-                if (clearItemType) modalItemType = null; else if (itemType != null) modalItemType = itemType;
-                if (clearPurity) modalPurity = null; else if (purity != null) modalPurity = purity;
+                if (clearMetal)
+                  modalMetal = null;
+                else if (metal != null) modalMetal = metal;
+                if (clearItemType)
+                  modalItemType = null;
+                else if (itemType != null) modalItemType = itemType;
+                if (clearPurity)
+                  modalPurity = null;
+                else if (purity != null) modalPurity = purity;
                 // Reset weight range to the new dynamic bounds
-                final newDyn = computeDynamicRange(modalMetal, modalItemType, modalPurity);
+                final newDyn =
+                    computeDynamicRange(modalMetal, modalItemType, modalPurity);
                 modalWeightRange = RangeValues(newDyn['min']!, newDyn['max']!);
               });
             }
@@ -1011,7 +1092,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       children: [
                         const Text(
                           'Filter Items',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
@@ -1022,9 +1104,10 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Metal Type Filter
-                    const Text('Metal Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Metal Type',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -1039,15 +1122,17 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                               clearMetal: !selected,
                             );
                           },
-                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          selectedColor:
+                              const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Item Type Filter
-                    const Text('Item Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Item Type',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -1062,15 +1147,17 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                               clearItemType: !selected,
                             );
                           },
-                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          selectedColor:
+                              const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Purity Filter
-                    const Text('Purity', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Purity',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -1085,37 +1172,43 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                               clearPurity: !selected,
                             );
                           },
-                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          selectedColor:
+                              const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Certification Filter
-                    const Text('Certification', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Certification',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       children: ['hallmarked', 'huid', 'none'].map((cert) {
                         final isSelected = modalCert == cert;
                         return FilterChip(
-                          label: Text(cert == 'none' ? 'Non-certified' : cert.toUpperCase()),
+                          label: Text(cert == 'none'
+                              ? 'Non-certified'
+                              : cert.toUpperCase()),
                           selected: isSelected,
                           onSelected: (selected) {
                             setModalState(() {
                               modalCert = selected ? cert : null;
                             });
                           },
-                          selectedColor: const Color(0xFFE94560).withOpacity(0.2),
+                          selectedColor:
+                              const Color(0xFFE94560).withOpacity(0.2),
                           checkmarkColor: const Color(0xFFE94560),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Weight Range Filter — dynamic bounds
-                    if (globalWeightRange != null || allLoadedItems.isNotEmpty) ...[ 
+                    if (globalWeightRange != null ||
+                        allLoadedItems.isNotEmpty) ...[
                       Row(
                         children: [
                           const Text('Weight Range (grams)',
@@ -1137,7 +1230,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.tune, size: 13, color: const Color(0xFFE94560)),
+                              Icon(Icons.tune,
+                                  size: 13, color: const Color(0xFFE94560)),
                               const SizedBox(width: 4),
                               Text(
                                 'Adjusted for selected filters',
@@ -1155,13 +1249,15 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                           values: effectiveRange,
                           min: dynMin,
                           max: dynMax,
-                          divisions: ((dynMax - dynMin) * 10).round().clamp(1, 200),
+                          divisions:
+                              ((dynMax - dynMin) * 10).round().clamp(1, 200),
                           labels: RangeLabels(
                             '${effectiveRange.start.toStringAsFixed(2)}g',
                             '${effectiveRange.end.toStringAsFixed(2)}g',
                           ),
                           activeColor: const Color(0xFFE94560),
-                          inactiveColor: const Color(0xFFE94560).withOpacity(0.2),
+                          inactiveColor:
+                              const Color(0xFFE94560).withOpacity(0.2),
                           onChanged: (RangeValues values) {
                             setModalState(() {
                               modalWeightRange = values;
@@ -1173,7 +1269,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
                             'All items weigh ${dynMin.toStringAsFixed(2)}g',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13),
                           ),
                         ),
                       Padding(
@@ -1197,7 +1294,7 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                       const SizedBox(height: 8),
                     ],
                     const SizedBox(height: 24),
-                    
+
                     // Apply Button
                     SizedBox(
                       width: double.infinity,
@@ -1210,8 +1307,12 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                             _purityFilter = modalPurity;
                             _certificationFilter = modalCert;
                             _weightRange = modalWeightRange;
-                            _minWeight = effectiveRange.start == dynMin ? null : effectiveRange.start;
-                            _maxWeight = effectiveRange.end == dynMax ? null : effectiveRange.end;
+                            _minWeight = effectiveRange.start == dynMin
+                                ? null
+                                : effectiveRange.start;
+                            _maxWeight = effectiveRange.end == dynMax
+                                ? null
+                                : effectiveRange.end;
                           });
                           Navigator.pop(sheetContext);
                           _loadItems();
@@ -1224,7 +1325,8 @@ class _ItemListScreenState extends State<ItemListScreen> with AutomaticKeepAlive
                           ),
                         ),
                         child: const Text('Apply Filters',
-                            style: TextStyle(fontSize: 16, color: Colors.white)),
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.white)),
                       ),
                     ),
                   ],

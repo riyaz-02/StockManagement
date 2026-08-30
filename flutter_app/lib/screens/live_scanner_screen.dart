@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../providers/tally_provider.dart';
 import '../utils/app_colors.dart';
 import '../widgets/weight_verification_dialog.dart';
+import '../utils/app_toast.dart';
 
 class LiveScannerScreen extends StatefulWidget {
   final String tallyId;
@@ -26,18 +27,19 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
-  
+
   bool _isProcessing = false;
   int _scannedCount = 0;
   int _totalItems = 0;
   String? _lastScannedBarcode;
   String? _lastResult;
   Color _resultColor = Colors.green;
-  
+
   // Cooldown mechanism to prevent rapid re-scans
   DateTime? _lastScanTime;
   String? _lastProcessedBarcode;
-  static const Duration _scanCooldown = Duration(milliseconds: 5000); // 5 second cooldown
+  static const Duration _scanCooldown =
+      Duration(milliseconds: 5000); // 5 second cooldown
 
   @override
   void initState() {
@@ -57,9 +59,9 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
   Future<void> _playSound(String type) async {
     try {
       String soundFile;
-      
+
       if (type == 'success') {
-        soundFile = 'sounds/beep.mp3';  // Use beep for success
+        soundFile = 'sounds/beep.mp3'; // Use beep for success
       } else if (type == 'error') {
         soundFile = 'sounds/error.mp3';
       } else if (type == 'complete') {
@@ -67,7 +69,7 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       } else {
         return;
       }
-      
+
       await _audioPlayer.play(AssetSource(soundFile), volume: 1.0);
     } catch (e) {
       print('Audio error: $e');
@@ -100,7 +102,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       final timeSinceLastScan = now.difference(_lastScanTime!);
       if (timeSinceLastScan < _scanCooldown) {
         // Still in cooldown period for this barcode - ignore
-        print('Cooldown active: ${_scanCooldown.inMilliseconds - timeSinceLastScan.inMilliseconds}ms remaining');
+        print(
+            'Cooldown active: ${_scanCooldown.inMilliseconds - timeSinceLastScan.inMilliseconds}ms remaining');
         return;
       }
     }
@@ -114,9 +117,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
     print('[SCAN] Processing barcode: $barcode');
     print('[SCAN] Current count: $_scannedCount/$_totalItems');
 
-
     final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
-    
+
     try {
       final result = await tallyProvider.scanItem(widget.tallyId, barcode);
 
@@ -124,14 +126,15 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 
       if (result != null) {
         print('[SCAN] ✓ API returned success for barcode: $barcode');
-        
+
         // **WEIGHT VERIFICATION CHECK**
-        final requiresWeightVerification = result['requiresWeightVerification'] ?? false;
-        
+        final requiresWeightVerification =
+            result['requiresWeightVerification'] ?? false;
+
         if (requiresWeightVerification) {
           print('[SCAN] ⚖️ Weight verification required');
           final itemData = result['data']?['item'];
-          
+
           if (itemData != null) {
             // Show weight verification dialog
             await showDialog(
@@ -142,21 +145,22 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                 onVerified: (verifiedWeight) async {
                   try {
                     // Call API to verify weight
-                    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+                    final tallyProvider =
+                        Provider.of<TallyProvider>(context, listen: false);
                     await tallyProvider.verifyTallyWeight(
                       widget.tallyId,
                       itemData['_id'],
                       verifiedWeight,
                     );
-                    
+
                     // Close dialog
                     if (mounted) {
                       Navigator.of(context).pop();
                     }
-                    
+
                     // Reload tally
                     await _loadTallyInfo();
-                    
+
                     // Show success feedback
                     _playSound('success');
                     HapticFeedback.lightImpact();
@@ -164,7 +168,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                     print('[SCAN] Weight verification error: $e');
                     // Show error
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      showAppSnackBar(
+                        context,
                         SnackBar(
                           content: Text('Failed to verify weight: $e'),
                           backgroundColor: Colors.red,
@@ -176,24 +181,24 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
               ),
             );
           }
-          
+
           setState(() => _isProcessing = false);
           return;
         }
-        
+
         final isOutOfStock = result['isOutOfStock'] ?? false;
-        
+
         // Play success sound and vibration
         _playSound('success');
         HapticFeedback.lightImpact();
-        
+
         setState(() {
           _lastScannedBarcode = barcode;
           // CRITICAL: Only increment count if item was actually added to tally
           // Don't increment for items not in expected list
           _scannedCount++;
-          _lastResult = isOutOfStock 
-              ? '⚠️ Out of stock - weight excluded' 
+          _lastResult = isOutOfStock
+              ? '⚠️ Out of stock - weight excluded'
               : '✓ Item scanned successfully';
           _resultColor = isOutOfStock ? Colors.orange : Colors.green;
         });
@@ -210,12 +215,12 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 
         // Reload tally info to get updated weights and counts
         print('Reloading tally info after scan...');
-        
+
         // Add delay to ensure database has updated
         await Future.delayed(const Duration(milliseconds: 800));
-        
+
         await _loadTallyInfo();
-        
+
         // Force provider to notify all listeners (updates parent page immediately)
         tallyProvider.notifyListeners();
         print('Tally reloaded: $_scannedCount / $_totalItems');
@@ -235,14 +240,15 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
         // API returned error or null
         print('[SCAN] ✗ API returned error/null for barcode: $barcode');
         print('[SCAN] Provider error: ${tallyProvider.error}');
-        
+
         // Check if it's an out-of-stock item (warning) or other error
-        final isOutOfStockWarning = tallyProvider.error?.contains('sold') == true ||
-                                     tallyProvider.error?.contains('repair') == true ||
-                                     tallyProvider.error?.contains('customer') == true ||
-                                     tallyProvider.error?.contains('out of stock') == true ||
-                                     tallyProvider.error?.contains('deleted') == true;
-        
+        final isOutOfStockWarning =
+            tallyProvider.error?.contains('sold') == true ||
+                tallyProvider.error?.contains('repair') == true ||
+                tallyProvider.error?.contains('customer') == true ||
+                tallyProvider.error?.contains('out of stock') == true ||
+                tallyProvider.error?.contains('deleted') == true;
+
         // Play appropriate sound
         if (isOutOfStockWarning) {
           _playSound('error'); // Could add a separate warning sound
@@ -251,10 +257,11 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
           _playSound('error');
           HapticFeedback.vibrate();
         }
-        
+
         setState(() {
           _lastScannedBarcode = barcode;
-          _lastResult = tallyProvider.error ?? '✗ Scan failed - please try again';
+          _lastResult =
+              tallyProvider.error ?? '✗ Scan failed - please try again';
           _resultColor = isOutOfStockWarning ? Colors.orange : Colors.red;
         });
 
@@ -270,9 +277,11 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 
         // Show error snackbar
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text(tallyProvider.error ?? 'Failed to save scan. Please try again.'),
+              content: Text(tallyProvider.error ??
+                  'Failed to save scan. Please try again.'),
               backgroundColor: isOutOfStockWarning ? Colors.orange : Colors.red,
               duration: const Duration(seconds: 3),
             ),
@@ -283,11 +292,11 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       }
     } catch (e) {
       print('[SCAN] ✗ EXCEPTION during scan: $e');
-      
+
       // Play error sound and vibration
       _playSound('error');
       HapticFeedback.vibrate();
-      
+
       setState(() {
         _lastScannedBarcode = barcode;
         _lastResult = '✗ Error: ${e.toString()}';
@@ -295,7 +304,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Scan error: ${e.toString()}'),
             backgroundColor: Colors.red,
@@ -315,7 +325,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('🎉 Tally Complete!'),
-        content: const Text('All items have been scanned. Would you like to lock the tally?'),
+        content: const Text(
+            'All items have been scanned. Would you like to lock the tally?'),
         actions: [
           TextButton(
             onPressed: () {
@@ -368,7 +379,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                     }
                   },
                 ),
-                _LiveScanOverlay(scanWindow: scanWindow, isProcessing: _isProcessing),
+                _LiveScanOverlay(
+                    scanWindow: scanWindow, isProcessing: _isProcessing),
               ]);
             },
           ),
@@ -396,7 +408,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                     Row(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.search, color: Colors.white.withOpacity(0.8)),
+                          icon: Icon(Icons.search,
+                              color: Colors.white.withOpacity(0.8)),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                         const Expanded(
@@ -412,7 +425,9 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                         ),
                         IconButton(
                           icon: Icon(
-                            cameraController.torchEnabled ? Icons.flash_on : Icons.flash_off,
+                            cameraController.torchEnabled
+                                ? Icons.flash_on
+                                : Icons.flash_off,
                             color: Colors.white,
                           ),
                           onPressed: () => cameraController.toggleTorch(),
@@ -442,9 +457,9 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Redesigned barcode input - pill shape with better styling
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -540,7 +555,6 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
             ),
           ),
 
-
           // Enhanced scan result feedback at bottom
           if (_lastResult != null)
             Positioned(
@@ -567,7 +581,8 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -579,11 +594,11 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        _resultColor == Colors.green 
-                          ? Icons.check_circle 
-                          : _resultColor == Colors.orange
-                            ? Icons.warning
-                            : Icons.error,
+                        _resultColor == Colors.green
+                            ? Icons.check_circle
+                            : _resultColor == Colors.orange
+                                ? Icons.warning
+                                : Icons.error,
                         color: Colors.white,
                         size: 48,
                       ),
@@ -631,13 +646,15 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 class _LiveScanOverlay extends StatelessWidget {
   final Rect scanWindow;
   final bool isProcessing;
-  const _LiveScanOverlay({required this.scanWindow, required this.isProcessing});
+  const _LiveScanOverlay(
+      {required this.scanWindow, required this.isProcessing});
 
   @override
   Widget build(BuildContext context) => CustomPaint(
-    size: Size.infinite,
-    painter: _LiveScanPainter(scanWindow: scanWindow, isProcessing: isProcessing),
-  );
+        size: Size.infinite,
+        painter: _LiveScanPainter(
+            scanWindow: scanWindow, isProcessing: isProcessing),
+      );
 }
 
 class _LiveScanPainter extends CustomPainter {
@@ -672,16 +689,20 @@ class _LiveScanPainter extends CustomPainter {
 
     canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
     canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
+    canvas.drawArc(
+        Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
     canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
     canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2,
+        3.14159 / 2, false, p);
     canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
     canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2,
+        3.14159 / 2, false, p);
     canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
     canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0,
+        3.14159 / 2, false, p);
   }
 
   @override

@@ -70,7 +70,8 @@ class _BarcodeScannerForAssignmentState
               const boxW = 280.0;
               const boxH = 180.0;
               final scanWindow = Rect.fromCenter(
-                center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                center:
+                    Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
                 width: boxW,
                 height: boxH,
               );
@@ -92,8 +93,7 @@ class _BarcodeScannerForAssignmentState
             right: 0,
             child: SafeArea(
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -264,9 +264,9 @@ class _AssignScanOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CustomPaint(
-    size: Size.infinite,
-    painter: _AssignScanPainter(scanWindow: scanWindow, scanned: scanned),
-  );
+        size: Size.infinite,
+        painter: _AssignScanPainter(scanWindow: scanWindow, scanned: scanned),
+      );
 }
 
 class _AssignScanPainter extends CustomPainter {
@@ -307,16 +307,20 @@ class _AssignScanPainter extends CustomPainter {
 
     canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
     canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
+    canvas.drawArc(
+        Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
     canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
     canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2,
+        3.14159 / 2, false, p);
     canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
     canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2,
+        3.14159 / 2, false, p);
     canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
     canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0, 3.14159 / 2, false, p);
+    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0,
+        3.14159 / 2, false, p);
   }
 
   @override

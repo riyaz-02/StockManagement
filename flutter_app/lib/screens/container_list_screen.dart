@@ -12,6 +12,7 @@ import '../utils/app_constants.dart';
 import 'recycle_bin_screen.dart';
 
 import 'edit_container_screen.dart';
+import '../utils/app_toast.dart';
 
 class ContainerListScreen extends StatefulWidget {
   const ContainerListScreen({super.key});
@@ -20,12 +21,13 @@ class ContainerListScreen extends StatefulWidget {
   State<ContainerListScreen> createState() => _ContainerListScreenState();
 }
 
-class _ContainerListScreenState extends State<ContainerListScreen> with AutomaticKeepAliveClientMixin {
+class _ContainerListScreenState extends State<ContainerListScreen>
+    with AutomaticKeepAliveClientMixin {
   String _statusFilter = 'all';
-  
+
   @override
   bool get wantKeepAlive => true;
-  
+
   @override
   void initState() {
     super.initState();
@@ -41,7 +43,7 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
@@ -105,239 +107,270 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
           ),
           Expanded(
             child: Consumer<ContainerProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (provider.error != null && provider.containers.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error: ${provider.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.fetchContainers(),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (provider.containers.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No containers found',
-                    style: const TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tap + to add a container',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            key: const PageStorageKey<String>('containersListView'),
-            padding: const EdgeInsets.all(16),
-            itemCount: _filterContainers(provider.containers).length,
-            itemBuilder: (context, index) {
-              final container = _filterContainers(provider.containers)[index];
-              // Use specific colors for status
-              Color statusColor = Colors.grey;
-              String statusText = 'INACTIVE';
-              
-              if (container.isActive) {
-                if (container.isLocked) {
-                  statusColor = Colors.orange;
-                  statusText = 'LOCKED';
-                } else {
-                  statusColor = Colors.green;
-                  statusText = 'ACTIVE';
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-              }
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                     Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ContainerViewScreen(container: container),
-                      ),
-                    ).then((_) => _refreshContainers());
-                  },
-                  onLongPress: () {
-                    _showContainerOptions(context, container);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                if (provider.error != null && provider.containers.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 1. Container Image (Placeholder)
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: statusColor.withOpacity(0.3)),
-                            image: (container.image != null && container.image!.isNotEmpty)
-                                ? DecorationImage(
-                                    image: NetworkImage(
-                                      container.image!.startsWith('http') 
-                                        ? container.image! 
-                                        : '${AppConstants.baseUrl}${container.image}'
-                                    ),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                              child: (container.image == null || container.image!.isEmpty)
-                              ? Icon(
-                                  container.isLocked ? Icons.lock : Icons.inventory_2,
-                                  size: 30,
-                                  color: statusColor,
-                                )
-                              : null,
+                        const Icon(Icons.error_outline,
+                            size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text('Error: ${provider.error}'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => provider.fetchContainers(),
+                          child: const Text('Retry'),
                         ),
-                        const SizedBox(width: 16),
-                        
-                        // 2. Details Column
-                        Expanded(
-                          child: Column(
+                      ],
+                    ),
+                  );
+                }
+
+                if (provider.containers.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.inventory_2_outlined,
+                            size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No containers found',
+                          style:
+                              const TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Tap + to add a container',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  key: const PageStorageKey<String>('containersListView'),
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _filterContainers(provider.containers).length,
+                  itemBuilder: (context, index) {
+                    final container =
+                        _filterContainers(provider.containers)[index];
+                    // Use specific colors for status
+                    Color statusColor = Colors.grey;
+                    String statusText = 'INACTIVE';
+
+                    if (container.isActive) {
+                      if (container.isLocked) {
+                        statusColor = Colors.orange;
+                        statusText = 'LOCKED';
+                      } else {
+                        statusColor = Colors.green;
+                        statusText = 'ACTIVE';
+                      }
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ContainerViewScreen(container: container),
+                            ),
+                          ).then((_) => _refreshContainers());
+                        },
+                        onLongPress: () {
+                          _showContainerOptions(context, container);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Name and Type Row
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          container.name,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          container.qrCode ?? container.id.substring(0, 8),
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12,
-                                            fontFamily: 'monospace',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      container.type.toUpperCase(),
-                                      style: const TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
+                              // 1. Container Image (Placeholder)
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: statusColor.withOpacity(0.3)),
+                                  image: (container.image != null &&
+                                          container.image!.isNotEmpty)
+                                      ? DecorationImage(
+                                          image: NetworkImage(container.image!
+                                                  .startsWith('http')
+                                              ? container.image!
+                                              : '${AppConstants.baseUrl}${container.image}'),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                ),
+                                child: (container.image == null ||
+                                        container.image!.isEmpty)
+                                    ? Icon(
+                                        container.isLocked
+                                            ? Icons.lock
+                                            : Icons.inventory_2,
+                                        size: 30,
+                                        color: statusColor,
+                                      )
+                                    : null,
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(width: 16),
 
-                              // Stats Row
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // Slots Info
-                                  Row(
-                                    children: [
-                                      Icon(Icons.grid_view, size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${container.availableSlots}/${container.capacity} Avl',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
-                                  ),
-                                  // Status Badge
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: statusColor.withOpacity(0.5)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                              // 2. Details Column
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Name and Type Row
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Icon(
-                                          container.isLocked ? Icons.lock : (container.isActive ? Icons.check_circle : Icons.cancel),
-                                          size: 12,
-                                          color: statusColor,
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                container.name,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                container.qrCode ??
+                                                    container.id
+                                                        .substring(0, 8),
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                  fontFamily: 'monospace',
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          statusText,
-                                          style: TextStyle(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            container.type.toUpperCase(),
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.blue,
+                                                fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 8),
+
+                                    // Stats Row
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Slots Info
+                                        Row(
+                                          children: [
+                                            Icon(Icons.grid_view,
+                                                size: 14,
+                                                color: Colors.grey[600]),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${container.availableSlots}/${container.capacity} Avl',
+                                              style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
+                                        ),
+                                        // Status Badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            border: Border.all(
+                                                color: statusColor
+                                                    .withOpacity(0.5)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                container.isLocked
+                                                    ? Icons.lock
+                                                    : (container.isActive
+                                                        ? Icons.check_circle
+                                                        : Icons.cancel),
+                                                size: 12,
+                                                color: statusColor,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                statusText,
+                                                style: TextStyle(
+                                                  color: statusColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -363,7 +396,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
           color: isSelected ? null : Colors.grey[100],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
+            color:
+                isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -379,9 +413,10 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
     );
   }
 
-  List<models.ItemContainer> _filterContainers(List<models.ItemContainer> containers) {
+  List<models.ItemContainer> _filterContainers(
+      List<models.ItemContainer> containers) {
     if (_statusFilter == 'all') return containers;
-    
+
     return containers.where((container) {
       switch (_statusFilter) {
         case 'active':
@@ -396,7 +431,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
     }).toList();
   }
 
-  void _showContainerOptions(BuildContext context, models.ItemContainer container) {
+  void _showContainerOptions(
+      BuildContext context, models.ItemContainer container) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -410,7 +446,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
             children: [
               Text(
                 container.name,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Divider(),
@@ -422,7 +459,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ContainerViewScreen(container: container),
+                      builder: (context) =>
+                          ContainerViewScreen(container: container),
                     ),
                   ).then((_) => _refreshContainers());
                 },
@@ -447,7 +485,8 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => EditContainerScreen(container: container),
+                      builder: (context) =>
+                          EditContainerScreen(container: container),
                     ),
                   ).then((_) => _refreshContainers());
                 },
@@ -463,32 +502,37 @@ class _ContainerListScreenState extends State<ContainerListScreen> with Automati
                       title: const Text('Move to Trash?'),
                       content: const Text('Delete this container?'),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
                         TextButton(
-                           onPressed: () => Navigator.pop(ctx, true), 
-                           style: TextButton.styleFrom(foregroundColor: Colors.red),
-                           child: const Text('Delete'),
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style:
+                              TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Delete'),
                         ),
                       ],
                     ),
                   );
 
                   if (confirm == true && mounted) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    final provider = Provider.of<ContainerProvider>(context, listen: false);
-                    final success = await provider.deleteContainer(container.id);
-                    
+                    final provider =
+                        Provider.of<ContainerProvider>(context, listen: false);
+                    final success =
+                        await provider.deleteContainer(container.id);
+
                     if (success) {
-                       _refreshContainers(); // Refresh after successful delete
+                      _refreshContainers(); // Refresh after successful delete
                     } else {
-                       if (mounted && provider.error != null) {
-                         messenger.showSnackBar(
-                           SnackBar(
-                             content: Text(provider.error!),
-                             backgroundColor: Colors.red,
-                           ),
-                         );
-                       }
+                      if (mounted && provider.error != null) {
+                        showAppSnackBar(
+                          context,
+                          SnackBar(
+                            content: Text(provider.error!),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     }
                   }
                 },

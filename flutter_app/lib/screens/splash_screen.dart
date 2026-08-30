@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:jewellery_stock_app/providers/auth_provider.dart';
 import 'package:jewellery_stock_app/providers/language_provider.dart';
 import 'package:jewellery_stock_app/screens/login_screen.dart';
 import 'package:jewellery_stock_app/screens/main_navigation_screen.dart';
 import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
+import 'package:jewellery_stock_app/services/api_service.dart';
+import 'package:jewellery_stock_app/models/app_version_model.dart';
+import 'package:jewellery_stock_app/widgets/update_dialog.dart';
 import 'package:jewellery_stock_app/utils/app_constants.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,10 +21,12 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  String _appVersionText = '';
 
   @override
   void initState() {
@@ -56,12 +63,45 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
+  Future<void> _loadAppVersionText() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersionText = 'Version ${packageInfo.version}');
+      }
+    } catch (_) {
+      // Keep the blank fallback — non-critical display text.
+    }
+  }
+
+  /// Checks the backend-controlled app version and shows the update dialog
+  /// if a newer build is available. Never throws — a failed check should
+  /// never block someone from using the app.
+  Future<void> _checkForUpdate() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+
+      final response = await ApiService().getAppVersion();
+      if (response['success'] != true) return;
+
+      final config = AppVersionConfig.fromJson(response['data']['appVersion']);
+      if (config.latestVersionCode > currentBuildNumber && mounted) {
+        await showUpdateDialog(context, config);
+      }
+    } catch (_) {
+      // Ignore — update check is best-effort.
+    }
+  }
+
   Future<void> _initialize() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final languageProvider =
+        Provider.of<LanguageProvider>(context, listen: false);
 
     // Initialize language (local, fast) and check server in parallel with splash delay
     await languageProvider.initialize();
+    unawaited(_loadAppVersionText());
 
     final results = await Future.wait([
       _isServerOnline(),
@@ -83,6 +123,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       return;
     }
 
+    // Server is online — check for a mandatory/optional update before
+    // letting the user any further into the app.
+    await _checkForUpdate();
+    if (!mounted) return;
+
     // Server is online — check auth token
     await authProvider.initialize();
     if (!mounted) return;
@@ -97,7 +142,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +222,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   },
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Glassmorphism Loading Card
                 FadeTransition(
                   opacity: _fadeAnimation,
@@ -187,7 +231,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 14),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -251,14 +296,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           color: Colors.grey[500],
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Version 1.2.0',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[400],
+                      if (_appVersionText.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          _appVersionText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[400],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

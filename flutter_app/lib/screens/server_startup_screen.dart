@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -25,6 +27,7 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
   int _pollCount = 0;
   static const int _maxPolls = 36; // 36 × 5s = 3 minutes max
   Timer? _pollTimer;
+  String _appVersionText = '';
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -42,6 +45,18 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadAppVersionText();
+  }
+
+  Future<void> _loadAppVersionText() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersionText = 'Version ${packageInfo.version}');
+      }
+    } catch (_) {
+      // Keep the blank fallback — non-critical display text.
+    }
   }
 
   @override
@@ -85,7 +100,8 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
         _pollTimer?.cancel();
         setState(() {
           _state = _ServerState.error;
-          _statusMessage = 'সার্ভার চালু করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।';
+          _statusMessage =
+              'সার্ভার চালু করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।';
         });
       } else {
         final secondsWaited = _pollCount * 5;
@@ -97,6 +113,22 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
     });
   }
 
+  void _applyLambdaBackendUrl(http.Response response) {
+    if (response.body.trim().isEmpty) return;
+
+    try {
+      final body = json.decode(response.body);
+      if (body is! Map<String, dynamic>) return;
+
+      final apiUrl = body['apiUrl'] ?? body['baseUrl'] ?? body['backendUrl'];
+      if (apiUrl is String && apiUrl.trim().isNotEmpty) {
+        AppConstants.setRuntimeProductionUrl(apiUrl);
+      }
+    } catch (_) {
+      // Older Lambda versions may return plain text. Startup polling still works.
+    }
+  }
+
   // ── Call Lambda to start EC2 ──────────────────────────────────────────────
   Future<void> _startServer() async {
     setState(() {
@@ -106,11 +138,10 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
     });
 
     try {
-      // Fire and forget — Lambda may take 25-30s to respond, we don't wait
-      http
+      final response = await http
           .get(Uri.parse(AppConstants.lambdaStartUrl))
-          .timeout(const Duration(seconds: 35))
-          .catchError((_) => http.Response('', 200)); // ignore Lambda timeout
+          .timeout(const Duration(seconds: 35));
+      _applyLambdaBackendUrl(response);
     } catch (_) {
       // Ignore — Lambda may time out before EC2 finishes starting
     }
@@ -147,9 +178,11 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
         children: [
           // ── Background decorations (matching splash screen) ──
           Positioned(
-            right: -100, top: -100,
+            right: -100,
+            top: -100,
             child: Container(
-              width: 280, height: 280,
+              width: 280,
+              height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _primary.withOpacity(0.10),
@@ -157,9 +190,11 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
             ),
           ),
           Positioned(
-            left: -80, bottom: -80,
+            left: -80,
+            bottom: -80,
             child: Container(
-              width: 220, height: 220,
+              width: 220,
+              height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFF667EEA).withOpacity(0.08),
@@ -167,9 +202,11 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
             ),
           ),
           Positioned(
-            right: 5, top: 5,
+            right: 5,
+            top: 5,
             child: Container(
-              width: 130, height: 130,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFFF6B9D).withOpacity(0.08),
@@ -277,11 +314,13 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
                   '© Laltu Guinea Palace',
                   style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Version 1.2.0',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[300]),
-                ),
+                if (_appVersionText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _appVersionText,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[300]),
+                  ),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
@@ -316,8 +355,8 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
               shape: BoxShape.circle,
               color: _primary.withOpacity(0.12),
             ),
-            child: const Icon(Icons.cloud_off_rounded,
-                color: _primary, size: 32),
+            child:
+                const Icon(Icons.cloud_off_rounded, color: _primary, size: 32),
           ),
         );
 

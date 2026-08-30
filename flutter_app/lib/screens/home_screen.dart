@@ -118,10 +118,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final logoHeight = constraints.maxWidth > 600 ? 70.0 : 60.0;
-                          final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          
+                          final logoHeight =
+                              constraints.maxWidth > 600 ? 70.0 : 60.0;
+                          final days = [
+                            'Sunday',
+                            'Monday',
+                            'Tuesday',
+                            'Wednesday',
+                            'Thursday',
+                            'Friday',
+                            'Saturday'
+                          ];
+                          final months = [
+                            'Jan',
+                            'Feb',
+                            'Mar',
+                            'Apr',
+                            'May',
+                            'Jun',
+                            'Jul',
+                            'Aug',
+                            'Sep',
+                            'Oct',
+                            'Nov',
+                            'Dec'
+                          ];
+
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -142,10 +164,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(20),
                                 child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                                  filter:
+                                      ImageFilter.blur(sigmaX: 3, sigmaY: 3),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 10),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
@@ -157,7 +181,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       ),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: const Color(0xFFE94560).withOpacity(0.3),
+                                        color: const Color(0xFFE94560)
+                                            .withOpacity(0.3),
                                         width: 1.5,
                                       ),
                                       boxShadow: [
@@ -169,19 +194,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       ],
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         // Gradient Icon
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
                                             gradient: const LinearGradient(
-                                              colors: [Color(0xFFE94560), Color(0xFFFF6B9D)],
+                                              colors: [
+                                                Color(0xFFE94560),
+                                                Color(0xFFFF6B9D)
+                                              ],
                                             ),
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: const Color(0xFFE94560).withOpacity(0.3),
+                                                color: const Color(0xFFE94560)
+                                                    .withOpacity(0.3),
                                                 blurRadius: 8,
                                                 offset: const Offset(0, 3),
                                               ),
@@ -197,18 +228,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         // Text Content
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Consumer<LanguageProvider>(
-                                                builder: (context, languageProvider, child) => Text(
+                                                builder: (context,
+                                                        languageProvider,
+                                                        child) =>
+                                                    Text(
                                                   '${languageProvider.t('welcome_back')} ${user?.name ?? 'User'}',
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w700,
                                                     color: Color(0xFF1A1A1A),
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   maxLines: 1,
                                                 ),
                                               ),
@@ -244,7 +280,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.logout, color: Color(0xFFE94560), size: 24),
+                icon: const Icon(Icons.logout,
+                    color: Color(0xFFE94560), size: 24),
                 onPressed: () async {
                   await authProvider.logout();
                   if (context.mounted) {
@@ -269,11 +306,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   // Feature Cards Grid (removed section header)
                   const SizedBox(height: 0),
                   const Text(
-                        '',
-                        style: TextStyle(
-                          fontSize: 0,
-                        ),
-                      ),
+                    '',
+                    style: TextStyle(
+                      fontSize: 0,
+                    ),
+                  ),
 
                   // Feature Cards Grid - Auto-sizing based on content
                   Wrap(
@@ -281,9 +318,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     runSpacing: 16,
                     children: [
                       SizedBox(
-                        width: (MediaQuery.of(context).size.width - 56) / 2, // Half width minus padding
+                        width: (MediaQuery.of(context).size.width - 56) /
+                            2, // Half width minus padding
                         child: Consumer<LanguageProvider>(
-                          builder: (context, languageProvider, child) => _ElegantCard(
+                          builder: (context, languageProvider, child) =>
+                              _ElegantCard(
                             icon: Icons.qr_code_scanner,
                             title: languageProvider.t('scan_item'),
                             description: languageProvider.t('scan_barcode'),
@@ -292,7 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const GeneralScanScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const GeneralScanScreen()),
                               );
                             },
                           ),
@@ -301,7 +341,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SizedBox(
                         width: (MediaQuery.of(context).size.width - 56) / 2,
                         child: Consumer<LanguageProvider>(
-                          builder: (context, languageProvider, child) => _ElegantCard(
+                          builder: (context, languageProvider, child) =>
+                              _ElegantCard(
                             icon: Icons.inventory_2_rounded,
                             title: languageProvider.t('items'),
                             description: languageProvider.t('view_all_items'),
@@ -309,7 +350,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFF38EF7D),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const ItemListScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const ItemListScreen()),
                             ),
                           ),
                         ),
@@ -317,7 +359,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SizedBox(
                         width: (MediaQuery.of(context).size.width - 56) / 2,
                         child: Consumer<LanguageProvider>(
-                          builder: (context, languageProvider, child) => _ElegantCard(
+                          builder: (context, languageProvider, child) =>
+                              _ElegantCard(
                             icon: Icons.widgets_rounded,
                             title: languageProvider.t('containers'),
                             description: languageProvider.t('manage_storage'),
@@ -325,7 +368,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFF4A00E0),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const ContainerListScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const ContainerListScreen()),
                             ),
                           ),
                         ),
@@ -333,7 +377,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SizedBox(
                         width: (MediaQuery.of(context).size.width - 56) / 2,
                         child: Consumer<LanguageProvider>(
-                          builder: (context, languageProvider, child) => _ElegantCard(
+                          builder: (context, languageProvider, child) =>
+                              _ElegantCard(
                             icon: Icons.assessment_rounded,
                             title: languageProvider.t('start_tally'),
                             description: languageProvider.t('verify_inventory'),
@@ -341,7 +386,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFFEE5A6F),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const TallyListScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const TallyListScreen()),
                             ),
                           ),
                         ),
@@ -349,7 +395,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SizedBox(
                         width: (MediaQuery.of(context).size.width - 56) / 2,
                         child: Consumer<LanguageProvider>(
-                          builder: (context, languageProvider, child) => _ElegantCard(
+                          builder: (context, languageProvider, child) =>
+                              _ElegantCard(
                             icon: Icons.receipt_long_rounded,
                             title: languageProvider.t('bookings'),
                             description: languageProvider.t('customer_orders'),
@@ -357,7 +404,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFF92FE9D),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const BookingListScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const BookingListScreen()),
                             ),
                           ),
                         ),
@@ -372,7 +420,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           secondaryColor: const Color(0xFFF5576C),
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const ReportsScreen()),
                           ),
                         ),
                       ),
@@ -413,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-          
+
           // Bottom padding for navigation bar
           SliverPadding(
             padding: const EdgeInsets.only(bottom: 70),
@@ -445,7 +494,8 @@ class _ElegantCard extends StatefulWidget {
   State<_ElegantCard> createState() => _ElegantCardState();
 }
 
-class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderStateMixin {
+class _ElegantCardState extends State<_ElegantCard>
+    with SingleTickerProviderStateMixin {
   bool _isPressed = false;
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -525,14 +575,14 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                     ),
                   ),
                 ),
-                
+
                 // Content
                 LayoutBuilder(
                   builder: (context, constraints) {
                     // Calculate responsive sizes based on card width
                     final cardWidth = constraints.maxWidth;
                     final isSmallScreen = cardWidth < 170;
-                    
+
                     // Responsive sizes - more aggressive reduction for small screens
                     final padding = isSmallScreen ? 8.0 : 14.0;
                     final iconSize = isSmallScreen ? 36.0 : 46.0;
@@ -542,7 +592,7 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                     final titleFontSize = isSmallScreen ? 13.0 : 15.5;
                     final spacingAfterTitle = isSmallScreen ? 2.0 : 3.0;
                     final descriptionFontSize = isSmallScreen ? 9.5 : 11.0;
-                    
+
                     return Padding(
                       padding: EdgeInsets.fromLTRB(
                         padding + 4, // Extra left padding
@@ -563,14 +613,19 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                                 height: iconSize,
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [widget.primaryColor, widget.secondaryColor],
+                                    colors: [
+                                      widget.primaryColor,
+                                      widget.secondaryColor
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
-                                  borderRadius: BorderRadius.circular(iconRadius),
+                                  borderRadius:
+                                      BorderRadius.circular(iconRadius),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: widget.primaryColor.withOpacity(0.3),
+                                      color:
+                                          widget.primaryColor.withOpacity(0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -583,7 +638,7 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                                 ),
                               ),
                               SizedBox(height: spacingAfterIcon),
-                              
+
                               // Title - flexible to prevent overflow
                               Flexible(
                                 child: Text(
@@ -599,7 +654,7 @@ class _ElegantCardState extends State<_ElegantCard> with SingleTickerProviderSta
                                 ),
                               ),
                               SizedBox(height: spacingAfterTitle),
-                              
+
                               // Description - flexible to prevent overflow
                               Flexible(
                                 child: Text(

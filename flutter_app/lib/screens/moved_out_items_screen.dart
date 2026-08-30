@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../utils/app_constants.dart';
 import '../models/item_model.dart';
 import 'item_details_screen.dart';
+import '../utils/app_toast.dart';
 
 class MovedOutItemsScreen extends StatefulWidget {
   const MovedOutItemsScreen({Key? key}) : super(key: key);
@@ -35,7 +36,8 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text('Error loading items: $e')),
       );
     }
@@ -43,17 +45,20 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
 
   List<dynamic> get _filteredMovements {
     if (_selectedFilter == 'ALL') return _movements;
-    return _movements.where((m) => m['movementType'] == _selectedFilter).toList();
+    return _movements
+        .where((m) => m['movementType'] == _selectedFilter)
+        .toList();
   }
 
   List<dynamic> get _repairMovements =>
       _movements.where((m) => m['movementType'] == 'REPAIR').toList();
-  
+
   List<dynamic> get _customerMovements =>
       _movements.where((m) => m['movementType'] == 'CUSTOMER_TRIAL').toList();
-  
-  List<dynamic> get _agentMovements =>
-      _movements.where((m) => m['movementType'] == 'AGENT_CONSIGNMENT').toList();
+
+  List<dynamic> get _agentMovements => _movements
+      .where((m) => m['movementType'] == 'AGENT_CONSIGNMENT')
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -86,13 +91,17 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _buildFilterChip('ALL', Icons.all_inclusive, _movements.length),
+                              _buildFilterChip('ALL', Icons.all_inclusive,
+                                  _movements.length),
                               const SizedBox(width: 8),
-                              _buildFilterChip('REPAIR', Icons.build, _repairMovements.length),
+                              _buildFilterChip('REPAIR', Icons.build,
+                                  _repairMovements.length),
                               const SizedBox(width: 8),
-                              _buildFilterChip('CUSTOMER_TRIAL', Icons.person, _customerMovements.length),
+                              _buildFilterChip('CUSTOMER_TRIAL', Icons.person,
+                                  _customerMovements.length),
                               const SizedBox(width: 8),
-                              _buildFilterChip('AGENT_CONSIGNMENT', Icons.store, _agentMovements.length),
+                              _buildFilterChip('AGENT_CONSIGNMENT', Icons.store,
+                                  _agentMovements.length),
                             ],
                           ),
                         ),
@@ -101,16 +110,21 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                       // Categorized Lists
                       if (_selectedFilter == 'ALL') ...[
                         if (_repairMovements.isNotEmpty)
-                          _buildCategorySection('🔧 Under Repair', _repairMovements, Colors.orange),
+                          _buildCategorySection('🔧 Under Repair',
+                              _repairMovements, Colors.orange),
                         if (_customerMovements.isNotEmpty)
-                          _buildCategorySection('👤 With Customer', _customerMovements, Colors.blue),
+                          _buildCategorySection('👤 With Customer',
+                              _customerMovements, Colors.blue),
                         if (_agentMovements.isNotEmpty)
-                          _buildCategorySection('🏪 With Agent', _agentMovements, Colors.purple),
+                          _buildCategorySection(
+                              '🏪 With Agent', _agentMovements, Colors.purple),
                       ] else
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
-                            children: _filteredMovements.map((m) => _buildMovementCard(m)).toList(),
+                            children: _filteredMovements
+                                .map((m) => _buildMovementCard(m))
+                                .toList(),
                           ),
                         ),
                     ],
@@ -138,7 +152,8 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
           color: isSelected ? null : Colors.grey[100],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
+            color:
+                isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -164,7 +179,9 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withOpacity(0.3) : const Color(0xFFE94560).withOpacity(0.1),
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.3)
+                      : const Color(0xFFE94560).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -183,7 +200,8 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
     );
   }
 
-  Widget _buildCategorySection(String title, List<dynamic> movements, Color color) {
+  Widget _buildCategorySection(
+      String title, List<dynamic> movements, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,7 +220,8 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
               const SizedBox(width: 8),
               Text(
                 '$title (${movements.length})',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -223,8 +242,9 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
     if (item == null) return const SizedBox.shrink();
 
     final outDate = movement['outDate']?.toString().split('T')[0] ?? 'N/A';
-    final expectedReturn = movement['expectedReturnDate']?.toString().split('T')[0] ?? 'N/A';
-    
+    final expectedReturn =
+        movement['expectedReturnDate']?.toString().split('T')[0] ?? 'N/A';
+
     // Check if overdue
     final isOverdue = movement['expectedReturnDate'] != null &&
         DateTime.parse(movement['expectedReturnDate']).isBefore(DateTime.now());
@@ -232,7 +252,7 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
     // Get who has it
     String whoHasIt = '';
     String contactInfo = '';
-    
+
     if (movement['movementType'] == 'REPAIR') {
       whoHasIt = movement['givenTo'] ?? 'Unknown';
       if (movement['repairType'] != null) contactInfo = movement['repairType'];
@@ -256,12 +276,14 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ItemDetailsScreen(item: Item.fromJson(itemData)),
+                  builder: (_) =>
+                      ItemDetailsScreen(item: Item.fromJson(itemData)),
                 ),
               ).then((_) => _loadMovedOutItems());
             }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               SnackBar(content: Text('Error loading item: $e')),
             );
           }
@@ -273,7 +295,8 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
               // Item Image
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: item['images'] != null && (item['images'] as List).isNotEmpty
+                child: item['images'] != null &&
+                        (item['images'] as List).isNotEmpty
                     ? Image.network(
                         item['images'][0].startsWith('http')
                             ? item['images'][0]
@@ -296,7 +319,7 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                       ),
               ),
               const SizedBox(width: 12),
-              
+
               // Item Details
               Expanded(
                 child: Column(
@@ -307,19 +330,24 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                         Expanded(
                           child: Text(
                             item['name'] ?? 'Unknown Item',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                         ),
                         if (isOverdue)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.red,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
                               'OVERDUE',
-                              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                       ],
@@ -333,9 +361,11 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                     Row(
                       children: [
                         Icon(
-                          movement['movementType'] == 'REPAIR' ? Icons.build :
-                          movement['movementType'] == 'CUSTOMER_TRIAL' ? Icons.person :
-                          Icons.store,
+                          movement['movementType'] == 'REPAIR'
+                              ? Icons.build
+                              : movement['movementType'] == 'CUSTOMER_TRIAL'
+                                  ? Icons.person
+                                  : Icons.store,
                           size: 14,
                           color: Colors.grey[600],
                         ),
@@ -343,7 +373,10 @@ class _MovedOutItemsScreenState extends State<MovedOutItemsScreen> {
                         Expanded(
                           child: Text(
                             whoHasIt,
-                            style: TextStyle(fontSize: 12, color: Colors.grey[800], fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[800],
+                                fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],

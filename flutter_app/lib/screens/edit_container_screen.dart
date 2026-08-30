@@ -11,6 +11,7 @@ import '../providers/settings_provider.dart';
 import '../utils/app_colors.dart';
 import '../models/container_model.dart';
 import '../services/api_service.dart';
+import '../utils/app_toast.dart';
 
 class EditContainerScreen extends StatefulWidget {
   final ItemContainer container;
@@ -30,7 +31,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   late TextEditingController _capacityController;
   final ImagePicker _imagePicker = ImagePicker();
   final ApiService _apiService = ApiService();
-  
+
   late String _selectedType;
   late String _selectedWeightCategory;
 
@@ -38,13 +39,13 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   late List<String> _selectedPurity;
   late String _selectedLayoutType;
   late List<String> _selectedItemTypes;
-  
+
   // Image state - Cloudinary approach
   String? _existingImageUrl; // Existing Cloudinary URL
   String? _uploadedImageUrl; // Newly uploaded Cloudinary URL
   bool _isUploadingImage = false;
   bool _isDeletingImage = false;
-  
+
   // Barcode state
   late String _generatedBarcode;
   int _barcodeSerial = 1;
@@ -54,29 +55,30 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     super.initState();
     // Initialize controllers with existing data
     _nameController = TextEditingController(text: widget.container.name);
-    _capacityController = TextEditingController(text: widget.container.capacity.toString());
-    
+    _capacityController =
+        TextEditingController(text: widget.container.capacity.toString());
+
     // Initialize state with existing data
     _selectedType = widget.container.type;
     _selectedWeightCategory = widget.container.weightCategory;
-
 
     _selectedMetalTypes = List.from(widget.container.metalType);
     _selectedPurity = List.from(widget.container.purity);
     _selectedLayoutType = widget.container.layoutType;
     _selectedItemTypes = List.from(widget.container.allowedItemTypes);
     _generatedBarcode = widget.container.qrCode ?? '';
-    
+
     // Initialize existing image URL
     _existingImageUrl = widget.container.image;
-    
+
     // Attempt to extract serial from barcode if possible, or just default to 1
     // Logic: if barcode is "R12", serial is 12.
     _extractSerialFromBarcode();
-    
+
     // Fetch settings
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
       settingsProvider.fetchContainerSettings();
       settingsProvider.fetchItemSettings();
     });
@@ -124,7 +126,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              leading:
+                  const Icon(Icons.photo_library, color: AppColors.primary),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -143,15 +146,16 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image == null) return;
 
       setState(() => _isUploadingImage = true);
 
       try {
         print('[UPLOAD] Uploading container image to Cloudinary...');
-        final result = await _apiService.uploadImage(image, folder: 'containers');
-        
+        final result =
+            await _apiService.uploadImage(image, folder: 'containers');
+
         if (result['success'] == true) {
           final imageUrl = result['data']['url'];
           setState(() {
@@ -159,7 +163,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
             _isUploadingImage = false;
           });
           print('[UPLOAD] ✅ Uploaded: $imageUrl');
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showMaterialBanner(
               MaterialBanner(
@@ -168,7 +172,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                 leading: const Icon(Icons.check_circle, color: Colors.green),
                 actions: [
                   TextButton(
-                    onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                    onPressed: () => ScaffoldMessenger.of(context)
+                        .hideCurrentMaterialBanner(),
                     child: const Text('DISMISS'),
                   ),
                 ],
@@ -205,7 +210,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
 
     try {
       final deleted = await _apiService.deleteImage(imageUrl);
-      
+
       if (deleted) {
         setState(() {
           if (isExisting) {
@@ -215,7 +220,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
           }
           _isDeletingImage = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showMaterialBanner(
             MaterialBanner(
@@ -224,7 +229,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
               leading: const Icon(Icons.delete_outline, color: Colors.orange),
               actions: [
                 TextButton(
-                  onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                  onPressed: () =>
+                      ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
                   child: const Text('DISMISS'),
                 ),
               ],
@@ -245,7 +251,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
 
   Future<void> _generateBarcode() async {
     if (_selectedItemTypes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(content: Text('Select item types first')),
       );
       return;
@@ -259,7 +266,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
       prefix = 'M';
     }
 
-    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    final containerProvider =
+        Provider.of<ContainerProvider>(context, listen: false);
     _barcodeSerial = await containerProvider.getNextSerial(prefix);
 
     setState(() {
@@ -270,7 +278,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   Future<void> _updateContainer() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedItemTypes.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Please select at least one item type'),
             backgroundColor: Colors.red,
@@ -279,11 +288,12 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
         return;
       }
 
-      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
 
       // Use uploaded image URL or existing image URL
       final imageUrl = _uploadedImageUrl ?? _existingImageUrl;
-      
+
       final containerData = {
         'name': _nameController.text,
         'type': _selectedType,
@@ -297,11 +307,13 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
         if (imageUrl != null) 'image': imageUrl,
       };
 
-      final success = await containerProvider.updateContainer(widget.container.id, containerData);
+      final success = await containerProvider.updateContainer(
+          widget.container.id, containerData);
 
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Container updated successfully'),
               backgroundColor: Colors.green,
@@ -309,9 +321,11 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
           );
           Navigator.pop(context);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text(containerProvider.error ?? 'Failed to update container'),
+              content:
+                  Text(containerProvider.error ?? 'Failed to update container'),
               backgroundColor: Colors.red,
             ),
           );
@@ -328,7 +342,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    
+
     // Don't block UI on edit, just use defaults if settings not loaded yet
     // because we already have the container data to show
 
@@ -371,19 +385,23 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                         Expanded(
                           child: Builder(
                             builder: (context) {
-                              final items = settingsProvider.containerTypes.isNotEmpty
-                                  ? settingsProvider.containerTypes
-                                  : ['drawer'];
+                              final items =
+                                  settingsProvider.containerTypes.isNotEmpty
+                                      ? settingsProvider.containerTypes
+                                      : ['drawer'];
                               // If current selection isn't in list (e.g. data from DB but setting removed), add it temporarily or default
                               // For now, assume data integrity or fallback
-                              final currentItems = items.contains(_selectedType) ? items : [...items, _selectedType];
-                              
+                              final currentItems = items.contains(_selectedType)
+                                  ? items
+                                  : [...items, _selectedType];
+
                               return _buildDropdown(
                                 value: _selectedType,
                                 label: 'Type',
                                 icon: Icons.category_outlined,
                                 items: currentItems,
-                                onChanged: (val) => setState(() => _selectedType = val!),
+                                onChanged: (val) =>
+                                    setState(() => _selectedType = val!),
                               );
                             },
                           ),
@@ -397,7 +415,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                             hint: 'Slots',
                             required: true,
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
                             validator: (value) {
                               if (value?.isEmpty ?? true) return 'Required';
                               final num = int.tryParse(value!);
@@ -414,17 +434,22 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                         Expanded(
                           child: Builder(
                             builder: (context) {
-                              final items = settingsProvider.weightCategories.isNotEmpty
-                                  ? settingsProvider.weightCategories
-                                  : ['light'];
-                              final currentItems = items.contains(_selectedWeightCategory) ? items : [...items, _selectedWeightCategory];
-                              
+                              final items =
+                                  settingsProvider.weightCategories.isNotEmpty
+                                      ? settingsProvider.weightCategories
+                                      : ['light'];
+                              final currentItems =
+                                  items.contains(_selectedWeightCategory)
+                                      ? items
+                                      : [...items, _selectedWeightCategory];
+
                               return _buildDropdown(
                                 value: _selectedWeightCategory,
                                 label: 'Weight Category',
                                 icon: Icons.scale_outlined,
                                 items: currentItems,
-                                onChanged: (val) => setState(() => _selectedWeightCategory = val!),
+                                onChanged: (val) => setState(
+                                    () => _selectedWeightCategory = val!),
                               );
                             },
                           ),
@@ -433,17 +458,22 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                         Expanded(
                           child: Builder(
                             builder: (context) {
-                              final items = settingsProvider.layoutTypes.isNotEmpty
-                                  ? settingsProvider.layoutTypes
-                                  : ['grid'];
-                              final currentItems = items.contains(_selectedLayoutType) ? items : [...items, _selectedLayoutType];
+                              final items =
+                                  settingsProvider.layoutTypes.isNotEmpty
+                                      ? settingsProvider.layoutTypes
+                                      : ['grid'];
+                              final currentItems =
+                                  items.contains(_selectedLayoutType)
+                                      ? items
+                                      : [...items, _selectedLayoutType];
 
                               return _buildDropdown(
                                 value: _selectedLayoutType,
                                 label: 'Layout Type',
                                 icon: Icons.view_module_outlined,
                                 items: currentItems,
-                                onChanged: (val) => setState(() => _selectedLayoutType = val!),
+                                onChanged: (val) =>
+                                    setState(() => _selectedLayoutType = val!),
                               );
                             },
                           ),
@@ -453,21 +483,24 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                     const SizedBox(height: 12),
                     // Metal and Purity
                     const SizedBox(height: 12),
-                    
+
                     // Metal Type Section
-                    const Text('Metal Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Metal Type',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
-                      children: (settingsProvider.metalTypes.isEmpty 
-                          ? ['gold'] 
-                          : settingsProvider.metalTypes).map((type) {
+                      children: (settingsProvider.metalTypes.isEmpty
+                              ? ['gold']
+                              : settingsProvider.metalTypes)
+                          .map((type) {
                         final isSelected = _selectedMetalTypes.contains(type);
                         return FilterChip(
                           label: Text(
                             _formatText(type),
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -478,7 +511,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                               if (selected) {
                                 _selectedMetalTypes.add(type);
                               } else {
-                                if (_selectedMetalTypes.length > 1) { // Prevent empty selection
+                                if (_selectedMetalTypes.length > 1) {
+                                  // Prevent empty selection
                                   _selectedMetalTypes.remove(type);
                                 }
                               }
@@ -490,7 +524,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
-                              color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.grey[300]!,
                               width: 1.5,
                             ),
                           ),
@@ -501,19 +537,24 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                     const SizedBox(height: 12),
 
                     // Purity Section
-                    const Text('Purity (Optional)', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Purity (Optional)',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
-                      children: (['all', ...settingsProvider.purityOptions.isEmpty 
-                          ? ['916'] 
-                          : settingsProvider.purityOptions]).map((type) {
+                      children: ([
+                        'all',
+                        ...settingsProvider.purityOptions.isEmpty
+                            ? ['916']
+                            : settingsProvider.purityOptions
+                      ]).map((type) {
                         final isSelected = _selectedPurity.contains(type);
                         return FilterChip(
                           label: Text(
                             type == 'all' ? 'All' : type,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -524,7 +565,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                               if (selected) {
                                 _selectedPurity.add(type);
                               } else {
-                                if (_selectedPurity.length > 1) { // Prevent empty selection
+                                if (_selectedPurity.length > 1) {
+                                  // Prevent empty selection
                                   _selectedPurity.remove(type);
                                 }
                               }
@@ -536,7 +578,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
-                              color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.grey[300]!,
                               width: 1.5,
                             ),
                           ),
@@ -556,14 +600,16 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: (settingsProvider.itemTypes.isNotEmpty
-                          ? settingsProvider.itemTypes
-                          : ['ring']).map((type) {
+                              ? settingsProvider.itemTypes
+                              : ['ring'])
+                          .map((type) {
                         final isSelected = _selectedItemTypes.contains(type);
                         return FilterChip(
                           label: Text(
                             _formatText(type),
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -585,7 +631,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
-                              color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.grey[300]!,
                               width: 1.5,
                             ),
                           ),
@@ -599,7 +647,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                 // Image Upload Section (can modify to show existing image if url exists, but for now reuse logic)
                 _buildImagePickerSection(),
                 const SizedBox(height: 12),
-                
+
                 // Barcode Display Section
                 _buildBarcodeSection(),
                 const SizedBox(height: 16),
@@ -646,7 +694,7 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Delete Button
                 SizedBox(
                   height: 50,
@@ -689,7 +737,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Container'),
-        content: const Text('Are you sure you want to delete this container? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to delete this container? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -705,22 +754,28 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-      final success = await containerProvider.deleteContainer(widget.container.id);
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
+      final success =
+          await containerProvider.deleteContainer(widget.container.id);
 
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(content: Text('Container deleted successfully')),
           );
           // Pop twice to go back to list (once for dialog which is handled, once for screen)
           // Actually nav pop passed true/false. We need to pop screen.
           Navigator.pop(context); // Pop edit screen
-          if (Navigator.canPop(context)) Navigator.pop(context); // Pop detail screen if we came from there
+          if (Navigator.canPop(context))
+            Navigator.pop(context); // Pop detail screen if we came from there
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text(containerProvider.error ?? 'Failed to delete container'),
+              content:
+                  Text(containerProvider.error ?? 'Failed to delete container'),
               backgroundColor: Colors.red,
             ),
           );
@@ -772,7 +827,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isDefaultId ? '${barcodeData.length > 8 ? barcodeData.substring(barcodeData.length - 8) : barcodeData} (Default)' : barcodeData,
+                    isDefaultId
+                        ? '${barcodeData.length > 8 ? barcodeData.substring(barcodeData.length - 8) : barcodeData} (Default)'
+                        : barcodeData,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -786,9 +843,9 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
             ),
           ),
         ),
-        
+
         const SizedBox(height: 8),
-        
+
         // Manual change button
         OutlinedButton.icon(
           onPressed: _generateBarcode,
@@ -809,12 +866,11 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
   // ... (keeping _buildSectionCard, _buildTextField, _buildDropdown, _buildImagePickerSection as is)
   // Re-declare them here if needed to assume context, but replacing from _buildBarcodeSection down to end of class is risky if I miss helpers.
   // I will target the build method specifically where buttons are to add delete, and replace _buildBarcodeSection separately or in same chunk if possible.
-  
+
   // This replacement block is getting too complex to merge perfectly with context unless I include everything.
   // Strategy: Add _deleteContainer method at top of class (or before build), modify build to include button, modify _buildBarcodeSection.
-  
-  // Let's do partial replacements.
 
+  // Let's do partial replacements.
 
   Widget _buildSectionCard({
     required String title,
@@ -895,7 +951,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
       validator: validator ??
           (required
@@ -931,7 +988,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
       items: items.map((item) {
         return DropdownMenuItem(
@@ -998,20 +1056,23 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                   top: 4,
                   right: 4,
                   child: GestureDetector(
-                    onTap: _isDeletingImage ? null : () => _removeImage(isExisting: true),
+                    onTap: _isDeletingImage
+                        ? null
+                        : () => _removeImage(isExisting: true),
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: _isDeletingImage ? Colors.grey : Colors.red,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      child: const Icon(Icons.close,
+                          size: 16, color: Colors.white),
                     ),
                   ),
                 ),
               ],
             ),
-          
+
           // Show uploaded image
           if (hasUploadedImage)
             Stack(
@@ -1050,14 +1111,17 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                   top: 4,
                   right: 4,
                   child: GestureDetector(
-                    onTap: _isDeletingImage ? null : () => _removeImage(isExisting: false),
+                    onTap: _isDeletingImage
+                        ? null
+                        : () => _removeImage(isExisting: false),
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: _isDeletingImage ? Colors.grey : Colors.red,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      child: const Icon(Icons.close,
+                          size: 16, color: Colors.white),
                     ),
                   ),
                 ),
@@ -1089,7 +1153,8 @@ class _EditContainerScreenState extends State<EditContainerScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
+                    Icon(Icons.add_photo_alternate,
+                        color: AppColors.primary, size: 24),
                     const SizedBox(width: 8),
                     Text(
                       hasAnyImage ? 'Replace Image' : 'Add Image',

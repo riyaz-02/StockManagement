@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import 'main_navigation_screen.dart';
+import '../utils/app_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       final success = await authProvider.login(
         _mobileController.text.trim(),
         _passwordController.text,
@@ -39,12 +40,14 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text(authProvider.error ?? 'Login failed'),
             backgroundColor: const Color(0xFFE94560),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -56,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final logoHeight = screenWidth > 600 ? 80.0 : 65.0;
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -121,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                   ),
-                  
+
                   // Glassmorphism Login Card
                   Expanded(
                     child: Center(
@@ -181,35 +184,46 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   // Language Selector
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       _LanguageButton(
                                         label: 'বাংলা',
-                                        isSelected: languageProvider.currentLanguage == 'bn',
-                                        onTap: () => languageProvider.changeLanguage('bn'),
+                                        isSelected:
+                                            languageProvider.currentLanguage ==
+                                                'bn',
+                                        onTap: () => languageProvider
+                                            .changeLanguage('bn'),
                                       ),
                                       const SizedBox(width: 10),
                                       _LanguageButton(
                                         label: 'English',
-                                        isSelected: languageProvider.currentLanguage == 'en',
-                                        onTap: () => languageProvider.changeLanguage('en'),
+                                        isSelected:
+                                            languageProvider.currentLanguage ==
+                                                'en',
+                                        onTap: () => languageProvider
+                                            .changeLanguage('en'),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   // Mobile Number
                                   TextFormField(
                                     controller: _mobileController,
                                     keyboardType: TextInputType.phone,
-                                    style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
+                                    style: const TextStyle(
+                                        color: Color(0xFF1A1A1A), fontSize: 14),
                                     decoration: InputDecoration(
-                                      labelText: languageProvider.t('mobile_number'),
-                                      labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
-                                      prefixIcon: const Icon(Icons.phone, color: Color(0xFFE94560), size: 20),
+                                      labelText:
+                                          languageProvider.t('mobile_number'),
+                                      labelStyle: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 13),
+                                      prefixIcon: const Icon(Icons.phone,
+                                          color: Color(0xFFE94560), size: 20),
                                       filled: true,
                                       fillColor: Colors.white.withOpacity(0.7),
                                       border: OutlineInputBorder(
@@ -237,7 +251,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                           width: 1.5,
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 12,
                                       ),
@@ -253,16 +268,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                     },
                                   ),
                                   const SizedBox(height: 14),
-                                  
+
                                   // Password
                                   TextFormField(
                                     controller: _passwordController,
                                     obscureText: _obscurePassword,
-                                    style: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
+                                    style: const TextStyle(
+                                        color: Color(0xFF1A1A1A), fontSize: 14),
                                     decoration: InputDecoration(
                                       labelText: languageProvider.t('password'),
-                                      labelStyle: TextStyle(color: Colors.grey[700], fontSize: 13),
-                                      prefixIcon: const Icon(Icons.lock, color: Color(0xFFE94560), size: 20),
+                                      labelStyle: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 13),
+                                      prefixIcon: const Icon(Icons.lock,
+                                          color: Color(0xFFE94560), size: 20),
                                       suffixIcon: IconButton(
                                         icon: Icon(
                                           _obscurePassword
@@ -273,7 +292,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                         onPressed: () {
                                           setState(() {
-                                            _obscurePassword = !_obscurePassword;
+                                            _obscurePassword =
+                                                !_obscurePassword;
                                           });
                                         },
                                       ),
@@ -304,7 +324,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                           width: 1.5,
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 12,
                                       ),
@@ -317,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     },
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   // Login Button
                                   Consumer<AuthProvider>(
                                     builder: (context, authProvider, child) {
@@ -325,39 +346,51 @@ class _LoginScreenState extends State<LoginScreen> {
                                         height: 50,
                                         decoration: BoxDecoration(
                                           gradient: const LinearGradient(
-                                            colors: [Color(0xFFE94560), Color(0xFFD32F2F)],
+                                            colors: [
+                                              Color(0xFFE94560),
+                                              Color(0xFFD32F2F)
+                                            ],
                                           ),
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: const Color(0xFFE94560).withOpacity(0.3),
+                                              color: const Color(0xFFE94560)
+                                                  .withOpacity(0.3),
                                               blurRadius: 10,
                                               offset: const Offset(0, 4),
                                             ),
                                           ],
                                         ),
                                         child: ElevatedButton(
-                                          onPressed: authProvider.isLoading ? null : _handleLogin,
+                                          onPressed: authProvider.isLoading
+                                              ? null
+                                              : _handleLogin,
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.transparent,
                                             shadowColor: Colors.transparent,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(14),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
                                             ),
                                           ),
                                           child: authProvider.isLoading
                                               ? const SizedBox(
                                                   width: 20,
                                                   height: 20,
-                                                  child: CircularProgressIndicator(
+                                                  child:
+                                                      CircularProgressIndicator(
                                                     strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                            Color>(
                                                       Colors.white,
                                                     ),
                                                   ),
                                                 )
                                               : Text(
-                                                  languageProvider.t('login_button'),
+                                                  languageProvider
+                                                      .t('login_button'),
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w700,
@@ -426,9 +459,8 @@ class _LanguageButton extends StatelessWidget {
           color: isSelected ? null : Colors.white.withOpacity(0.6),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected
-                ? Colors.transparent
-                : Colors.grey.withOpacity(0.3),
+            color:
+                isSelected ? Colors.transparent : Colors.grey.withOpacity(0.3),
             width: 1,
           ),
         ),

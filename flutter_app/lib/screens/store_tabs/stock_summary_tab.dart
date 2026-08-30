@@ -64,8 +64,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
                 unselectedLabelColor: Colors.grey[500],
                 indicatorColor: AppColors.primary,
                 indicatorSize: TabBarIndicatorSize.label,
-                labelStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700),
+                labelStyle:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 tabs: const [
                   Tab(text: 'Daily Ledger'),
                   Tab(text: 'GST / ITC Summary'),
@@ -101,8 +101,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
                   ? _buildEmpty('No stock movement yet',
                       'Purchases and sales will appear here')
                   : RefreshIndicator(
-                      onRefresh: () => store.fetchDailySummary(
-                          metalType: _filterMetal),
+                      onRefresh: () =>
+                          store.fetchDailySummary(metalType: _filterMetal),
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(14, 8, 14, 80),
                         children: _buildDayCards(store.dailySummary),
@@ -122,7 +122,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
         scrollDirection: Axis.horizontal,
         child: Row(
           children: metals.map((m) {
-            final sel = (_filterMetal == null && m == 'all') || _filterMetal == m;
+            final sel =
+                (_filterMetal == null && m == 'all') || _filterMetal == m;
             final color = m == 'all' ? AppColors.primary : _metalColor(m);
             return GestureDetector(
               onTap: () {
@@ -132,7 +133,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: sel ? color.withAlpha(18) : Colors.grey[100],
                   borderRadius: BorderRadius.circular(20),
@@ -157,8 +159,10 @@ class _StockSummaryTabState extends State<StockSummaryTab>
 
   List<Widget> _buildDayCards(Map<String, dynamic> summary) {
     final sortedDates = summary.keys.toList()..sort((a, b) => b.compareTo(a));
-    return sortedDates.map((date) => _dayCard(date,
-        summary[date] as Map<String, dynamic>? ?? {})).toList();
+    return sortedDates
+        .map((date) =>
+            _dayCard(date, summary[date] as Map<String, dynamic>? ?? {}))
+        .toList();
   }
 
   Widget _dayCard(String date, Map<String, dynamic> dayData) {
@@ -170,7 +174,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
         boxShadow: [
           BoxShadow(
               color: Colors.black.withAlpha(5),
-              blurRadius: 6, offset: const Offset(0, 1)),
+              blurRadius: 6,
+              offset: const Offset(0, 1)),
         ],
       ),
       child: Padding(
@@ -184,38 +189,46 @@ class _StockSummaryTabState extends State<StockSummaryTab>
             ),
             child: Text(_formatDate(date),
                 style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: Colors.blue)),
           ),
           const SizedBox(height: 12),
           ...dayData.entries.map((entry) {
             final metal = entry.key;
-            final data  = entry.value as Map<String, dynamic>;
-            final inW   = (data['in'] as num?)?.toDouble()  ?? 0;
-            final outW  = (data['out'] as num?)?.toDouble() ?? 0;
-            final net   = (data['net'] as num?)?.toDouble() ?? 0;
+            final data = entry.value as Map<String, dynamic>;
+            final inW = (data['in'] as num?)?.toDouble() ?? 0;
+            final outW = (data['out'] as num?)?.toDouble() ?? 0;
+            final net = (data['net'] as num?)?.toDouble() ?? 0;
             final color = _metalColor(metal);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(width: 6, height: 6,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Text(metal[0].toUpperCase() + metal.substring(1),
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                          color: Colors.grey[600])),
-                ]),
-                const SizedBox(height: 6),
-                Row(children: [
-                  _ledgerCell('In (Credit)', inW, Colors.green),
-                  const SizedBox(width: 8),
-                  _ledgerCell('Out (Debit)', outW, Colors.red),
-                  const SizedBox(width: 8),
-                  _ledgerCell('Net', net,
-                      net >= 0 ? Colors.green.shade700 : Colors.red),
-                ]),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                              color: color, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text(metal[0].toUpperCase() + metal.substring(1),
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600])),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      _ledgerCell('In (Credit)', inW, Colors.green),
+                      const SizedBox(width: 8),
+                      _ledgerCell('Out (Debit)', outW, Colors.red),
+                      const SizedBox(width: 8),
+                      _ledgerCell('Net', net,
+                          net >= 0 ? Colors.green.shade700 : Colors.red),
+                    ]),
+                  ]),
             );
           }),
         ]),
@@ -271,8 +284,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
         const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey),
         const SizedBox(width: 6),
         const Text('Financial Year',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                color: Colors.grey)),
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
         const SizedBox(width: 10),
         Expanded(
           child: Container(
@@ -286,11 +299,15 @@ class _StockSummaryTabState extends State<StockSummaryTab>
               isExpanded: true,
               underline: const SizedBox.shrink(),
               style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: Color(0xFF1A1A1A)),
-              items: _fyOptions.map((fy) => DropdownMenuItem(
-                value: fy, child: Text('FY $fy'),
-              )).toList(),
+              items: _fyOptions
+                  .map((fy) => DropdownMenuItem(
+                        value: fy,
+                        child: Text('FY $fy'),
+                      ))
+                  .toList(),
               onChanged: (fy) {
                 if (fy == null) return;
                 setState(() => _selectedFy = fy);
@@ -303,12 +320,14 @@ class _StockSummaryTabState extends State<StockSummaryTab>
         GestureDetector(
           onTap: () => store.fetchItcSummary(fy: _selectedFy),
           child: Container(
-            width: 36, height: 36,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: AppColors.primary.withAlpha(14),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+            child:
+                Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
           ),
         ),
       ]),
@@ -316,10 +335,10 @@ class _StockSummaryTabState extends State<StockSummaryTab>
   }
 
   Widget _buildItcContent(Map<String, dynamic> summary) {
-    final quarters  = (summary['quarters'] as List? ?? [])
-        .cast<Map<String, dynamic>>();
-    final yearTot   = summary['yearTotals'] as Map<String, dynamic>? ?? {};
-    final fy        = summary['fy'] as String? ?? '';
+    final quarters =
+        (summary['quarters'] as List? ?? []).cast<Map<String, dynamic>>();
+    final yearTot = summary['yearTotals'] as Map<String, dynamic>? ?? {};
+    final fy = summary['fy'] as String? ?? '';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 80),
@@ -358,21 +377,24 @@ class _StockSummaryTabState extends State<StockSummaryTab>
   }
 
   Widget _fyBanner(String fy, Map<String, dynamic> t) {
-    final itc    = (t['totalItc'] ?? 0).toDouble();
-    final cgst   = (t['itcCgst']  ?? 0).toDouble();
-    final sgst   = (t['itcSgst']  ?? 0).toDouble();
-    final igst   = (t['itcIgst']  ?? 0).toDouble();
+    final itc = (t['totalItc'] ?? 0).toDouble();
+    final cgst = (t['itcCgst'] ?? 0).toDouble();
+    final sgst = (t['itcSgst'] ?? 0).toDouble();
+    final igst = (t['itcIgst'] ?? 0).toDouble();
     final amount = (t['totalAmount'] ?? 0).toDouble();
-    final wt     = (t['totalWeight']  ?? 0).toDouble();
-    final inv    = (t['invoices']     ?? 0) as int;
+    final wt = (t['totalWeight'] ?? 0).toDouble();
+    final inv = (t['invoices'] ?? 0) as int;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary.withAlpha(230),
-                   AppColors.primary.withAlpha(180)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withAlpha(230),
+            AppColors.primary.withAlpha(180)
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -383,12 +405,16 @@ class _StockSummaryTabState extends State<StockSummaryTab>
             const Icon(Icons.savings_outlined, size: 16, color: Colors.white),
             const SizedBox(width: 6),
             Text('FY $fy — Full Year ITC',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white70)),
           ]),
           const SizedBox(height: 10),
           Text('₹${_fmt(itc)}',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900,
+              style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white)),
           const Text('Total ITC Claimable',
               style: TextStyle(fontSize: 11, color: Colors.white70)),
@@ -401,8 +427,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
           const SizedBox(height: 10),
           Row(children: [
             _bnrCell('Invoices', '$inv'),
-            _bnrCell('Metal Wt',  '${wt.toStringAsFixed(3)} g'),
-            _bnrCell('Taxable',  '₹${_compact(amount)}'),
+            _bnrCell('Metal Wt', '${wt.toStringAsFixed(3)} g'),
+            _bnrCell('Taxable', '₹${_compact(amount)}'),
           ]),
         ],
       ),
@@ -411,24 +437,28 @@ class _StockSummaryTabState extends State<StockSummaryTab>
 
   Widget _bnrCell(String label, String value) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-              color: Colors.white)),
+          Text(label,
+              style: const TextStyle(fontSize: 9, color: Colors.white60)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
         ]),
       );
 
   Widget _quarterCard(Map<String, dynamic> q) {
-    final label   = q['label']   as String? ?? '';
+    final label = q['label'] as String? ?? '';
     final quarter = q['quarter'] as String? ?? '';
-    final totals  = q['totals']  as Map<String, dynamic>? ?? {};
+    final totals = q['totals'] as Map<String, dynamic>? ?? {};
     final byMetal = q['byMetal'] as Map<String, dynamic>? ?? {};
 
-    final itc  = (totals['totalItc'] ?? 0).toDouble();
-    final cgst = (totals['itcCgst']  ?? 0).toDouble();
-    final sgst = (totals['itcSgst']  ?? 0).toDouble();
-    final igst = (totals['itcIgst']  ?? 0).toDouble();
+    final itc = (totals['totalItc'] ?? 0).toDouble();
+    final cgst = (totals['itcCgst'] ?? 0).toDouble();
+    final sgst = (totals['itcSgst'] ?? 0).toDouble();
+    final igst = (totals['itcIgst'] ?? 0).toDouble();
     final invoices = (totals['invoices'] ?? 0) as int;
-    final wt   = (totals['totalWeight'] ?? 0).toDouble();
+    final wt = (totals['totalWeight'] ?? 0).toDouble();
     final empty = invoices == 0;
 
     return Container(
@@ -437,11 +467,15 @@ class _StockSummaryTabState extends State<StockSummaryTab>
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: empty ? Colors.grey.shade100 : Colors.green.withAlpha(30)),
-        boxShadow: empty ? [] : [
-          BoxShadow(color: Colors.black.withAlpha(4),
-              blurRadius: 6, offset: const Offset(0, 1)),
-        ],
+            color: empty ? Colors.grey.shade100 : Colors.green.withAlpha(30)),
+        boxShadow: empty
+            ? []
+            : [
+                BoxShadow(
+                    color: Colors.black.withAlpha(4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1)),
+              ],
       ),
       child: Column(children: [
         // Header
@@ -453,7 +487,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
           ),
           child: Row(children: [
             Container(
-              width: 34, height: 34,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 color: empty
                     ? Colors.grey.withAlpha(18)
@@ -463,17 +498,23 @@ class _StockSummaryTabState extends State<StockSummaryTab>
               child: Center(
                 child: Text(quarter,
                     style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w900,
-                        color: empty ? Colors.grey[400] : Colors.green.shade700)),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color:
+                            empty ? Colors.grey[400] : Colors.green.shade700)),
               ),
             ),
             const SizedBox(width: 10),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700,
-                  color: empty ? Colors.grey[400] : const Color(0xFF1A1A1A))),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color:
+                          empty ? Colors.grey[400] : const Color(0xFF1A1A1A))),
               if (!empty)
-                Text('$invoices invoice${invoices > 1 ? 's' : ''} · '
+                Text(
+                    '$invoices invoice${invoices > 1 ? 's' : ''} · '
                     '${wt.toStringAsFixed(3)} g',
                     style: TextStyle(fontSize: 10, color: Colors.grey[500])),
             ]),
@@ -482,13 +523,15 @@ class _StockSummaryTabState extends State<StockSummaryTab>
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text('₹${_fmt(itc)}',
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                         color: Colors.green.shade700)),
                 const Text('ITC',
                     style: TextStyle(fontSize: 9, color: Colors.grey)),
               ])
             else
-              Text('No data', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+              Text('No data',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[400])),
           ]),
         ),
 
@@ -513,26 +556,33 @@ class _StockSummaryTabState extends State<StockSummaryTab>
                 const Divider(height: 1),
                 const SizedBox(height: 8),
                 ...byMetal.entries.map((e) {
-                  final m    = e.key;
+                  final m = e.key;
                   final data = e.value as Map<String, dynamic>;
                   final mItc = (data['totalItc'] ?? 0).toDouble();
-                  final mWt  = (data['totalWeight'] ?? 0).toDouble();
+                  final mWt = (data['totalWeight'] ?? 0).toDouble();
                   final mInv = (data['invoices'] ?? 0) as int;
-                  final col  = _metalColor(m);
+                  final col = _metalColor(m);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(children: [
-                      Container(width: 6, height: 6,
-                          decoration: BoxDecoration(color: col, shape: BoxShape.circle)),
+                      Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                              color: col, shape: BoxShape.circle)),
                       const SizedBox(width: 8),
                       Text(m[0].toUpperCase() + m.substring(1),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 6),
                       Text('$mInv inv · ${mWt.toStringAsFixed(3)} g',
-                          style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.grey[500])),
                       const Spacer(),
                       Text('₹${_fmt(mItc)}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: Colors.green.shade700)),
                     ]),
                   );
@@ -552,7 +602,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
             color: color.withAlpha(10),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[500])),
             const SizedBox(height: 3),
             Text('₹${_fmt(amount)}',
@@ -568,16 +619,22 @@ class _StockSummaryTabState extends State<StockSummaryTab>
   Widget _buildEmpty(String title, String sub) => Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Container(
-            width: 72, height: 72,
-            decoration: BoxDecoration(
-                color: Colors.grey[100], shape: BoxShape.circle),
-            child: Icon(Icons.bar_chart_rounded, size: 32, color: Colors.grey[400]),
+            width: 72,
+            height: 72,
+            decoration:
+                BoxDecoration(color: Colors.grey[100], shape: BoxShape.circle),
+            child: Icon(Icons.bar_chart_rounded,
+                size: 32, color: Colors.grey[400]),
           ),
           const SizedBox(height: 14),
-          Text(title, style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: Colors.grey[700])),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[700])),
           const SizedBox(height: 4),
-          Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          Text(sub,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               textAlign: TextAlign.center),
         ]),
       );
@@ -588,7 +645,8 @@ class _StockSummaryTabState extends State<StockSummaryTab>
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             const Icon(Icons.cloud_off_outlined, color: Colors.red, size: 48),
             const SizedBox(height: 12),
-            Text(err, textAlign: TextAlign.center,
+            Text(err,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -603,29 +661,46 @@ class _StockSummaryTabState extends State<StockSummaryTab>
   String _formatDate(String isoDate) {
     try {
       final dt = DateTime.parse(isoDate);
-      const m = ['Jan','Feb','Mar','Apr','May','Jun',
-                  'Jul','Aug','Sep','Oct','Nov','Dec'];
+      const m = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
       return '${dt.day} ${m[dt.month - 1]} ${dt.year}';
-    } catch (_) { return isoDate; }
+    } catch (_) {
+      return isoDate;
+    }
   }
 
   Color _metalColor(String metal) {
     switch (metal.toLowerCase()) {
-      case 'gold':     return const Color(0xFFF59E0B);
-      case 'silver':   return const Color(0xFF6B7280);
-      case 'platinum': return const Color(0xFF3B82F6);
-      default:         return Colors.teal;
+      case 'gold':
+        return const Color(0xFFF59E0B);
+      case 'silver':
+        return const Color(0xFF6B7280);
+      case 'platinum':
+        return const Color(0xFF3B82F6);
+      default:
+        return Colors.teal;
     }
   }
 
-  String _fmt(double v) =>
-      v.toStringAsFixed(2).replaceAllMapped(
-          RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
+  String _fmt(double v) => v.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
 
   String _compact(double v) {
     if (v >= 10000000) return '${(v / 10000000).toStringAsFixed(1)}Cr';
-    if (v >= 100000)   return '${(v / 100000).toStringAsFixed(1)}L';
-    if (v >= 1000)     return '${(v / 1000).toStringAsFixed(1)}K';
+    if (v >= 100000) return '${(v / 100000).toStringAsFixed(1)}L';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
     return v.toStringAsFixed(0);
   }
 }

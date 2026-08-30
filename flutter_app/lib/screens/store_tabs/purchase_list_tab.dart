@@ -6,6 +6,7 @@ import '../../providers/store_provider.dart';
 import '../../models/purchase_model.dart';
 import '../../utils/app_colors.dart';
 import '../add_purchase_screen.dart';
+import '../../utils/app_toast.dart';
 
 class PurchaseListTab extends StatefulWidget {
   const PurchaseListTab({super.key});
@@ -19,10 +20,10 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
   String _sort = 'date_desc';
 
   static const _sortOptions = [
-    _SO('date_desc',   'Date: Newest First',  Icons.arrow_downward),
-    _SO('date_asc',    'Date: Oldest First',  Icons.arrow_upward),
-    _SO('amount_desc', 'Amount: High → Low',  Icons.trending_down),
-    _SO('amount_asc',  'Amount: Low → High',  Icons.trending_up),
+    _SO('date_desc', 'Date: Newest First', Icons.arrow_downward),
+    _SO('date_asc', 'Date: Oldest First', Icons.arrow_upward),
+    _SO('amount_desc', 'Amount: High → Low', Icons.trending_down),
+    _SO('amount_asc', 'Amount: Low → High', Icons.trending_up),
   ];
 
   @override
@@ -67,9 +68,9 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Row(
         children: store.metalTotals.entries.map((e) {
-          final wt  = (e.value['totalWeight'] as num?)?.toDouble() ?? 0.0;
+          final wt = (e.value['totalWeight'] as num?)?.toDouble() ?? 0.0;
           final amt = (e.value['totalAmount'] as num?)?.toDouble() ?? 0.0;
-          final cnt = (e.value['count']       as num?)?.toInt()    ?? 0;
+          final cnt = (e.value['count'] as num?)?.toInt() ?? 0;
           return Expanded(
             child: Container(
               margin: EdgeInsets.only(
@@ -84,23 +85,30 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Container(width: 6, height: 6,
+                    Container(
+                        width: 6,
+                        height: 6,
                         decoration: BoxDecoration(
                             color: _mc(e.key), shape: BoxShape.circle)),
                     const SizedBox(width: 4),
-                    Expanded(child: Text(
+                    Expanded(
+                        child: Text(
                       e.key[0].toUpperCase() + e.key.substring(1),
-                      style: TextStyle(fontSize: 10,
-                          fontWeight: FontWeight.w700, color: _mc(e.key)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _mc(e.key)),
                       overflow: TextOverflow.ellipsis,
                     )),
-                    Text('$cnt', style: TextStyle(
-                        fontSize: 9, color: Colors.grey[500])),
+                    Text('$cnt',
+                        style: TextStyle(fontSize: 9, color: Colors.grey[500])),
                   ]),
                   const SizedBox(height: 2),
                   Text('${wt.toStringAsFixed(3)} g',
-                      style: TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.w800, color: _mc(e.key))),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: _mc(e.key))),
                   Text('₹${_rupee(amt)}',
                       style: TextStyle(fontSize: 9, color: Colors.grey[600])),
                 ],
@@ -122,9 +130,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
         Expanded(
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(children: metals.map((m) {
-              final sel   = _filterMetal == m;
-              final label = m == null ? 'All' : m[0].toUpperCase() + m.substring(1);
+            child: Row(
+                children: metals.map((m) {
+              final sel = _filterMetal == m;
+              final label =
+                  m == null ? 'All' : m[0].toUpperCase() + m.substring(1);
               final color = m == null ? AppColors.primary : _mc(m);
               return GestureDetector(
                 onTap: () {
@@ -134,7 +144,8 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 140),
                   margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
                     color: sel ? color.withAlpha(20) : Colors.grey[100],
                     borderRadius: BorderRadius.circular(20),
@@ -142,10 +153,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                         color: sel ? color : Colors.grey.shade200,
                         width: sel ? 1.5 : 1),
                   ),
-                  child: Text(label, style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                      color: sel ? color : Colors.grey[600])),
+                  child: Text(label,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                          color: sel ? color : Colors.grey[600])),
                 ),
               );
             }).toList()),
@@ -184,9 +196,13 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 36, height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)))),
+            Center(
+                child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
             const Text('Sort By',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
@@ -200,23 +216,29 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                   Navigator.pop(context);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
                     color: _sort == opt.key
-                        ? AppColors.primary.withAlpha(12) : null,
+                        ? AppColors.primary.withAlpha(12)
+                        : null,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(children: [
-                    Icon(opt.icon, size: 16,
+                    Icon(opt.icon,
+                        size: 16,
                         color: _sort == opt.key
-                            ? AppColors.primary : Colors.grey[500]),
+                            ? AppColors.primary
+                            : Colors.grey[500]),
                     const SizedBox(width: 10),
-                    Text(opt.label, style: TextStyle(
-                        fontWeight: _sort == opt.key
-                            ? FontWeight.w700 : FontWeight.w500,
-                        color: _sort == opt.key
-                            ? AppColors.primary : Colors.grey[700])),
+                    Text(opt.label,
+                        style: TextStyle(
+                            fontWeight: _sort == opt.key
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: _sort == opt.key
+                                ? AppColors.primary
+                                : Colors.grey[700])),
                   ]),
                 ),
               ),
@@ -235,11 +257,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Column(
-              mainAxisAlignment: MainAxisAlignment.center, children: [
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             const Icon(Icons.cloud_off_outlined, color: Colors.red, size: 48),
             const SizedBox(height: 12),
-            Text(store.purchasesError ?? '', textAlign: TextAlign.center,
+            Text(store.purchasesError ?? '',
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -253,15 +275,19 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
     if (store.purchases.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(width: 80, height: 80,
+          Container(
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                   color: Colors.grey[100], shape: BoxShape.circle),
               child: Icon(Icons.receipt_long_outlined,
                   size: 36, color: Colors.grey[400])),
           const SizedBox(height: 16),
-          Text('No purchases yet', style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16, color: Colors.grey[700])),
+          Text('No purchases yet',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: Colors.grey[700])),
           const SizedBox(height: 6),
           Text(
             _filterMetal != null
@@ -298,8 +324,12 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.grey.shade100),
-          boxShadow: [BoxShadow(color: Colors.black.withAlpha(5),
-              blurRadius: 6, offset: const Offset(0, 1))],
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withAlpha(5),
+                blurRadius: 6,
+                offset: const Offset(0, 1))
+          ],
         ),
         child: Column(children: [
           // ── Header ────────────────────────────────────────────────────────
@@ -317,15 +347,18 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                     color: color.withAlpha(20),
                     borderRadius: BorderRadius.circular(5)),
                 child: Text(p.metalType.toUpperCase(),
-                    style: TextStyle(fontSize: 9,
-                        fontWeight: FontWeight.w800, color: color,
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: color,
                         letterSpacing: 0.4)),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Text(p.invoiceNumber,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                  overflow: TextOverflow.ellipsis)),
+              Expanded(
+                  child: Text(p.invoiceNumber,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14),
+                      overflow: TextOverflow.ellipsis)),
               if (p.attachmentMeta.isNotEmpty || p.attachments.isNotEmpty) ...[
                 Icon(Icons.attach_file_rounded,
                     size: 13, color: Colors.grey[400]),
@@ -347,8 +380,7 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 _cell('Weight', '${p.quantity.toStringAsFixed(3)} g',
                     Icons.scale_outlined),
                 const SizedBox(width: 6),
-                _cell('Rate/g', '₹${_rupee(p.rate)}',
-                    Icons.currency_rupee),
+                _cell('Rate/g', '₹${_rupee(p.rate)}', Icons.currency_rupee),
               ]),
 
               if (p.description.isNotEmpty) ...[
@@ -356,9 +388,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 Row(children: [
                   Icon(Icons.notes_outlined, size: 11, color: Colors.grey[400]),
                   const SizedBox(width: 4),
-                  Expanded(child: Text(p.description,
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                      child: Text(p.description,
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[600]),
+                          overflow: TextOverflow.ellipsis)),
                 ]),
               ],
 
@@ -369,18 +403,19 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
               // Financial row — full amounts, small font, no overflow
               Row(children: [
                 // Taxable
-                Expanded(child: _amtCol('Taxable',
-                    '₹${_rupee(p.totalAmount)}', Colors.grey[800]!)),
+                Expanded(
+                    child: _amtCol('Taxable', '₹${_rupee(p.totalAmount)}',
+                        Colors.grey[800]!)),
                 _chevron(),
                 // GST
-                Expanded(child: _amtCol(
-                    'GST ${p.gstRate.toStringAsFixed(0)}%',
-                    '+₹${_rupee(p.totalGst)}', Colors.indigo)),
+                Expanded(
+                    child: _amtCol('GST ${p.gstRate.toStringAsFixed(0)}%',
+                        '+₹${_rupee(p.totalGst)}', Colors.indigo)),
                 if (p.tdsApplicable) ...[
                   _chevron(),
-                  Expanded(child: _amtCol(
-                      'TDS ${p.tdsRate.toStringAsFixed(0)}%',
-                      '−₹${_rupee(p.tdsAmount)}', Colors.orange)),
+                  Expanded(
+                      child: _amtCol('TDS ${p.tdsRate.toStringAsFixed(0)}%',
+                          '−₹${_rupee(p.tdsAmount)}', Colors.orange)),
                 ],
                 const SizedBox(width: 8),
                 // Net payable — larger, right-aligned
@@ -388,8 +423,10 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                   Text('Net Payable',
                       style: TextStyle(fontSize: 9, color: Colors.grey[500])),
                   Text('₹${_rupee(p.netPayable)}',
-                      style: TextStyle(fontSize: 14,
-                          fontWeight: FontWeight.w800, color: color)),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: color)),
                 ]),
               ]),
 
@@ -397,11 +434,12 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
               if (p.totalItc > 0) ...[
                 const SizedBox(height: 5),
                 Row(children: [
-                  Icon(Icons.savings_outlined, size: 11,
-                      color: Colors.green.shade600),
+                  Icon(Icons.savings_outlined,
+                      size: 11, color: Colors.green.shade600),
                   const SizedBox(width: 4),
                   Text('ITC claim: ₹${_rupee(p.totalItc)}',
-                      style: TextStyle(fontSize: 10,
+                      style: TextStyle(
+                          fontSize: 10,
                           color: Colors.green.shade700,
                           fontWeight: FontWeight.w600)),
                 ]),
@@ -423,8 +461,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 36, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300],
+          Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 8),
           // Mini header
@@ -435,13 +476,17 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                   color: _mc(p.metalType).withAlpha(20),
                   borderRadius: BorderRadius.circular(7)),
               child: Text(p.metalType.toUpperCase(),
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800,
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
                       color: _mc(p.metalType))),
             ),
             const SizedBox(width: 10),
-            Expanded(child: Text(p.invoiceNumber,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                overflow: TextOverflow.ellipsis)),
+            Expanded(
+                child: Text(p.invoiceNumber,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis)),
             Text(p.invoiceDateFormatted,
                 style: TextStyle(fontSize: 12, color: Colors.grey[500])),
           ]),
@@ -449,16 +494,22 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
           const Divider(height: 1),
           const SizedBox(height: 10),
           _actionTile(
-            icon: Icons.visibility_outlined, label: 'View Details',
+            icon: Icons.visibility_outlined,
+            label: 'View Details',
             color: Colors.blue,
-            onTap: () { Navigator.pop(ctx); _viewDetails(ctx, p, store); },
+            onTap: () {
+              Navigator.pop(ctx);
+              _viewDetails(ctx, p, store);
+            },
           ),
           _actionTile(
-            icon: Icons.edit_outlined, label: 'Edit Purchase',
+            icon: Icons.edit_outlined,
+            label: 'Edit Purchase',
             color: Colors.orange,
             onTap: () async {
               Navigator.pop(ctx);
-              final ok = await Navigator.push<bool>(ctx,
+              final ok = await Navigator.push<bool>(
+                  ctx,
                   MaterialPageRoute(
                       builder: (_) => AddPurchaseScreen(purchase: p)));
               if (ok == true && ctx.mounted) {
@@ -468,31 +519,41 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
             },
           ),
           _actionTile(
-            icon: Icons.delete_outline_rounded, label: 'Delete Purchase',
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete Purchase',
             color: Colors.red,
-            onTap: () { Navigator.pop(ctx); _confirmDelete(ctx, p, store); },
+            onTap: () {
+              Navigator.pop(ctx);
+              _confirmDelete(ctx, p, store);
+            },
           ),
         ]),
       ),
     );
   }
 
-  Widget _actionTile({required IconData icon, required String label,
-      required Color color, required VoidCallback onTap}) =>
+  Widget _actionTile(
+          {required IconData icon,
+          required String label,
+          required Color color,
+          required VoidCallback onTap}) =>
       InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           child: Row(children: [
-            Container(width: 36, height: 36,
+            Container(
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                     color: color.withAlpha(15),
                     borderRadius: BorderRadius.circular(9)),
                 child: Icon(icon, size: 18, color: color)),
             const SizedBox(width: 14),
-            Text(label, style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600, color: color)),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: color)),
           ]),
         ),
       );
@@ -517,7 +578,9 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
             // Drag handle
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 4),
-              child: Container(width: 40, height: 4,
+              child: Container(
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2))),
@@ -527,24 +590,28 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               child: Row(children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                       color: color.withAlpha(20),
                       borderRadius: BorderRadius.circular(8)),
                   child: Text(p.metalType.toUpperCase(),
-                      style: TextStyle(fontSize: 11,
-                          fontWeight: FontWeight.w800, color: color)),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: color)),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: Text('Invoice #${p.invoiceNumber}',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700))),
+                Expanded(
+                    child: Text('Invoice #${p.invoiceNumber}',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700))),
                 // Edit shortcut button
                 GestureDetector(
                   onTap: () async {
                     Navigator.pop(ctx);
-                    final ok = await Navigator.push<bool>(ctx,
+                    final ok = await Navigator.push<bool>(
+                        ctx,
                         MaterialPageRoute(
                             builder: (_) => AddPurchaseScreen(purchase: p)));
                     if (ok == true && ctx.mounted) {
@@ -554,7 +621,8 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                     }
                   },
                   child: Container(
-                    width: 32, height: 32,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                         color: Colors.orange.withAlpha(15),
                         borderRadius: BorderRadius.circular(8)),
@@ -571,32 +639,34 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
                 children: [
                   _section('Supplier', [
-                    _d2('Name',  p.biller),
-                    _d2('Date',  p.invoiceDateFormatted),
-                    if (p.billerGstin.isNotEmpty)
-                      _d2('GSTIN', p.billerGstin),
+                    _d2('Name', p.biller),
+                    _d2('Date', p.invoiceDateFormatted),
+                    if (p.billerGstin.isNotEmpty) _d2('GSTIN', p.billerGstin),
                   ]),
                   _section('Metal & Quantity', [
-                    _d2('Metal',  p.metalType[0].toUpperCase() + p.metalType.substring(1)),
+                    _d2(
+                        'Metal',
+                        p.metalType[0].toUpperCase() +
+                            p.metalType.substring(1)),
                     _d2('Weight', '${p.quantity.toStringAsFixed(3)} g'),
                     _d2('Rate/g', '₹${_rupee(p.rate)}'),
                     if (p.description.isNotEmpty)
                       _d2('Description', p.description),
                   ]),
                   _section('Transaction', [
-                    _d2('Type',     p.transactionType),
+                    _d2('Type', p.transactionType),
                     _d2('HSN Code', p.hsnCode),
                     _d2('GST Rate', '${p.gstRate.toStringAsFixed(0)}%'),
                   ]),
                   _section('Financial Summary', [
-                    _d2('Taxable Value',  '₹${_rupee(p.totalAmount)}'),
+                    _d2('Taxable Value', '₹${_rupee(p.totalAmount)}'),
                     if (p.cgstAmount > 0) ...[
                       _d2('CGST', '+₹${_rupee(p.cgstAmount)}'),
                       _d2('SGST', '+₹${_rupee(p.sgstAmount)}'),
                     ],
                     if (p.igstAmount > 0)
                       _d2('IGST', '+₹${_rupee(p.igstAmount)}'),
-                    _d2('Total GST',     '₹${_rupee(p.totalGst)}'),
+                    _d2('Total GST', '₹${_rupee(p.totalGst)}'),
                     _d2('Invoice Total', '₹${_rupee(p.totalPayable)}',
                         bold: true),
                     if (p.tdsApplicable) ...[
@@ -629,8 +699,10 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(p.remarks,
-                            style: TextStyle(fontSize: 13,
-                                color: Colors.grey[700], height: 1.5)),
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                                height: 1.5)),
                       ),
                     ]),
                   if (p.createdByName.isNotEmpty)
@@ -652,11 +724,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
   Widget _attachmentsView(List<Map<String, dynamic>> metas) {
     return Column(
       children: metas.asMap().entries.map((entry) {
-        final meta   = entry.value;
-        final url    = meta['url'] as String? ?? '';
+        final meta = entry.value;
+        final url = meta['url'] as String? ?? '';
         final format = (meta['format'] as String? ?? '').toLowerCase();
-        final name   = meta['originalName'] as String? ?? 'Attachment';
-        final isPdf  = format == 'pdf';
+        final name = meta['originalName'] as String? ?? 'Attachment';
+        final isPdf = format == 'pdf';
 
         if (isPdf) {
           return GestureDetector(
@@ -678,10 +750,11 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 const Icon(Icons.picture_as_pdf_outlined,
                     color: Colors.red, size: 22),
                 const SizedBox(width: 10),
-                Expanded(child: Text(name,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(name,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis)),
                 Icon(Icons.open_in_new, size: 15, color: Colors.grey[400]),
               ]),
             ),
@@ -721,19 +794,19 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 ),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   color: Colors.grey[50],
                   child: Row(children: [
                     const Icon(Icons.image_outlined,
                         size: 12, color: Colors.grey),
                     const SizedBox(width: 6),
-                    Expanded(child: Text(name,
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey[600]),
-                        overflow: TextOverflow.ellipsis)),
-                    Icon(Icons.fullscreen, size: 14,
-                        color: Colors.grey[400]),
+                    Expanded(
+                        child: Text(name,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[600]),
+                            overflow: TextOverflow.ellipsis)),
+                    Icon(Icons.fullscreen, size: 14, color: Colors.grey[400]),
                   ]),
                 ),
               ]),
@@ -760,8 +833,7 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                 onPressed: () async {
                   final uri = Uri.tryParse(url);
                   if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri,
-                        mode: LaunchMode.externalApplication);
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 },
               ),
@@ -796,14 +868,14 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: const TextStyle(
-                color: Colors.grey, fontSize: 13, height: 1.5),
+            style:
+                const TextStyle(color: Colors.grey, fontSize: 13, height: 1.5),
             children: [
               const TextSpan(text: 'Invoice '),
-              TextSpan(text: p.invoiceNumber,
+              TextSpan(
+                  text: p.invoiceNumber,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A1A))),
+                      fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
               const TextSpan(
                   text: ' will be deleted and the stock entry reversed.'),
             ],
@@ -813,25 +885,24 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           OutlinedButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white),
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
               final err = await store.deletePurchase(p.id);
               if (ctx.mounted) {
-                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                  content: Text(err ?? 'Purchase deleted'),
-                  backgroundColor:
-                      err != null ? Colors.red : Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                ));
+                showAppSnackBar(
+                    ctx,
+                    SnackBar(
+                      content: Text(err ?? 'Purchase deleted'),
+                      backgroundColor: err != null ? Colors.red : Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                    ));
               }
             },
             child: const Text('Delete'),
@@ -845,8 +916,12 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
   Widget _section(String title, List<Widget> rows) => Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-              color: Colors.grey[400], letterSpacing: 0.8)),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[400],
+                  letterSpacing: 0.8)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -859,25 +934,25 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
         ]),
       );
 
-  Widget _d2(String label, String value,
-      {bool bold = false, Color? color}) =>
+  Widget _d2(String label, String value, {bool bold = false, Color? color}) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 120,
+          SizedBox(
+              width: 120,
               child: Text(label,
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]))),
-          Expanded(child: Text(value,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                  color: color ?? const Color(0xFF1A1A1A)))),
+          Expanded(
+              child: Text(value,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                      color: color ?? const Color(0xFF1A1A1A)))),
         ]),
       );
 
   // ── Card sub-widgets ──────────────────────────────────────────────────────
-  Widget _cell(String label, String value, IconData icon,
-      {int flex = 1}) =>
+  Widget _cell(String label, String value, IconData icon, {int flex = 1}) =>
       Expanded(
         flex: flex,
         child: Container(
@@ -885,18 +960,20 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
           decoration: BoxDecoration(
               color: const Color(0xFFF8F9FC),
               borderRadius: BorderRadius.circular(8)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Icon(icon, size: 9, color: Colors.grey[400]),
               const SizedBox(width: 2),
-              Expanded(child: Text(label,
-                  style: TextStyle(fontSize: 9, color: Colors.grey[500]),
-                  overflow: TextOverflow.ellipsis)),
+              Expanded(
+                  child: Text(label,
+                      style: TextStyle(fontSize: 9, color: Colors.grey[500]),
+                      overflow: TextOverflow.ellipsis)),
             ]),
             const SizedBox(height: 2),
             Text(value,
-                style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700),
+                style:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 overflow: TextOverflow.ellipsis),
           ]),
         ),
@@ -904,11 +981,10 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
 
   Widget _amtCol(String label, String value, Color valueColor) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+        Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[500])),
         Text(value,
-            style: TextStyle(fontSize: 11,
-                fontWeight: FontWeight.w600, color: valueColor),
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: valueColor),
             overflow: TextOverflow.ellipsis),
       ]);
 
@@ -919,26 +995,33 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
 
   // ── Number formatting ─────────────────────────────────────────────────────
   /// Full Indian number with commas, 2dp for amounts.
-  String _rupee(double v) => v
-      .toStringAsFixed(2)
-      .replaceAllMapped(
-          RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
+  String _rupee(double v) => v.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
 
   String _sortLabel(String key) => _sortOptions
       .firstWhere((o) => o.key == key, orElse: () => _sortOptions.first)
-      .label.split(':').first.trim();
+      .label
+      .split(':')
+      .first
+      .trim();
 
   Color _mc(String metal) {
     switch (metal.toLowerCase()) {
-      case 'gold':     return const Color(0xFFF59E0B);
-      case 'silver':   return const Color(0xFF6B7280);
-      case 'platinum': return const Color(0xFF3B82F6);
-      default:         return Colors.teal;
+      case 'gold':
+        return const Color(0xFFF59E0B);
+      case 'silver':
+        return const Color(0xFF6B7280);
+      case 'platinum':
+        return const Color(0xFF3B82F6);
+      default:
+        return Colors.teal;
     }
   }
 }
 
 class _SO {
-  final String key; final String label; final IconData icon;
+  final String key;
+  final String label;
+  final IconData icon;
   const _SO(this.key, this.label, this.icon);
 }

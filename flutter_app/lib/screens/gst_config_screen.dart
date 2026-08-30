@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/store_provider.dart';
 import '../models/store_models.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 /// Admin-only screen for configuring the firm's GST credentials and settings.
 /// GST rates are legally fixed at 3% (Chapter 71) and shown read-only.
@@ -64,7 +65,10 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
   // ── Live GSTIN validation ───────────────────────────────────────────────
   Future<void> _validateGstin(String value) async {
     if (value.trim().isEmpty) {
-      setState(() { _gstinValid = null; _gstinError = null; });
+      setState(() {
+        _gstinValid = null;
+        _gstinError = null;
+      });
       return;
     }
     final store = Provider.of<StoreProvider>(context, listen: false);
@@ -72,7 +76,8 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
     if (mounted) {
       setState(() {
         _gstinValid = valid;
-        _gstinError = (valid == true) ? null : 'Invalid GSTIN. Format: 22AAAAA0000A1Z5';
+        _gstinError =
+            (valid == true) ? null : 'Invalid GSTIN. Format: 22AAAAA0000A1Z5';
       });
     }
   }
@@ -80,7 +85,10 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
   // ── Live PAN validation ─────────────────────────────────────────────────
   Future<void> _validatePan(String value) async {
     if (value.trim().isEmpty) {
-      setState(() { _panValid = null; _panError = null; });
+      setState(() {
+        _panValid = null;
+        _panError = null;
+      });
       return;
     }
     final store = Provider.of<StoreProvider>(context, listen: false);
@@ -104,9 +112,12 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
     final store = Provider.of<StoreProvider>(context, listen: false);
 
     final error = await store.updateGstConfig({
-      if (_firmNameCtrl.text.trim().isNotEmpty) 'firmName': _firmNameCtrl.text.trim(),
-      if (_gstinCtrl.text.trim().isNotEmpty) 'gstin': _gstinCtrl.text.trim().toUpperCase(),
-      if (_panCtrl.text.trim().isNotEmpty) 'pan': _panCtrl.text.trim().toUpperCase(),
+      if (_firmNameCtrl.text.trim().isNotEmpty)
+        'firmName': _firmNameCtrl.text.trim(),
+      if (_gstinCtrl.text.trim().isNotEmpty)
+        'gstin': _gstinCtrl.text.trim().toUpperCase(),
+      if (_panCtrl.text.trim().isNotEmpty)
+        'pan': _panCtrl.text.trim().toUpperCase(),
       'firmTurnoverCategory': _turnoverCategory,
       'defaultTransactionType': _defaultTransactionType,
     });
@@ -122,10 +133,12 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? Colors.red : Colors.green,
-    ));
+    showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: isError ? Colors.red : Colors.green,
+        ));
   }
 
   @override
@@ -149,8 +162,8 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                     )
                   : const Text(
                       'Save',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
             ),
         ],
@@ -174,8 +187,8 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                     TextFormField(
                       controller: _firmNameCtrl,
                       textCapitalization: TextCapitalization.words,
-                      decoration: _inputDec(
-                          'Firm / Shop Name', Icons.store_outlined),
+                      decoration:
+                          _inputDec('Firm / Shop Name', Icons.store_outlined),
                     ),
                     const SizedBox(height: 12),
 
@@ -192,7 +205,10 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                         helperText: 'Format: 22AAAAA0000A1Z5',
                       ),
                       onChanged: (v) {
-                        setState(() { _gstinValid = null; _gstinError = null; });
+                        setState(() {
+                          _gstinValid = null;
+                          _gstinError = null;
+                        });
                         if (v.trim().length == 15) _validateGstin(v);
                       },
                     ),
@@ -211,7 +227,10 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                         helperText: 'Format: AAAAA0000A',
                       ),
                       onChanged: (v) {
-                        setState(() { _panValid = null; _panError = null; });
+                        setState(() {
+                          _panValid = null;
+                          _panError = null;
+                        });
                         if (v.trim().length == 10) _validatePan(v);
                       },
                     ),
@@ -226,8 +245,7 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                     DropdownButtonFormField<String>(
                       value: _turnoverCategory,
                       decoration: _inputDec(
-                          'Annual Turnover Category',
-                          Icons.bar_chart_outlined),
+                          'Annual Turnover Category', Icons.bar_chart_outlined),
                       items: const [
                         DropdownMenuItem(
                           value: 'below_1_5cr',
@@ -290,8 +308,7 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                                     strokeWidth: 2, color: Colors.white))
                             : const Text('Save Configuration',
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600)),
+                                    fontSize: 16, fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -314,26 +331,22 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
           ],
         ),
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: Colors.amber.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.gavel_outlined,
-                  color: Colors.amber, size: 18),
+              const Icon(Icons.gavel_outlined, color: Colors.amber, size: 18),
               const SizedBox(width: 8),
               const Text(
                 'Legally Fixed Tax Rates (Chapter 71)',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
@@ -366,8 +379,8 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
               Expanded(
                 flex: 3,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -397,9 +410,7 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
           children: [
             Text(value,
                 style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: color)),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(fontSize: 9, color: Colors.grey[600]),
@@ -483,8 +494,8 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
                     borderRadius: BorderRadius.circular(4))),
             const SizedBox(width: 8),
             Text(text,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           ],
         ),
       );
@@ -514,15 +525,12 @@ class _GstConfigScreenState extends State<GstConfigScreen> {
       filled: true,
       fillColor: Colors.grey[50],
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              BorderSide(color: AppColors.primary, width: 1.5)),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
       errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red, width: 1.5)),

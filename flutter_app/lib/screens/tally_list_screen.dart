@@ -6,6 +6,7 @@ import '../models/tally_model.dart';
 import '../utils/app_colors.dart';
 import 'create_tally_screen.dart';
 import 'tally_details_screen.dart';
+import '../utils/app_toast.dart';
 
 class TallyListScreen extends StatefulWidget {
   const TallyListScreen({super.key});
@@ -79,7 +80,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const Icon(Icons.error_outline,
+                            size: 48, color: Colors.red),
                         const SizedBox(height: 16),
                         Text(
                           tallyProvider.error!,
@@ -101,9 +103,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined, 
-                             size: 64, 
-                             color: Colors.grey[400]),
+                        Icon(Icons.inventory_2_outlined,
+                            size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
                           'No tally sessions found',
@@ -175,7 +176,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
           color: isSelected ? AppColors.primary : Colors.grey[100],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.3),
+            color:
+                isSelected ? AppColors.primary : Colors.grey.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -244,8 +246,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: tally.progress == 100 
-                          ? Colors.green 
+                      color: tally.progress == 100
+                          ? Colors.green
                           : AppColors.primary,
                     ),
                   ),
@@ -269,7 +271,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
               // Items count
               Row(
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 14, color: Colors.grey[600]),
+                  Icon(Icons.inventory_2_outlined,
+                      size: 14, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
                     '${tally.scannedItemsCount}/${tally.expectedItems} items',
@@ -292,7 +295,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                     itemCount: tally.metalData.length,
                     itemBuilder: (context, index) {
                       return Padding(
-                        padding: EdgeInsets.only(right: index < tally.metalData.length - 1 ? 8 : 0),
+                        padding: EdgeInsets.only(
+                            right: index < tally.metalData.length - 1 ? 8 : 0),
                         child: _buildMetalCard(tally.metalData[index]),
                       );
                     },
@@ -347,7 +351,7 @@ class _TallyListScreenState extends State<TallyListScreen> {
 
   Widget _buildMetalCard(MetalData metal) {
     Color bgColor;
-    
+
     switch (metal.metalType.toLowerCase()) {
       case 'gold':
         bgColor = const Color(0xFFE5B80B);
@@ -405,7 +409,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(6),
@@ -436,9 +441,10 @@ class _TallyListScreenState extends State<TallyListScreen> {
                       )
                     else
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: diff > 0 
+                          color: diff > 0
                               ? Colors.orange.withOpacity(0.3)
                               : Colors.green.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(6),
@@ -523,7 +529,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
             children: [
               Text(
                 tally.description,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -536,7 +543,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TallyDetailsScreen(tallyId: tally.id),
+                      builder: (context) =>
+                          TallyDetailsScreen(tallyId: tally.id),
                     ),
                   ).then((_) => _loadTallies());
                 },
@@ -573,12 +581,14 @@ class _TallyListScreenState extends State<TallyListScreen> {
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(ctx);
-              final provider = Provider.of<TallyProvider>(context, listen: false);
+              final provider =
+                  Provider.of<TallyProvider>(context, listen: false);
               final success = await provider.deleteTallySession(tally.id);
-              
+
               if (mounted) {
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  showAppSnackBar(
+                    context,
                     const SnackBar(
                       content: Text('Tally session deleted successfully'),
                       backgroundColor: Colors.green,
@@ -586,7 +596,8 @@ class _TallyListScreenState extends State<TallyListScreen> {
                   );
                   _loadTallies();
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  showAppSnackBar(
+                    context,
                     SnackBar(
                       content: Text(provider.error ?? 'Failed to delete'),
                       backgroundColor: Colors.red,

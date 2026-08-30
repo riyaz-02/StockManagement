@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -49,7 +50,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (mounted) {
         if (result['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Password changed successfully'),
               backgroundColor: Colors.green,
@@ -57,7 +59,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           );
           Navigator.pop(context);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(result['message'] ?? 'Failed to change password'),
               backgroundColor: Colors.red,
@@ -67,7 +70,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
@@ -84,7 +88,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -114,7 +118,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade700, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -138,8 +143,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 labelText: 'Current Password *',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureCurrentPassword ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
+                  icon: Icon(_obscureCurrentPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility),
+                  onPressed: () => setState(
+                      () => _obscureCurrentPassword = !_obscureCurrentPassword),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -164,8 +172,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 labelText: 'New Password *',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureNewPassword ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                  icon: Icon(_obscureNewPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility),
+                  onPressed: () => setState(
+                      () => _obscureNewPassword = !_obscureNewPassword),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -196,8 +207,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 labelText: 'Confirm New Password *',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  icon: Icon(_obscureConfirmPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility),
+                  onPressed: () => setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),

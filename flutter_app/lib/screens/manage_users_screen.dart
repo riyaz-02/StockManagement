@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'add_user_screen.dart';
+import '../utils/app_toast.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -78,7 +79,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         final result = await _apiService.deleteUser(userId);
         if (result['success'] == true) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               SnackBar(
                 content: Text('$userName deleted successfully'),
                 backgroundColor: Colors.green,
@@ -88,7 +90,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               SnackBar(
                 content: Text(result['message'] ?? 'Failed to delete user'),
                 backgroundColor: Colors.red,
@@ -98,7 +101,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text('Error: $e'),
               backgroundColor: Colors.red,
@@ -165,7 +169,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(_error!),
                       const SizedBox(height: 16),
@@ -181,7 +186,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                          const Icon(Icons.people_outline,
+                              size: 64, color: Colors.grey),
                           const SizedBox(height: 16),
                           const Text(
                             'No users found',
@@ -203,14 +209,15 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                         itemBuilder: (context, index) {
                           final user = _users[index];
                           final isCurrentUser = user['_id'] == currentUserId;
-                          
+
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: isCurrentUser
-                                  ? Border.all(color: AppColors.primary, width: 2)
+                                  ? Border.all(
+                                      color: AppColors.primary, width: 2)
                                   : null,
                               boxShadow: [
                                 BoxShadow(
@@ -221,15 +228,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                               ],
                             ),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
                               leading: CircleAvatar(
                                 radius: 28,
-                                backgroundColor: AppColors.primary.withOpacity(0.1),
+                                backgroundColor:
+                                    AppColors.primary.withOpacity(0.1),
                                 backgroundImage: user['profileImage'] != null
                                     ? NetworkImage(user['profileImage'])
                                     : null,
                                 child: user['profileImage'] == null
-                                    ? Icon(Icons.person, color: AppColors.primary)
+                                    ? Icon(Icons.person,
+                                        color: AppColors.primary)
                                     : null,
                               ),
                               title: Row(
@@ -245,7 +255,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                   ),
                                   if (isCurrentUser)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: AppColors.primary,
                                         borderRadius: BorderRadius.circular(12),
@@ -267,13 +278,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     user['mobile'] ?? '',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 13),
                                   ),
                                   const SizedBox(height: 4),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: _getRoleColor(user['role']).withOpacity(0.1),
+                                      color: _getRoleColor(user['role'])
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -292,10 +306,14 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                 onSelected: (value) {
                                   if (value == 'edit') {
                                     // TODO: Navigate to edit user screen
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Edit user coming soon!')),
+                                    showAppSnackBar(
+                                      context,
+                                      const SnackBar(
+                                          content:
+                                              Text('Edit user coming soon!')),
                                     );
-                                  } else if (value == 'delete' && !isCurrentUser) {
+                                  } else if (value == 'delete' &&
+                                      !isCurrentUser) {
                                     _deleteUser(user['_id'], user['name']);
                                   }
                                 },
@@ -315,9 +333,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                       value: 'delete',
                                       child: Row(
                                         children: [
-                                          Icon(Icons.delete, size: 18, color: Colors.red),
+                                          Icon(Icons.delete,
+                                              size: 18, color: Colors.red),
                                           SizedBox(width: 8),
-                                          Text('Delete', style: TextStyle(color: Colors.red)),
+                                          Text('Delete',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
                                         ],
                                       ),
                                     ),

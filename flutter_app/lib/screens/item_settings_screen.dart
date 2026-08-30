@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class ItemSettingsScreen extends StatefulWidget {
   const ItemSettingsScreen({super.key});
@@ -50,8 +51,10 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
                 title: 'Item Types',
                 icon: Icons.category_outlined,
                 items: provider.itemTypes,
-                onAdd: () => _showAddDialog(context, 'Item Type', 'item', 'itemTypes'),
-                onDelete: (value) => _deleteValue(context, 'item', 'itemTypes', value),
+                onAdd: () =>
+                    _showAddDialog(context, 'Item Type', 'item', 'itemTypes'),
+                onDelete: (value) =>
+                    _deleteValue(context, 'item', 'itemTypes', value),
               ),
               const SizedBox(height: 12),
               _buildSettingSection(
@@ -59,8 +62,10 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
                 title: 'Metal Types',
                 icon: Icons.diamond_outlined,
                 items: provider.metalTypes,
-                onAdd: () => _showAddDialog(context, 'Metal Type', 'item', 'metalTypes'),
-                onDelete: (value) => _deleteValue(context, 'item', 'metalTypes', value),
+                onAdd: () =>
+                    _showAddDialog(context, 'Metal Type', 'item', 'metalTypes'),
+                onDelete: (value) =>
+                    _deleteValue(context, 'item', 'metalTypes', value),
               ),
               const SizedBox(height: 12),
               _buildSettingSection(
@@ -68,8 +73,10 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
                 title: 'Purity Options',
                 icon: Icons.verified_outlined,
                 items: provider.purityOptions,
-                onAdd: () => _showAddDialog(context, 'Purity Option', 'item', 'purityOptions'),
-                onDelete: (value) => _deleteValue(context, 'item', 'purityOptions', value),
+                onAdd: () => _showAddDialog(
+                    context, 'Purity Option', 'item', 'purityOptions'),
+                onDelete: (value) =>
+                    _deleteValue(context, 'item', 'purityOptions', value),
               ),
             ],
           );
@@ -102,7 +109,8 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
               ],
             ),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+            border:
+                Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -153,7 +161,8 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
                   children: items.map((item) {
                     return Chip(
                       label: Text(
-                        item[0].toUpperCase() + item.substring(1).replaceAll('-', ' '),
+                        item[0].toUpperCase() +
+                            item.substring(1).replaceAll('-', ' '),
                         style: const TextStyle(fontSize: 13),
                       ),
                       deleteIcon: const Icon(Icons.close, size: 18),
@@ -173,7 +182,8 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
     );
   }
 
-  void _showAddDialog(BuildContext context, String itemName, String category, String type) {
+  void _showAddDialog(
+      BuildContext context, String itemName, String category, String type) {
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -198,14 +208,19 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
                 Navigator.pop(dialogContext);
-                final value = controller.text.trim().toLowerCase().replaceAll(' ', '-');
-                final provider = Provider.of<SettingsProvider>(context, listen: false);
+                final value =
+                    controller.text.trim().toLowerCase().replaceAll(' ', '-');
+                final provider =
+                    Provider.of<SettingsProvider>(context, listen: false);
                 final success = await provider.addValue(category, type, value);
-                
+
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  showAppSnackBar(
+                    context,
                     SnackBar(
-                      content: Text(success ? '$itemName added successfully' : 'Failed to add $itemName'),
+                      content: Text(success
+                          ? '$itemName added successfully'
+                          : 'Failed to add $itemName'),
                       backgroundColor: success ? Colors.green : Colors.red,
                     ),
                   );
@@ -219,7 +234,8 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
     );
   }
 
-  void _deleteValue(BuildContext context, String category, String type, String value) {
+  void _deleteValue(
+      BuildContext context, String category, String type, String value) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -241,13 +257,16 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final provider = Provider.of<SettingsProvider>(context, listen: false);
+              final provider =
+                  Provider.of<SettingsProvider>(context, listen: false);
               final success = await provider.deleteValue(category, type, value);
-              
+
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                showAppSnackBar(
+                  context,
                   SnackBar(
-                    content: Text(success ? 'Deleted successfully' : 'Failed to delete'),
+                    content: Text(
+                        success ? 'Deleted successfully' : 'Failed to delete'),
                     backgroundColor: success ? Colors.red : Colors.grey,
                   ),
                 );

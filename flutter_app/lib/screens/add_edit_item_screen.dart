@@ -17,18 +17,19 @@ import '../utils/app_constants.dart';
 import '../utils/app_colors.dart';
 import '../services/api_service.dart';
 import 'barcode_scanner_for_assignment.dart';
+import '../utils/app_toast.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final Item? item; // Add this
   final String? itemId;
   final String? initialContainerId;
   final int? initialSlotNumber;
-  
+
   const AddEditItemScreen({
-    super.key, 
+    super.key,
     this.item, // Add this
-    this.itemId, 
-    this.initialContainerId, 
+    this.itemId,
+    this.initialContainerId,
     this.initialSlotNumber,
   });
 
@@ -43,7 +44,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _weightController = TextEditingController();
   final _piecesController = TextEditingController(text: '1');
   final _huidController = TextEditingController();
-  
+
   String _selectedItemType = ''; // Start blank
   String _selectedMetalType = ''; // Start blank
   String _selectedPurity = ''; // Start blank
@@ -51,16 +52,17 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String _selectedWeightAccuracy = 'exact'; // Default
   String? _selectedContainerId;
   int? _selectedSlotNumber;
-  
+
   // Certification - Simple checkboxes
   bool _isHallmarked = false;
   bool _isHUID = false;
-  
+
   String _generatedBarcode = '';
   bool _isLoadingContainers = false;
   bool _isUploadingImages = false; // Track upload status
   int? _deletingImageIndex; // Track which image is being deleted
-  bool _isDeletingExisting = false; // Track if deleting existing or uploaded image
+  bool _isDeletingExisting =
+      false; // Track if deleting existing or uploaded image
 
   List<Map<String, dynamic>> _recommendedContainers = [];
   final List<XFile> _selectedImages = [];
@@ -83,13 +85,13 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _generatedBarcode = item.barcode;
       _weightController.text = item.netWeight.toString();
       _piecesController.text = item.numberOfPieces.toString();
-      
+
       _selectedItemType = item.itemType;
       _selectedMetalType = item.metalType;
       _selectedPurity = item.purity;
       _selectedWeightCategory = item.weightCategory;
       _selectedWeightAccuracy = item.weightAccuracy;
-      
+
       // Load certification data
       _isHallmarked = item.certificationType == 'hallmarked';
       _isHUID = item.certificationType == 'huid';
@@ -99,7 +101,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       // Handle Container & Slot
       _selectedContainerId = item.containerId;
       _selectedSlotNumber = item.slotNumber;
-      
+
       // Initialize existing images
       _existingImages = List.from(item.images);
     } else {
@@ -115,49 +117,55 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
 
     // Fetch settings on init and set default values IF NOT EDITING
-  Future.microtask(() async {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    await settingsProvider.fetchItemSettings();
-    
-    // Always fetch containers to ensure dropdown is populated
-    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-    await containerProvider.fetchContainers();
-    
-    // Validate initial container is not locked
-    if (widget.initialContainerId != null && mounted) {
-      final initialContainer = containerProvider.containers.firstWhere(
-        (c) => c.id == widget.initialContainerId,
-        orElse: () => containerProvider.containers.first,
-      );
-      
-      // If the initial container is locked, clear the selection and show warning
-      if (initialContainer.isLocked) {
-        setState(() {
-          _selectedContainerId = null;
-          _selectedSlotNumber = null;
-        });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Container "${initialContainer.name}" is locked. Please select a different container.'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 4),
-            ),
-          );
+    Future.microtask(() async {
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
+      await settingsProvider.fetchItemSettings();
+
+      // Always fetch containers to ensure dropdown is populated
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
+      await containerProvider.fetchContainers();
+
+      // Validate initial container is not locked
+      if (widget.initialContainerId != null && mounted) {
+        final initialContainer = containerProvider.containers.firstWhere(
+          (c) => c.id == widget.initialContainerId,
+          orElse: () => containerProvider.containers.first,
+        );
+
+        // If the initial container is locked, clear the selection and show warning
+        if (initialContainer.isLocked) {
+          setState(() {
+            _selectedContainerId = null;
+            _selectedSlotNumber = null;
+          });
+
+          if (mounted) {
+            showAppSnackBar(
+              context,
+              SnackBar(
+                content: Text(
+                    'Container "${initialContainer.name}" is locked. Please select a different container.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
         }
       }
-    }
-    
-    if (mounted) {
-      // Don't auto-fill type/metal/purity - let user choose
-      // Only trigger analysis if we have values to analyze
-      if (_selectedItemType.isNotEmpty && _selectedMetalType.isNotEmpty && _selectedPurity.isNotEmpty) {
-        _analyzeContainer();
+
+      if (mounted) {
+        // Don't auto-fill type/metal/purity - let user choose
+        // Only trigger analysis if we have values to analyze
+        if (_selectedItemType.isNotEmpty &&
+            _selectedMetalType.isNotEmpty &&
+            _selectedPurity.isNotEmpty) {
+          _analyzeContainer();
+        }
       }
-    }
-  });
-}
+    });
+  }
 
   @override
   void dispose() {
@@ -183,22 +191,22 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   }
 
   void _onWeightChanged() {
-     // Weight category is now manually selected by user, not auto-calculated
-     // Only trigger container analysis when weight changes
-     _analyzeContainer();
+    // Weight category is now manually selected by user, not auto-calculated
+    // Only trigger container analysis when weight changes
+    _analyzeContainer();
   }
 
   Future<void> _analyzeContainer() async {
     // Force async execution to avoid "setState during build" and race conditions
     await Future.delayed(Duration.zero);
-    
+
     // Determine Weight Category
     double weight = double.tryParse(_weightController.text) ?? 0.0;
-    
+
     // Auto-set category if user hasn't manually overridden (or just update logical variable)
     // For now, let's keep it simple: Calculate it for recommendation, but also update the UI dropdown if needed?
     // User asked for "optional" field. Let's make the dropdown control the logic.
-    
+
     // If we want auto-calculation to update the dropdown:
     String calculatedCategory = 'Light';
     if (weight > 100) {
@@ -206,50 +214,55 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     } else if (weight > 10) {
       calculatedCategory = 'Medium';
     }
-    
+
     // Use the selected category for logic, defaulting to calculated if not set (but we initialized it)
     // Actually, user might want auto-calc to update the dropdown. Let's do that in _onSpecsChanged listener instead?
     // For now, let's just use _selectedWeightCategory for the logic.
     String weightCategory = _selectedWeightCategory;
 
     try {
-      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
-      
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
+
       // Only show loading if we need to fetch data
       if (containerProvider.containers.isEmpty) {
         setState(() => _isLoadingContainers = true);
         await containerProvider.fetchContainers();
       }
-      
+
       final containers = containerProvider.containers;
       final recommended = containers.map((container) {
         // Advanced Scoring Algorithm
         int score = 0;
-        
+
         // 1. Metal Type Match (Highest Priority)
-        bool metalMatch = container.metalType.any((m) => m.toLowerCase() == _selectedMetalType.toLowerCase());
+        bool metalMatch = container.metalType
+            .any((m) => m.toLowerCase() == _selectedMetalType.toLowerCase());
         if (metalMatch) score += 10;
-        
+
         // 2. Item Type Match
-        bool typeMatch = container.allowedItemTypes.any((t) => t.toLowerCase() == _selectedItemType.toLowerCase());
+        bool typeMatch = container.allowedItemTypes
+            .any((t) => t.toLowerCase() == _selectedItemType.toLowerCase());
         if (typeMatch) score += 5;
-        
+
         // 3. Status checks
         bool isLocked = container.isLocked;
         bool isActive = container.isActive;
         bool hasSpace = container.availableSlots > 0;
-        
+
         if (!isActive) score -= 100; // Dead container
-        if (isLocked) score -= 50;   // Locked container
-        if (!hasSpace) score -= 20;  // Full container
-        
+        if (isLocked) score -= 50; // Locked container
+        if (!hasSpace) score -= 20; // Full container
+
         // 4. Weight Category Preference (Bonus)
-        if (container.weightCategory.toLowerCase() == weightCategory.toLowerCase()) {
+        if (container.weightCategory.toLowerCase() ==
+            weightCategory.toLowerCase()) {
           score += 2;
         }
 
         // Determine usability
-        bool isAssignable = isActive && !isLocked && hasSpace && metalMatch && typeMatch;
+        bool isAssignable =
+            isActive && !isLocked && hasSpace && metalMatch && typeMatch;
 
         return {
           'id': container.id,
@@ -259,23 +272,26 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
           'totalSlots': container.capacity,
           'score': score,
           'isAssignable': isAssignable,
-          'status': isLocked ? 'Locked' : (!isActive ? 'Inactive' : (!hasSpace ? 'Full' : 'Active')),
+          'status': isLocked
+              ? 'Locked'
+              : (!isActive ? 'Inactive' : (!hasSpace ? 'Full' : 'Active')),
           'metalMatch': metalMatch,
           'typeMatch': typeMatch,
         };
       }).toList();
-      
+
       // Sort: Highest score first, then by available slots (most empty first)
       recommended.sort((a, b) {
         int scoreComp = (b['score'] as int).compareTo(a['score'] as int);
         if (scoreComp != 0) return scoreComp;
-        return (b['availableSlots'] as int).compareTo(a['availableSlots'] as int);
+        return (b['availableSlots'] as int)
+            .compareTo(a['availableSlots'] as int);
       });
-      
+
       setState(() {
         _recommendedContainers = recommended;
         _isLoadingContainers = false;
-        
+
         // Auto-select logic: Only auto-select if no container was pre-selected
         // If user came from container slot, preserve that selection
         if (_selectedContainerId == null || widget.initialContainerId == null) {
@@ -293,12 +309,12 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
   }
 
-
   /// Checks if [barcode] is already assigned to another item.
   /// Uses the dedicated /items/barcode/:code endpoint for exact match lookup.
   /// In edit mode, [excludeItemId] is the current item's id so its own barcode
   /// is not treated as a duplicate.
-  Future<void> _checkBarcodeExists(String barcode, {String? excludeItemId}) async {
+  Future<void> _checkBarcodeExists(String barcode,
+      {String? excludeItemId}) async {
     try {
       final apiService = ApiService();
       // Use getItemByBarcode — exact match on /items/barcode/:code
@@ -327,7 +343,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         _generatedBarcode = barcode;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Barcode assigned successfully'),
             backgroundColor: Colors.green,
@@ -345,7 +362,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
           _generatedBarcode = barcode;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Barcode assigned successfully'),
               backgroundColor: Colors.green,
@@ -356,7 +374,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       }
       // Genuine network / server error
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error checking barcode: $e'),
             backgroundColor: Colors.red,
@@ -371,9 +390,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   Future<void> _scanBarcode() async {
     if (kIsWeb) {
       // Camera scanning not supported on web — inform user
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(
-          content: Text('Camera scanning is not supported on web. Please enter the barcode manually.'),
+          content: Text(
+              'Camera scanning is not supported on web. Please enter the barcode manually.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -423,7 +444,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Name: ${existingItem['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Name: ${existingItem['name']}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text('Type: ${existingItem['itemType']}'),
                   Text('Metal: ${existingItem['metalType']}'),
                   Text('Weight: ${existingItem['netWeight']}g'),
@@ -477,7 +499,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFFE94560)),
+              leading:
+                  const Icon(Icons.photo_library, color: Color(0xFFE94560)),
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
@@ -497,7 +520,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      
+
       if (image == null) return;
 
       setState(() => _isUploadingImages = true);
@@ -505,16 +528,17 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       try {
         print('[CAMERA] Uploading captured image to Cloudinary...');
         final result = await _apiService.uploadImage(image);
-        
+
         if (result['success'] == true) {
           final imageUrl = result['data']['url'];
           setState(() {
             _uploadedImageUrls.add(imageUrl);
           });
           print('[CAMERA] ✅ Uploaded: $imageUrl');
-          
+
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               const SnackBar(
                 content: Text('Photo captured and uploaded successfully'),
                 backgroundColor: Colors.green,
@@ -528,7 +552,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       } catch (e) {
         print('[CAMERA] ❌ Failed to upload: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text('Failed to upload photo: $e'),
               backgroundColor: Colors.red,
@@ -558,7 +583,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         try {
           print('[UPLOAD] Uploading ${image.name} to Cloudinary...');
           final result = await _apiService.uploadImage(image);
-          
+
           if (result['success'] == true) {
             final imageUrl = result['data']['url'];
             setState(() {
@@ -587,7 +612,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
             leading: const Icon(Icons.check_circle, color: Colors.green),
             actions: [
               TextButton(
-                onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                onPressed: () =>
+                    ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
                 child: const Text('DISMISS'),
               ),
             ],
@@ -617,12 +643,13 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _isDeletingExisting = isExisting;
     });
 
-    final imageUrl = isExisting ? _existingImages[index] : _uploadedImageUrls[index];
-    
+    final imageUrl =
+        isExisting ? _existingImages[index] : _uploadedImageUrls[index];
+
     try {
       // Delete from Cloudinary
       final deleted = await _apiService.deleteImage(imageUrl);
-      
+
       if (deleted) {
         setState(() {
           if (isExisting) {
@@ -633,7 +660,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
           _deletingImageIndex = null;
           _isDeletingExisting = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showMaterialBanner(
             MaterialBanner(
@@ -642,7 +669,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               leading: const Icon(Icons.delete_outline, color: Colors.orange),
               actions: [
                 TextButton(
-                  onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                  onPressed: () =>
+                      ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
                   child: const Text('DISMISS'),
                 ),
               ],
@@ -669,16 +697,19 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   Future<void> _saveItem() async {
     if (_formKey.currentState!.validate()) {
       // Validation 1: Ensure a container is selected (only for NEW items)
-      if (widget.item == null && (_selectedContainerId == null || _selectedContainerId!.isEmpty)) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (widget.item == null &&
+          (_selectedContainerId == null || _selectedContainerId!.isEmpty)) {
+        showAppSnackBar(
+          context,
           const SnackBar(
-            content: Text('Please select a valid container before saving the item.'),
+            content:
+                Text('Please select a valid container before saving the item.'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
-      
+
       // Validation 2: Check if selected container is locked (only if container is being changed)
       if (_selectedContainerId != null) {
         Map<String, dynamic>? selectedContainer;
@@ -689,31 +720,37 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         } catch (e) {
           selectedContainer = null;
         }
-        
-        if (selectedContainer != null && selectedContainer['status'] == 'Locked') {
-          ScaffoldMessenger.of(context).showSnackBar(
+
+        if (selectedContainer != null &&
+            selectedContainer['status'] == 'Locked') {
+          showAppSnackBar(
+            context,
             const SnackBar(
-              content: Text('Cannot add items to a locked container. Please select a different container.'),
+              content: Text(
+                  'Cannot add items to a locked container. Please select a different container.'),
               backgroundColor: Colors.orange,
             ),
           );
           return;
         }
-        
+
         // Validation 3: Check if container is assignable
-        if (selectedContainer != null && selectedContainer['isAssignable'] == false) {
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (selectedContainer != null &&
+            selectedContainer['isAssignable'] == false) {
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('Cannot add items to this container. Status: ${selectedContainer['status']}'),
+              content: Text(
+                  'Cannot add items to this container. Status: ${selectedContainer['status']}'),
               backgroundColor: Colors.orange,
             ),
           );
           return;
         }
       }
-      
+
       final itemProvider = Provider.of<ItemProvider>(context, listen: false);
-      
+
       // Determine certification type
       String certificationType = 'none';
       if (_isHallmarked) {
@@ -721,7 +758,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       } else if (_isHUID) {
         certificationType = 'huid';
       }
-      
+
       final itemData = {
         'name': _nameController.text,
         'barcode': _barcodeController.text,
@@ -752,15 +789,18 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text(widget.item != null ? 'Item updated successfully' : 'Item created successfully'),
-              backgroundColor: Colors.green
-            ),
+                content: Text(widget.item != null
+                    ? 'Item updated successfully'
+                    : 'Item created successfully'),
+                backgroundColor: Colors.green),
           );
           Navigator.pop(context, true); // Return true to signal refresh
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(itemProvider.error ?? 'Failed to save item'),
               backgroundColor: Colors.red,
@@ -772,38 +812,47 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   }
 
   Future<void> _deleteItem() async {
-     bool confirm = await showDialog(
-       context: context, 
-       builder: (ctx) => AlertDialog(
-         title: const Text('Delete Item?'),
-         content: const Text('Are you sure you want to delete this item? This cannot be undone.'),
-         actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              onPressed: () => Navigator.pop(ctx, true), 
-              child: const Text('Delete')
-            ),
-         ],
-       )
-     ) ?? false;
+    bool confirm = await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Item?'),
+                  content: const Text(
+                      'Are you sure you want to delete this item? This cannot be undone.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel')),
+                    TextButton(
+                        style:
+                            TextButton.styleFrom(foregroundColor: Colors.red),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete')),
+                  ],
+                )) ??
+        false;
 
-     if (confirm) {
-        final itemProvider = Provider.of<ItemProvider>(context, listen: false);
-        final success = await itemProvider.deleteItem(widget.item!.id);
-        if (mounted) {
-          if (success) {
-            Navigator.pop(context); // Close screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Item deleted successfully'), backgroundColor: Colors.green),
-            );
-          } else {
-             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(itemProvider.error ?? 'Failed to delete'), backgroundColor: Colors.red),
-            );
-          }
+    if (confirm) {
+      final itemProvider = Provider.of<ItemProvider>(context, listen: false);
+      final success = await itemProvider.deleteItem(widget.item!.id);
+      if (mounted) {
+        if (success) {
+          Navigator.pop(context); // Close screen
+          showAppSnackBar(
+            context,
+            const SnackBar(
+                content: Text('Item deleted successfully'),
+                backgroundColor: Colors.green),
+          );
+        } else {
+          showAppSnackBar(
+            context,
+            SnackBar(
+                content: Text(itemProvider.error ?? 'Failed to delete'),
+                backgroundColor: Colors.red),
+          );
         }
-     }
+      }
+    }
   }
 
   @override
@@ -847,7 +896,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 required: true,
               ),
               const SizedBox(height: 16),
-              
+
               // 2. Type & Metal
               Row(
                 children: [
@@ -856,7 +905,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       value: _selectedItemType,
                       label: 'Type',
                       icon: Icons.category_outlined,
-                      items: Provider.of<SettingsProvider>(context).itemTypes.isNotEmpty
+                      items: Provider.of<SettingsProvider>(context)
+                              .itemTypes
+                              .isNotEmpty
                           ? Provider.of<SettingsProvider>(context).itemTypes
                           : ['ring'],
                       onChanged: (value) {
@@ -871,7 +922,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       value: _selectedMetalType,
                       label: 'Metal',
                       icon: Icons.diamond_outlined,
-                      items: Provider.of<SettingsProvider>(context).metalTypes.isNotEmpty
+                      items: Provider.of<SettingsProvider>(context)
+                              .metalTypes
+                              .isNotEmpty
                           ? Provider.of<SettingsProvider>(context).metalTypes
                           : ['gold'],
                       onChanged: (value) {
@@ -883,7 +936,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // 3. Purity & Weight
               Row(
                 children: [
@@ -892,7 +945,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       value: _selectedPurity,
                       label: 'Purity',
                       icon: Icons.verified_outlined,
-                      items: Provider.of<SettingsProvider>(context).purityOptions.isNotEmpty
+                      items: Provider.of<SettingsProvider>(context)
+                              .purityOptions
+                              .isNotEmpty
                           ? Provider.of<SettingsProvider>(context).purityOptions
                           : ['916'],
                       onChanged: (value) {
@@ -909,7 +964,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       label: 'Weight',
                       icon: Icons.scale_outlined,
                       required: true,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       suffix: 'g',
                       hint: '0.000',
                     ),
@@ -971,7 +1027,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // 4. Certification Options (in one row)
               Row(
                 children: [
@@ -991,33 +1047,45 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _isHallmarked ? const Color(0xFFB8860B) : Colors.grey[300]!,
+                            color: _isHallmarked
+                                ? const Color(0xFFB8860B)
+                                : Colors.grey[300]!,
                             width: _isHallmarked ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),
-                          color: _isHallmarked ? const Color(0xFFFFD700).withOpacity(0.1) : null,
+                          color: _isHallmarked
+                              ? const Color(0xFFFFD700).withOpacity(0.1)
+                              : null,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _isHallmarked ? Icons.check_circle : Icons.circle_outlined,
-                              color: _isHallmarked ? const Color(0xFFB8860B) : Colors.grey,
+                              _isHallmarked
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: _isHallmarked
+                                  ? const Color(0xFFB8860B)
+                                  : Colors.grey,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             const Text(
                               'Hallmarked',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                             if (_isHallmarked) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFD700).withOpacity(0.3),
+                                  color:
+                                      const Color(0xFFFFD700).withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFFB8860B)),
+                                  border: Border.all(
+                                      color: const Color(0xFFB8860B)),
                                 ),
                                 child: const Text(
                                   '916',
@@ -1035,7 +1103,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  
+
                   // HUID Option
                   Expanded(
                     child: InkWell(
@@ -1053,33 +1121,45 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _isHUID ? const Color(0xFF0D47A1) : Colors.grey[300]!,
+                            color: _isHUID
+                                ? const Color(0xFF0D47A1)
+                                : Colors.grey[300]!,
                             width: _isHUID ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),
-                          color: _isHUID ? const Color(0xFF2196F3).withOpacity(0.1) : null,
+                          color: _isHUID
+                              ? const Color(0xFF2196F3).withOpacity(0.1)
+                              : null,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _isHUID ? Icons.check_circle : Icons.circle_outlined,
-                              color: _isHUID ? const Color(0xFF0D47A1) : Colors.grey,
+                              _isHUID
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: _isHUID
+                                  ? const Color(0xFF0D47A1)
+                                  : Colors.grey,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             const Text(
                               'HUID',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                             if (_isHUID) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2196F3).withOpacity(0.3),
+                                  color:
+                                      const Color(0xFF2196F3).withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFF0D47A1)),
+                                  border: Border.all(
+                                      color: const Color(0xFF0D47A1)),
                                 ),
                                 child: const Text(
                                   'HUID',
@@ -1098,7 +1178,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                   ),
                 ],
               ),
-              
+
               // HUID Number Input (shown when HUID is selected)
               if (_isHUID) ...[
                 const SizedBox(height: 12),
@@ -1121,7 +1201,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              
+
               // 6. Container Selection
               if (_isLoadingContainers)
                 const LinearProgressIndicator()
@@ -1134,7 +1214,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Item Images', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text('Item Images',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   TextButton.icon(
                     onPressed: _showImageSourceDialog,
                     icon: const Icon(Icons.add_a_photo),
@@ -1143,7 +1225,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (_existingImages.isNotEmpty || _uploadedImageUrls.isNotEmpty || _isUploadingImages)
+              if (_existingImages.isNotEmpty ||
+                  _uploadedImageUrls.isNotEmpty ||
+                  _isUploadingImages)
                 SizedBox(
                   height: 100,
                   child: ListView(
@@ -1157,9 +1241,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         if (path.startsWith('http')) {
                           imageUrl = path;
                         } else {
-                          imageUrl = '${AppConstants.baseUrl}/${path.replaceAll('\\', '/')}';
+                          imageUrl =
+                              '${AppConstants.baseUrl}/${path.replaceAll('\\', '/')}';
                         }
-                        
+
                         return Stack(
                           children: [
                             Container(
@@ -1175,12 +1260,15 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                                 child: Image.network(
                                   imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                  errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.broken_image,
+                                          color: Colors.grey)),
                                 ),
                               ),
                             ),
                             // Loading overlay during deletion
-                            if (_deletingImageIndex == index && _isDeletingExisting)
+                            if (_deletingImageIndex == index &&
+                                _isDeletingExisting)
                               Container(
                                 margin: const EdgeInsets.only(right: 8),
                                 width: 100,
@@ -1200,26 +1288,33 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                               top: 4,
                               right: 12,
                               child: GestureDetector(
-                                onTap: (_deletingImageIndex == index && _isDeletingExisting) 
-                                    ? null 
-                                    : () => _removeImage(index, isExisting: true),
+                                onTap: (_deletingImageIndex == index &&
+                                        _isDeletingExisting)
+                                    ? null
+                                    : () =>
+                                        _removeImage(index, isExisting: true),
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: (_deletingImageIndex == index && _isDeletingExisting) 
-                                        ? Colors.grey 
+                                    color: (_deletingImageIndex == index &&
+                                            _isDeletingExisting)
+                                        ? Colors.grey
                                         : Colors.red,
                                     shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                                    boxShadow: const [
+                                      BoxShadow(
+                                          color: Colors.black26, blurRadius: 2)
+                                    ],
                                   ),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                  child: const Icon(Icons.close,
+                                      size: 14, color: Colors.white),
                                 ),
                               ),
                             ),
                           ],
                         );
                       }),
-                      
+
                       // Newly Uploaded Images (Cloudinary)
                       ..._uploadedImageUrls.asMap().entries.map((entry) {
                         final index = entry.key;
@@ -1232,19 +1327,24 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                               height: 100,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.green.withOpacity(0.5)), // Green border for new
+                                border: Border.all(
+                                    color: Colors.green.withOpacity(
+                                        0.5)), // Green border for new
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
                                   imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                  errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.broken_image,
+                                          color: Colors.grey)),
                                 ),
                               ),
                             ),
                             // Loading overlay during deletion
-                            if (_deletingImageIndex == index && !_isDeletingExisting)
+                            if (_deletingImageIndex == index &&
+                                !_isDeletingExisting)
                               Container(
                                 margin: const EdgeInsets.only(right: 8),
                                 width: 100,
@@ -1264,26 +1364,33 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                               top: 4,
                               right: 12,
                               child: GestureDetector(
-                                onTap: (_deletingImageIndex == index && !_isDeletingExisting) 
-                                    ? null 
-                                    : () => _removeImage(index, isExisting: false),
+                                onTap: (_deletingImageIndex == index &&
+                                        !_isDeletingExisting)
+                                    ? null
+                                    : () =>
+                                        _removeImage(index, isExisting: false),
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: (_deletingImageIndex == index && !_isDeletingExisting) 
-                                        ? Colors.grey 
+                                    color: (_deletingImageIndex == index &&
+                                            !_isDeletingExisting)
+                                        ? Colors.grey
                                         : Colors.red,
                                     shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                                    boxShadow: const [
+                                      BoxShadow(
+                                          color: Colors.black26, blurRadius: 2)
+                                    ],
                                   ),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                  child: const Icon(Icons.close,
+                                      size: 14, color: Colors.white),
                                 ),
                               ),
                             ),
                           ],
                         );
                       }),
-                      
+
                       // Upload Progress Indicator
                       if (_isUploadingImages)
                         Container(
@@ -1292,7 +1399,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                           height: 100,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.withOpacity(0.5)),
+                            border:
+                                Border.all(color: Colors.blue.withOpacity(0.5)),
                             color: Colors.blue.withOpacity(0.1),
                           ),
                           child: const Center(
@@ -1302,20 +1410,21 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     ],
                   ),
                 )
-              else 
+              else
                 Container(
                   height: 60,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
+                    border: Border.all(
+                        color: Colors.grey[300]!, style: BorderStyle.solid),
                     borderRadius: BorderRadius.circular(8),
                     color: Colors.grey[50],
                   ),
                   child: Center(
-                     child: Text(
-                        'No images added',
-                        style: TextStyle(color: Colors.grey[500]),
-                     ),
+                    child: Text(
+                      'No images added',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
                   ),
                 ),
 
@@ -1338,7 +1447,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('BARCODE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const Text('BARCODE',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey)),
                           const SizedBox(height: 4),
                           Text(
                             _generatedBarcode,
@@ -1352,7 +1465,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         ],
                       ),
                     ),
-                    
+
                     // Visual Barcode
                     if (_generatedBarcode.isNotEmpty)
                       Expanded(
@@ -1369,7 +1482,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                           ),
                         ),
                       ),
-                    
+
                     // Actions
                     Container(
                       height: 40,
@@ -1381,7 +1494,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     if (!kIsWeb)
                       IconButton(
                         onPressed: _scanBarcode,
-                        icon: const Icon(Icons.qr_code_scanner, color: Color(0xFFE94560)),
+                        icon: const Icon(Icons.qr_code_scanner,
+                            color: Color(0xFFE94560)),
                         tooltip: 'Scan blank tag barcode',
                       ),
                     if (!kIsWeb)
@@ -1401,11 +1515,12 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               ),
 
               const SizedBox(height: 32),
-              
+
               // 9. Save Button
               Consumer<ItemProvider>(
                 builder: (context, provider, child) {
-                  final bool isDisabled = provider.isLoading || _isUploadingImages;
+                  final bool isDisabled =
+                      provider.isLoading || _isUploadingImages;
                   return SizedBox(
                     width: double.infinity,
                     height: 54,
@@ -1414,7 +1529,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       child: isDisabled
                           ? Row(
@@ -1430,12 +1546,20 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  _isUploadingImages ? 'UPLOADING IMAGES...' : 'SAVING...',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  _isUploadingImages
+                                      ? 'UPLOADING IMAGES...'
+                                      : 'SAVING...',
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ],
                             )
-                          : const Text('SAVE ITEM', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                          : const Text('SAVE ITEM',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2)),
                     ),
                   );
                 },
@@ -1460,11 +1584,12 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       ),
       isExpanded: true,
       selectedItemBuilder: (BuildContext context) {
-        return _recommendedContainers.map<Widget>((Map<String, dynamic> container) {
+        return _recommendedContainers
+            .map<Widget>((Map<String, dynamic> container) {
           return Text(
             '${container['name']} (${container['code']})',
             overflow: TextOverflow.ellipsis,
-             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           );
         }).toList();
       },
@@ -1473,18 +1598,19 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         final String status = container['status'] as String;
         final int available = container['availableSlots'] as int;
         final int total = container['totalSlots'] as int;
-        
+
         return DropdownMenuItem(
           value: container['id'] as String,
-          enabled: isAssignable, // Only enable if container is assignable (not locked, active, has space)
+          enabled:
+              isAssignable, // Only enable if container is assignable (not locked, active, has space)
           child: Opacity(
             opacity: isAssignable ? 1.0 : 0.5,
             child: Row(
               children: [
                 Icon(
-                   isAssignable ? Icons.check_circle : Icons.error_outline,
-                   color: isAssignable ? Colors.green : Colors.grey,
-                   size: 16,
+                  isAssignable ? Icons.check_circle : Icons.error_outline,
+                  color: isAssignable ? Colors.green : Colors.grey,
+                  size: 16,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1496,12 +1622,16 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       Text(
                         '${container['name']} (${container['code']})',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       Text(
                         '$available/$total Slots • $status',
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11, color: isAssignable ? Colors.grey[700] : Colors.red),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color:
+                                isAssignable ? Colors.grey[700] : Colors.red),
                       ),
                     ],
                   ),
@@ -1554,7 +1684,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
-      validator: validator ?? (required ? (value) => value?.isEmpty ?? true ? 'Required' : null : null),
+      validator: validator ??
+          (required
+              ? (value) => value?.isEmpty ?? true ? 'Required' : null
+              : null),
     );
   }
 
@@ -1564,13 +1697,14 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     if (RegExp(r'^\d').hasMatch(text)) {
       return text.toUpperCase(); // 916, 22k, etc.
     }
-    
+
     // Replace hyphens and underscores with spaces, then capitalize each word
     return text
         .replaceAll('-', ' ')
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .map((word) =>
+            word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join(' ');
   }
 
@@ -1594,10 +1728,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     if (safeItems.isEmpty) {
       safeItems.add('No options available');
     }
-    
+
     // Allow null value to show hint
     String? safeValue = value.isEmpty ? null : value;
-    
+
     return DropdownButtonFormField<String>(
       value: safeValue,
       hint: Text('Select $label', style: TextStyle(color: Colors.grey[600])),
@@ -1628,7 +1762,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         } else {
           displayText = _formatText(item);
         }
-        
+
         return DropdownMenuItem(
           value: item,
           child: Text(displayText),
@@ -1637,8 +1771,4 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       onChanged: onChanged,
     );
   }
-
-
-
-
 }

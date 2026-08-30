@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/analytics_provider.dart';
 import 'item_list_screen.dart';
+import 'inventory_snapshot_list_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({Key? key}) : super(key: key);
@@ -16,7 +17,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.initState();
     Future.microtask(() {
       if (mounted) {
-        Provider.of<AnalyticsProvider>(context, listen: false).fetchDashboardStats();
+        Provider.of<AnalyticsProvider>(context, listen: false)
+            .fetchDashboardStats();
       }
     });
   }
@@ -145,7 +147,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF27AE60).withOpacity(0.1),
+                                  color:
+                                      const Color(0xFF27AE60).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
@@ -187,16 +190,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             height: 110,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              itemCount: provider.currentStockMetalBreakdown.length,
+                              itemCount:
+                                  provider.currentStockMetalBreakdown.length,
                               itemBuilder: (context, index) {
-                                final metal = provider.currentStockMetalBreakdown[index];
+                                final metal =
+                                    provider.currentStockMetalBreakdown[index];
                                 return _buildMetalCard(
-                                  metal: metal['metal']?.toString() ?? 'Unknown',
+                                  metal:
+                                      metal['metal']?.toString() ?? 'Unknown',
                                   weight: (metal['weight'] ?? 0).toDouble(),
                                   count: metal['count'] ?? 0,
                                   status: 'active',
                                   isFirst: index == 0,
-                                  isLast: index == provider.currentStockMetalBreakdown.length - 1,
+                                  isLast: index ==
+                                      provider.currentStockMetalBreakdown
+                                              .length -
+                                          1,
                                 );
                               },
                             ),
@@ -206,6 +215,66 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     const SizedBox(height: 20),
                   ],
+
+                  // INVENTORY HISTORY - link to saved tally snapshots
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const InventorySnapshotListScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[300]!, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF27AE60).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.history,
+                              color: Color(0xFF27AE60),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Inventory History',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Saved inventory snapshots from past tallies',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: Colors.grey[400]),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                   // EXCLUDED FROM STOCK - Subtle grey section
                   if (provider.inRepairBreakdown.isNotEmpty ||
@@ -266,7 +335,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               ),
                             ],
                           ),
-                          
+
                           // In Repair
                           if (provider.inRepairBreakdown.isNotEmpty) ...[
                             const SizedBox(height: 20),
@@ -461,7 +530,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),

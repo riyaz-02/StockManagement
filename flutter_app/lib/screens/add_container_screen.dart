@@ -11,6 +11,7 @@ import '../providers/settings_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
+import '../utils/app_toast.dart';
 
 class AddContainerScreen extends StatefulWidget {
   const AddContainerScreen({super.key});
@@ -25,7 +26,7 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   final _capacityController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   final ApiService _apiService = ApiService();
-  
+
   String _selectedType = 'drawer';
   String _selectedWeightCategory = 'light';
 
@@ -33,11 +34,11 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   List<String> _selectedPurity = [];
   String _selectedLayoutType = 'grid';
   List<String> _selectedItemTypes = [];
-  
+
   // Image upload state
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
-  
+
   // Barcode state
   String _generatedBarcode = '';
   int _barcodeSerial = 1;
@@ -47,12 +48,13 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
     super.initState();
     // Fetch settings and set defaults
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
       await Future.wait([
         settingsProvider.fetchContainerSettings(),
         settingsProvider.fetchItemSettings(),
       ]);
-      
+
       if (mounted) {
         setState(() {
           // Update selected values to match loaded settings
@@ -104,7 +106,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              leading:
+                  const Icon(Icons.photo_library, color: AppColors.primary),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -123,15 +126,16 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image == null) return;
 
       setState(() => _isUploadingImage = true);
 
       try {
         print('[UPLOAD] Uploading container image to Cloudinary...');
-        final result = await _apiService.uploadImage(image, folder: 'containers');
-        
+        final result =
+            await _apiService.uploadImage(image, folder: 'containers');
+
         if (result['success'] == true) {
           final imageUrl = result['data']['url'];
           setState(() {
@@ -139,9 +143,10 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
             _isUploadingImage = false;
           });
           print('[UPLOAD] ✅ Uploaded: $imageUrl');
-          
+
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               const SnackBar(
                 content: Text('Image uploaded successfully'),
                 backgroundColor: Colors.green,
@@ -156,7 +161,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         setState(() => _isUploadingImage = false);
         print('[UPLOAD] ❌ Failed: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text('Failed to upload image: $e'),
               backgroundColor: Colors.red,
@@ -191,7 +197,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
       prefix = 'M';
     }
 
-    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    final containerProvider =
+        Provider.of<ContainerProvider>(context, listen: false);
     _barcodeSerial = await containerProvider.getNextSerial(prefix);
 
     setState(() {
@@ -202,7 +209,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   Future<void> _saveContainer() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedItemTypes.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Please select at least one item type'),
             backgroundColor: Colors.red,
@@ -211,7 +219,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         return;
       }
 
-      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
 
       final containerData = {
         'name': _nameController.text,
@@ -230,7 +239,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
 
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Container created successfully'),
               backgroundColor: Colors.green,
@@ -238,9 +248,11 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           );
           Navigator.pop(context);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text(containerProvider.error ?? 'Failed to create container'),
+              content:
+                  Text(containerProvider.error ?? 'Failed to create container'),
               backgroundColor: Colors.red,
             ),
           );
@@ -252,10 +264,10 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    
+
     // Wait for settings to load before showing form
-    if (settingsProvider.containerTypes.isEmpty || 
-        settingsProvider.weightCategories.isEmpty || 
+    if (settingsProvider.containerTypes.isEmpty ||
+        settingsProvider.weightCategories.isEmpty ||
         settingsProvider.layoutTypes.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Add Container')),
@@ -278,302 +290,344 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
         ),
       ),
       body: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-            // All fields in single section (no title/icon)
-            _buildSectionCard(
-              title: '',
-              icon: Icons.abc,
-              children: [
-                _buildTextField(
-                  controller: _nameController,
-                  label: 'Container Name',
-                  icon: Icons.label_outline,
-                  hint: 'e.g., Gold Ring Drawer 1',
-                  required: true,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Builder(
-                        builder: (context) {
-                          final items = Provider.of<SettingsProvider>(context).containerTypes.isNotEmpty
-                              ? Provider.of<SettingsProvider>(context).containerTypes
-                              : ['drawer'];
-                          // Ensure value exists in items
-                          final value = items.contains(_selectedType) ? _selectedType : items.first;
-                          return _buildDropdown(
-                            value: value,
-                            label: 'Type',
-                            icon: Icons.category_outlined,
-                            items: items,
-                            onChanged: (val) => setState(() => _selectedType = val!),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _capacityController,
-                        label: 'Capacity',
-                        icon: Icons.grid_3x3,
-                        hint: 'Slots',
-                        required: true,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Required';
-                          final num = int.tryParse(value!);
-                          if (num == null || num < 1) return 'Invalid';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Metal and Purity Row
-                const SizedBox(height: 12),
-                
-                // Metal Type Section
-                const Text('Metal Type', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: (Provider.of<SettingsProvider>(context).metalTypes.isEmpty 
-                      ? ['gold'] 
-                      : Provider.of<SettingsProvider>(context).metalTypes).map((type) {
-                    final isSelected = _selectedMetalTypes.contains(type);
-                    return FilterChip(
-                      label: Text(
-                        type[0].toUpperCase() + type.substring(1),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      selected: isSelected,
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedMetalTypes.add(type);
-                          } else {
-                            if (_selectedMetalTypes.length > 1) { // Prevent empty selection
-                              _selectedMetalTypes.remove(type);
-                            }
-                          }
-                        });
-                      },
-                      selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : Colors.grey[300]!,
-                          width: 1.5,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Purity Section
-                const Text('Purity (Optional)', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: (['all', ...Provider.of<SettingsProvider>(context).purityOptions.isEmpty 
-                      ? ['916'] 
-                      : Provider.of<SettingsProvider>(context).purityOptions]).map((type) {
-                    final isSelected = _selectedPurity.contains(type);
-                    return FilterChip(
-                      label: Text(
-                        type == 'all' ? 'All' : type,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      selected: isSelected,
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        setState(() {
-                           if (selected) {
-                            _selectedPurity.add(type);
-                          } else {
-                            if (_selectedPurity.length > 1) { // Prevent empty selection
-                              _selectedPurity.remove(type);
-                            }
-                          }
-                        });
-                      },
-                      selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : Colors.grey[300]!,
-                          width: 1.5,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Builder(
-                        builder: (context) {
-                          final items = Provider.of<SettingsProvider>(context).weightCategories.isNotEmpty
-                              ? Provider.of<SettingsProvider>(context).weightCategories
-                              : ['light'];
-                          final value = items.contains(_selectedWeightCategory) ? _selectedWeightCategory : items.first;
-                          return _buildDropdown(
-                            value: value,
-                            label: 'Weight Category',
-                            icon: Icons.scale_outlined,
-                            items: items,
-                            onChanged: (val) => setState(() => _selectedWeightCategory = val!),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Builder(
-                        builder: (context) {
-                          final items = Provider.of<SettingsProvider>(context).layoutTypes.isNotEmpty
-                              ? Provider.of<SettingsProvider>(context).layoutTypes
-                              : ['grid'];
-                          final value = items.contains(_selectedLayoutType) ? _selectedLayoutType : items.first;
-                          return _buildDropdown(
-                            value: value,
-                            label: 'Layout Type',
-                            icon: Icons.view_module_outlined,
-                            items: items,
-                            onChanged: (val) => setState(() => _selectedLayoutType = val!),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Allowed Item Types',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              // All fields in single section (no title/icon)
+              _buildSectionCard(
+                title: '',
+                icon: Icons.abc,
+                children: [
+                  _buildTextField(
+                    controller: _nameController,
+                    label: 'Container Name',
+                    icon: Icons.label_outline,
+                    hint: 'e.g., Gold Ring Drawer 1',
+                    required: true,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: (Provider.of<SettingsProvider>(context).itemTypes.isNotEmpty
-                      ? Provider.of<SettingsProvider>(context).itemTypes
-                      : ['ring']).map((type) {
-                    final isSelected = _selectedItemTypes.contains(type);
-                    return FilterChip(
-                      label: Text(
-                        _formatText(type),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final items = Provider.of<SettingsProvider>(context)
+                                    .containerTypes
+                                    .isNotEmpty
+                                ? Provider.of<SettingsProvider>(context)
+                                    .containerTypes
+                                : ['drawer'];
+                            // Ensure value exists in items
+                            final value = items.contains(_selectedType)
+                                ? _selectedType
+                                : items.first;
+                            return _buildDropdown(
+                              value: value,
+                              label: 'Type',
+                              icon: Icons.category_outlined,
+                              items: items,
+                              onChanged: (val) =>
+                                  setState(() => _selectedType = val!),
+                            );
+                          },
                         ),
                       ),
-                      selected: isSelected,
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedItemTypes.add(type);
-                          } else {
-                            _selectedItemTypes.remove(type);
-                          }
-                          _generateBarcode();
-                        });
-                      },
-                      selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : Colors.grey[300]!,
-                          width: 1.5,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _capacityController,
+                          label: 'Capacity',
+                          icon: Icons.grid_3x3,
+                          hint: 'Slots',
+                          required: true,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          validator: (value) {
+                            if (value?.isEmpty ?? true) return 'Required';
+                            final num = int.tryParse(value!);
+                            if (num == null || num < 1) return 'Invalid';
+                            return null;
+                          },
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Metal and Purity Row
+                  const SizedBox(height: 12),
 
-            // Image Upload Section
-            _buildImagePickerSection(),
-            const SizedBox(height: 12),
-            
-            // Barcode Display Section
-            if (_generatedBarcode.isNotEmpty) _buildBarcodeSection(),
-            const SizedBox(height: 16),
-
-            // Save Button
-            Consumer<ContainerProvider>(
-              builder: (context, provider, child) {
-                return SizedBox(
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: provider.isLoading ? null : _saveContainer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: provider.isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_circle_outline, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Create Container',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                  // Metal Type Section
+                  const Text('Metal Type',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: (Provider.of<SettingsProvider>(context)
+                                .metalTypes
+                                .isEmpty
+                            ? ['gold']
+                            : Provider.of<SettingsProvider>(context).metalTypes)
+                        .map((type) {
+                      final isSelected = _selectedMetalTypes.contains(type);
+                      return FilterChip(
+                        label: Text(
+                          type[0].toUpperCase() + type.substring(1),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: FontWeight.w600,
                           ),
+                        ),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedMetalTypes.add(type);
+                            } else {
+                              if (_selectedMetalTypes.length > 1) {
+                                // Prevent empty selection
+                                _selectedMetalTypes.remove(type);
+                              }
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: Colors.white.withOpacity(0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppColors.primary
+                                : Colors.grey[300]!,
+                            width: 1.5,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                );
-              },
-            ),
-          ],
+
+                  const SizedBox(height: 12),
+
+                  // Purity Section
+                  const Text('Purity (Optional)',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ([
+                      'all',
+                      ...Provider.of<SettingsProvider>(context)
+                              .purityOptions
+                              .isEmpty
+                          ? ['916']
+                          : Provider.of<SettingsProvider>(context).purityOptions
+                    ]).map((type) {
+                      final isSelected = _selectedPurity.contains(type);
+                      return FilterChip(
+                        label: Text(
+                          type == 'all' ? 'All' : type,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedPurity.add(type);
+                            } else {
+                              if (_selectedPurity.length > 1) {
+                                // Prevent empty selection
+                                _selectedPurity.remove(type);
+                              }
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: Colors.white.withOpacity(0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppColors.primary
+                                : Colors.grey[300]!,
+                            width: 1.5,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final items = Provider.of<SettingsProvider>(context)
+                                    .weightCategories
+                                    .isNotEmpty
+                                ? Provider.of<SettingsProvider>(context)
+                                    .weightCategories
+                                : ['light'];
+                            final value =
+                                items.contains(_selectedWeightCategory)
+                                    ? _selectedWeightCategory
+                                    : items.first;
+                            return _buildDropdown(
+                              value: value,
+                              label: 'Weight Category',
+                              icon: Icons.scale_outlined,
+                              items: items,
+                              onChanged: (val) => setState(
+                                  () => _selectedWeightCategory = val!),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final items = Provider.of<SettingsProvider>(context)
+                                    .layoutTypes
+                                    .isNotEmpty
+                                ? Provider.of<SettingsProvider>(context)
+                                    .layoutTypes
+                                : ['grid'];
+                            final value = items.contains(_selectedLayoutType)
+                                ? _selectedLayoutType
+                                : items.first;
+                            return _buildDropdown(
+                              value: value,
+                              label: 'Layout Type',
+                              icon: Icons.view_module_outlined,
+                              items: items,
+                              onChanged: (val) =>
+                                  setState(() => _selectedLayoutType = val!),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Allowed Item Types',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: (Provider.of<SettingsProvider>(context)
+                                .itemTypes
+                                .isNotEmpty
+                            ? Provider.of<SettingsProvider>(context).itemTypes
+                            : ['ring'])
+                        .map((type) {
+                      final isSelected = _selectedItemTypes.contains(type);
+                      return FilterChip(
+                        label: Text(
+                          _formatText(type),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedItemTypes.add(type);
+                            } else {
+                              _selectedItemTypes.remove(type);
+                            }
+                            _generateBarcode();
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: Colors.white.withOpacity(0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppColors.primary
+                                : Colors.grey[300]!,
+                            width: 1.5,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Image Upload Section
+              _buildImagePickerSection(),
+              const SizedBox(height: 12),
+
+              // Barcode Display Section
+              if (_generatedBarcode.isNotEmpty) _buildBarcodeSection(),
+              const SizedBox(height: 16),
+
+              // Save Button
+              Consumer<ContainerProvider>(
+                builder: (context, provider, child) {
+                  return SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: provider.isLoading ? null : _saveContainer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: provider.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_circle_outline, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Create Container',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -657,7 +711,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
       validator: validator ??
           (required
@@ -693,13 +748,16 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
       items: items.map((item) {
         return DropdownMenuItem(
           value: item,
           child: Text(
-            translate ? item[0].toUpperCase() + item.substring(1) : item.toUpperCase(), 
+            translate
+                ? item[0].toUpperCase() + item.substring(1)
+                : item.toUpperCase(),
           ),
         );
       }).toList(),
@@ -732,7 +790,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                         height: 60,
                         width: 60,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.broken_image),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -759,7 +818,8 @@ class _AddContainerScreenState extends State<AddContainerScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_photo_alternate, color: AppColors.primary, size: 24),
+                        Icon(Icons.add_photo_alternate,
+                            color: AppColors.primary, size: 24),
                         const SizedBox(width: 8),
                         Text(
                           'Add Image',

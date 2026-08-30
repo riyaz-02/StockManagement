@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/tally_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class CreateTallyScreen extends StatefulWidget {
   const CreateTallyScreen({super.key});
@@ -17,17 +18,17 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
   final _descriptionController = TextEditingController();
   final _expectedItemsController = TextEditingController();
   final _expectedContainersController = TextEditingController();
-  
+
   DateTime _selectedDate = DateTime.now();
   bool _isCalculating = false;
   bool _hasCalculated = false;
-  
+
   // Dynamic metal types with weight and count
   List<String> _metalTypes = [];
   Map<String, TextEditingController> _metalWeightControllers = {};
   Map<String, TextEditingController> _metalItemControllers = {};
   Map<String, bool> _metalEditable = {};
-  
+
   // Track which fields are editable
   bool _itemsEditable = false;
   bool _containersEditable = false;
@@ -46,7 +47,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
 
     try {
       final apiService = ApiService();
-      
+
       // Fetch metal types from settings
       print('=== FETCHING METAL TYPES ===');
       final settingsResponse = await apiService.getSettings('item');
@@ -54,11 +55,12 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
       print('  success: ${settingsResponse['success']}');
       print('  data type: ${settingsResponse['data'].runtimeType}');
       print('  data: ${settingsResponse['data']}');
-      
+
       if (settingsResponse['success'] == true) {
-        final Map<String, dynamic> settingsData = settingsResponse['data'] ?? {};
+        final Map<String, dynamic> settingsData =
+            settingsResponse['data'] ?? {};
         print('  settings keys: ${settingsData.keys.toList()}');
-        
+
         // Check if metalTypes exists in the map
         if (settingsData.containsKey('metalTypes')) {
           final List<dynamic> values = settingsData['metalTypes'] ?? [];
@@ -85,13 +87,15 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
       }
 
       // Fetch all items that are physically in the rack
-      final response = await apiService.getItems(queryParams: {'status': 'active,action_needed,in_stock,booked,wishlisted'});
+      final response = await apiService.getItems(queryParams: {
+        'status': 'active,action_needed,in_stock,booked,wishlisted'
+      });
 
       if (response['success'] == true) {
         final List<dynamic> items = response['data']['items'] ?? [];
-        
+
         print('[CREATE TALLY] Fetched ${items.length} items for tally');
-        
+
         // Calculate totals
         int totalItems = items.length;
         Map<String, double> metalWeights = {};
@@ -107,7 +111,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
         for (var item in items) {
           final metalType = (item['metalType'] ?? '').toString();
           final weight = (item['netWeight'] ?? 0).toDouble();
-          
+
           // Add weight and count to corresponding metal type
           if (metalWeights.containsKey(metalType)) {
             metalWeights[metalType] = (metalWeights[metalType] ?? 0) + weight;
@@ -127,7 +131,8 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
           final containerData = containersResponse['data'];
           if (containerData is List) {
             totalContainers = containerData.length;
-          } else if (containerData is Map && containerData.containsKey('containers')) {
+          } else if (containerData is Map &&
+              containerData.containsKey('containers')) {
             totalContainers = (containerData['containers'] as List).length;
           }
         }
@@ -137,11 +142,13 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
           setState(() {
             _expectedItemsController.text = totalItems.toString();
             _expectedContainersController.text = totalContainers.toString();
-            
+
             // Fill metal weights and counts
             for (var metal in _metalTypes) {
-              _metalWeightControllers[metal]?.text = (metalWeights[metal] ?? 0).toStringAsFixed(3);
-              _metalItemControllers[metal]?.text = (metalItemCounts[metal] ?? 0).toString();
+              _metalWeightControllers[metal]?.text =
+                  (metalWeights[metal] ?? 0).toStringAsFixed(3);
+              _metalItemControllers[metal]?.text =
+                  (metalItemCounts[metal] ?? 0).toString();
             }
           });
         }
@@ -185,11 +192,13 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
 
     // Prepare metalData array for all metal types
     List<Map<String, dynamic>> metalDataArray = [];
-    
+
     for (var metal in _metalTypes) {
-      final weight = double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
-      final itemCount = int.tryParse(_metalItemControllers[metal]?.text ?? '0') ?? 0;
-      
+      final weight =
+          double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
+      final itemCount =
+          int.tryParse(_metalItemControllers[metal]?.text ?? '0') ?? 0;
+
       metalDataArray.add({
         'metalType': metal.toLowerCase(),
         'expectedWeight': weight,
@@ -202,12 +211,14 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
     // Find Gold and Silver for legacy fields
     double goldWeight = 0.0;
     double silverWeight = 0.0;
-    
+
     for (var metal in _metalTypes) {
       if (metal.toLowerCase() == 'gold') {
-        goldWeight = double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
+        goldWeight =
+            double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
       } else if (metal.toLowerCase() == 'silver') {
-        silverWeight = double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
+        silverWeight =
+            double.tryParse(_metalWeightControllers[metal]?.text ?? '0') ?? 0.0;
       }
     }
 
@@ -223,7 +234,8 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
 
     if (mounted) {
       if (tally != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Tally created successfully!'),
             backgroundColor: Colors.green,
@@ -231,7 +243,8 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
         );
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text(tallyProvider.error ?? 'Failed to create tally'),
             backgroundColor: Colors.red,
@@ -327,7 +340,8 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
+            const Icon(Icons.calendar_today,
+                color: AppColors.primary, size: 20),
             const SizedBox(width: 12),
             const Text(
               'Date:',
@@ -353,10 +367,12 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
         hintText: 'e.g., Monthly Stock Audit',
         labelStyle: const TextStyle(fontSize: 13),
         hintStyle: const TextStyle(fontSize: 12),
-        prefixIcon: const Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
+        prefixIcon: const Icon(Icons.description_outlined,
+            color: AppColors.primary, size: 20),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -375,10 +391,12 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
             readOnly: !_containersEditable,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onTap: _containersEditable ? null : () {
-              FocusScope.of(context).unfocus();
-              _showContainersModal();
-            },
+            onTap: _containersEditable
+                ? null
+                : () {
+                    FocusScope.of(context).unfocus();
+                    _showContainersModal();
+                  },
             style: TextStyle(
               fontSize: 14,
               color: _containersEditable ? Colors.black : Colors.grey[700],
@@ -386,13 +404,15 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
             decoration: InputDecoration(
               labelText: 'Containers',
               labelStyle: const TextStyle(fontSize: 13),
-              prefixIcon: const Icon(Icons.inbox_outlined, color: AppColors.primary, size: 20),
+              prefixIcon: const Icon(Icons.inbox_outlined,
+                  color: AppColors.primary, size: 20),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (!_containersEditable)
                     IconButton(
-                      icon: const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                      icon: const Icon(Icons.info_outline,
+                          color: AppColors.primary, size: 18),
                       onPressed: () => _showContainersModal(),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -401,15 +421,18 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                     Icon(Icons.edit, size: 16, color: Colors.grey[400])
                   else
                     GestureDetector(
-                      onDoubleTap: () => setState(() => _containersEditable = true),
-                      child: Icon(Icons.lock_outline, size: 16, color: Colors.grey[400]),
+                      onDoubleTap: () =>
+                          setState(() => _containersEditable = true),
+                      child: Icon(Icons.lock_outline,
+                          size: 16, color: Colors.grey[400]),
                     ),
                   const SizedBox(width: 8),
                 ],
               ),
               filled: true,
               fillColor: _containersEditable ? Colors.white : Colors.grey[50],
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -430,10 +453,12 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
             readOnly: !_itemsEditable,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onTap: _itemsEditable ? null : () {
-              FocusScope.of(context).unfocus();
-              _showItemsModal();
-            },
+            onTap: _itemsEditable
+                ? null
+                : () {
+                    FocusScope.of(context).unfocus();
+                    _showItemsModal();
+                  },
             style: TextStyle(
               fontSize: 14,
               color: _itemsEditable ? Colors.black : Colors.grey[700],
@@ -441,13 +466,15 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
             decoration: InputDecoration(
               labelText: 'Items',
               labelStyle: const TextStyle(fontSize: 13),
-              prefixIcon: const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+              prefixIcon: const Icon(Icons.inventory_2_outlined,
+                  color: AppColors.primary, size: 20),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (!_itemsEditable)
                     IconButton(
-                      icon: const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                      icon: const Icon(Icons.info_outline,
+                          color: AppColors.primary, size: 18),
                       onPressed: () => _showItemsModal(),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -457,14 +484,16 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                   else
                     GestureDetector(
                       onDoubleTap: () => setState(() => _itemsEditable = true),
-                      child: Icon(Icons.lock_outline, size: 16, color: Colors.grey[400]),
+                      child: Icon(Icons.lock_outline,
+                          size: 16, color: Colors.grey[400]),
                     ),
                   const SizedBox(width: 8),
                 ],
               ),
               filled: true,
               fillColor: _itemsEditable ? Colors.white : Colors.grey[50],
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -482,20 +511,22 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
   }
 
   List<Widget> _buildMetalRows() {
-    return _metalTypes.map((metal) => Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: _buildMetalRow(metal),
-    )).toList();
+    return _metalTypes
+        .map((metal) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildMetalRow(metal),
+            ))
+        .toList();
   }
 
   Widget _buildMetalRow(String metal) {
     final weightController = _metalWeightControllers[metal]!;
     final itemController = _metalItemControllers[metal]!;
     final isEditable = _metalEditable[metal] ?? false;
-    
+
     // Capitalize first letter for display
     final displayName = metal[0].toUpperCase() + metal.substring(1);
-    
+
     // Determine color based on metal type
     Color color;
     IconData icon;
@@ -520,7 +551,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
         color = AppColors.primary;
         icon = Icons.category_outlined;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -548,7 +579,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
               ],
             ),
           ),
-          
+
           // Column 2: Weight (40%)
           Expanded(
             flex: 4,
@@ -557,7 +588,8 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
               child: TextFormField(
                 controller: weightController,
                 readOnly: !isEditable,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
                 ],
@@ -568,12 +600,15 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                 decoration: InputDecoration(
                   labelText: 'Weight (g)',
                   labelStyle: const TextStyle(fontSize: 12),
-                  suffixIcon: isEditable 
-                      ? null 
-                      : Icon(Icons.lock_outline, size: 14, color: Colors.grey[400]),
+                  suffixIcon: isEditable
+                      ? null
+                      : Icon(Icons.lock_outline,
+                          size: 14, color: Colors.grey[400]),
                   filled: true,
-                  fillColor: isEditable ? Colors.white : color.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  fillColor:
+                      isEditable ? Colors.white : color.withOpacity(0.05),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
                     borderSide: BorderSide(color: Colors.grey[300]!),
@@ -597,9 +632,9 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
               ),
             ),
           ),
-          
+
           const SizedBox(width: 10),
-          
+
           // Column 3: Items Count (30%)
           Expanded(
             flex: 3,
@@ -611,10 +646,12 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
               decoration: InputDecoration(
                 labelText: 'Items',
                 labelStyle: const TextStyle(fontSize: 12),
-                suffixIcon: Icon(Icons.lock_outline, size: 14, color: Colors.grey[400]),
+                suffixIcon:
+                    Icon(Icons.lock_outline, size: 14, color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[50],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -631,7 +668,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
   // Show items modal
   void _showItemsModal() async {
     final apiService = ApiService();
-    
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -665,27 +702,37 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: FutureBuilder(
-                  future: apiService.getItems(queryParams: {}), // Fetch ALL items
+                  future:
+                      apiService.getItems(queryParams: {}), // Fetch ALL items
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    
-                    if (!snapshot.hasData || snapshot.data?['success'] != true) {
+
+                    if (!snapshot.hasData ||
+                        snapshot.data?['success'] != true) {
                       return const Center(child: Text('Failed to load items'));
                     }
-                    
-                    final allItems = snapshot.data?['data']['items'] as List? ?? [];
-                    
+
+                    final allItems =
+                        snapshot.data?['data']['items'] as List? ?? [];
+
                     // Separate included and excluded items
-                    final includedStatuses = ['active', 'in_stock', 'booked', 'wishlisted'];
-                    final includedItems = allItems.where((item) => 
-                      includedStatuses.contains(item['status']?.toString().toLowerCase())
-                    ).toList();
-                    final excludedItems = allItems.where((item) => 
-                      !includedStatuses.contains(item['status']?.toString().toLowerCase())
-                    ).toList();
-                    
+                    final includedStatuses = [
+                      'active',
+                      'in_stock',
+                      'booked',
+                      'wishlisted'
+                    ];
+                    final includedItems = allItems
+                        .where((item) => includedStatuses
+                            .contains(item['status']?.toString().toLowerCase()))
+                        .toList();
+                    final excludedItems = allItems
+                        .where((item) => !includedStatuses
+                            .contains(item['status']?.toString().toLowerCase()))
+                        .toList();
+
                     return ListView(
                       children: [
                         // Included Items Section
@@ -708,9 +755,11 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                               margin: const EdgeInsets.only(bottom: 4),
                               child: ListTile(
                                 dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
                                 leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                                  backgroundColor:
+                                      AppColors.primary.withOpacity(0.1),
                                   child: Text(
                                     '${index + 1}',
                                     style: const TextStyle(
@@ -722,18 +771,23 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                                 ),
                                 title: Text(
                                   item['name'] ?? 'Unnamed Item',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 2),
-                                    Text('Barcode: ${item['barcode'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
-                                    Text('Metal: ${item['metalType'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
+                                    Text('Barcode: ${item['barcode'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
+                                    Text('Metal: ${item['metalType'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
                                   ],
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: _getStatusColor(item['status']),
                                     borderRadius: BorderRadius.circular(12),
@@ -751,7 +805,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                             );
                           }).toList(),
                         ],
-                        
+
                         // Excluded Items Section
                         if (excludedItems.isNotEmpty) ...[
                           const Divider(height: 24, thickness: 2),
@@ -772,22 +826,30 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                               color: Colors.grey[100],
                               child: ListTile(
                                 dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                leading: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                leading: const Icon(Icons.remove_circle_outline,
+                                    color: Colors.red, size: 20),
                                 title: Text(
                                   item['name'] ?? 'Unnamed Item',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700]),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: Colors.grey[700]),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 2),
-                                    Text('Barcode: ${item['barcode'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
-                                    Text('Metal: ${item['metalType'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
+                                    Text('Barcode: ${item['barcode'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
+                                    Text('Metal: ${item['metalType'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
                                   ],
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[600],
                                     borderRadius: BorderRadius.circular(12),
@@ -820,7 +882,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
   // Show containers modal
   void _showContainersModal() async {
     final apiService = ApiService();
-    
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -856,44 +918,50 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                 child: FutureBuilder(
                   future: Future.wait([
                     apiService.getContainers(), // Active containers
-                    apiService.getContainers(queryParams: {'isDeleted': 'true'}), // Deleted containers
+                    apiService.getContainers(queryParams: {
+                      'isDeleted': 'true'
+                    }), // Deleted containers
                   ]),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    
+
                     if (!snapshot.hasData) {
-                      return const Center(child: Text('Failed to load containers'));
+                      return const Center(
+                          child: Text('Failed to load containers'));
                     }
-                    
+
                     // Extract active and deleted containers
                     final activeResponse = snapshot.data![0];
                     final deletedResponse = snapshot.data![1];
-                    
+
                     List<dynamic> activeContainers = [];
                     List<dynamic> deletedContainers = [];
-                    
+
                     if (activeResponse['success'] == true) {
                       final data = activeResponse['data'];
                       if (data is List) {
                         activeContainers = data;
-                      } else if (data is Map && data.containsKey('containers')) {
+                      } else if (data is Map &&
+                          data.containsKey('containers')) {
                         activeContainers = data['containers'] as List? ?? [];
                       }
                     }
-                    
+
                     if (deletedResponse['success'] == true) {
                       final data = deletedResponse['data'];
                       if (data is List) {
                         deletedContainers = data;
-                      } else if (data is Map && data.containsKey('containers')) {
+                      } else if (data is Map &&
+                          data.containsKey('containers')) {
                         deletedContainers = data['containers'] as List? ?? [];
                       }
                     }
-                    
-                    print('[CONTAINER MODAL] Active: ${activeContainers.length}, Deleted: ${deletedContainers.length}');
-                    
+
+                    print(
+                        '[CONTAINER MODAL] Active: ${activeContainers.length}, Deleted: ${deletedContainers.length}');
+
                     return ListView(
                       children: [
                         // Active Containers Section
@@ -916,9 +984,11 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                               margin: const EdgeInsets.only(bottom: 4),
                               child: ListTile(
                                 dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
                                 leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                                  backgroundColor:
+                                      AppColors.primary.withOpacity(0.1),
                                   child: Text(
                                     '${index + 1}',
                                     style: const TextStyle(
@@ -930,24 +1000,36 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                                 ),
                                 title: Text(
                                   container['name'] ?? 'Unnamed Container',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 2),
-                                    Text('QR Code: ${container['qrCode'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
-                                    Text('Type: ${container['type'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
+                                    Text(
+                                        'QR Code: ${container['qrCode'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
+                                    Text('Type: ${container['type'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
                                   ],
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: (container["isActive"] == true) ? Colors.green : Colors.orange,
+                                    color: (container["isActive"] == true)
+                                        ? Colors.green
+                                        : Colors.orange,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    (container["isActive"] == true) ? "active" : (container["isLocked"] == true) ? "locked" : "inactive",
+                                    (container["isActive"] == true)
+                                        ? "active"
+                                        : (container["isLocked"] == true)
+                                            ? "locked"
+                                            : "inactive",
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
@@ -959,7 +1041,7 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                             );
                           }).toList(),
                         ],
-                        
+
                         // Deleted Containers Section
                         if (deletedContainers.isNotEmpty) ...[
                           const Divider(height: 24, thickness: 2),
@@ -980,22 +1062,31 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
                               color: Colors.grey[100],
                               child: ListTile(
                                 dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                leading: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                leading: const Icon(Icons.delete_outline,
+                                    color: Colors.red, size: 20),
                                 title: Text(
                                   container['name'] ?? 'Unnamed Container',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700]),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: Colors.grey[700]),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 2),
-                                    Text('QR Code: ${container['qrCode'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
-                                    Text('Type: ${container['type'] ?? 'N/A'}', style: const TextStyle(fontSize: 11)),
+                                    Text(
+                                        'QR Code: ${container['qrCode'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
+                                    Text('Type: ${container['type'] ?? 'N/A'}',
+                                        style: const TextStyle(fontSize: 11)),
                                   ],
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[600],
                                     borderRadius: BorderRadius.circular(12),
@@ -1045,4 +1136,3 @@ class _CreateTallyScreenState extends State<CreateTallyScreen> {
     }
   }
 }
-

@@ -1,0 +1,10 @@
+{
+  "name": "laltu-ec2-wake-lambda",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "start-ec2-update-hostinger-dns.mjs",
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.637.0"
+  }
+}

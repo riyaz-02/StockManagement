@@ -62,8 +62,7 @@ class ReconciliationTab extends StatelessWidget {
     );
   }
 
-  Widget _buildMetalCard(
-      BuildContext context, String metal, Map reconcile) {
+  Widget _buildMetalCard(BuildContext context, String metal, Map reconcile) {
     final hasAlert = reconcile['hasAlert'] == true;
     final discrepancy = (reconcile['discrepancy'] as num?)?.toDouble() ?? 0;
     final alertMsg = reconcile['alertMessage'] as String?;
@@ -73,8 +72,7 @@ class ReconciliationTab extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: cardBorderColor.withOpacity(0.4), width: 1.5),
+        border: Border.all(color: cardBorderColor.withOpacity(0.4), width: 1.5),
         color: Colors.white,
         boxShadow: [
           BoxShadow(
@@ -99,13 +97,12 @@ class ReconciliationTab extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: cardBorderColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: cardBorderColor.withOpacity(0.4)),
+                    border: Border.all(color: cardBorderColor.withOpacity(0.4)),
                   ),
                   child: Row(
                     children: [
@@ -133,8 +130,7 @@ class ReconciliationTab extends StatelessWidget {
             if (alertMsg != null) ...[
               const SizedBox(height: 8),
               Text(alertMsg,
-                  style: const TextStyle(
-                      fontSize: 12, color: Colors.red)),
+                  style: const TextStyle(fontSize: 12, color: Colors.red)),
             ],
 
             const SizedBox(height: 14),
@@ -202,8 +198,7 @@ class ReconciliationTab extends StatelessWidget {
                 : EdgeInsets.zero,
             decoration: highlight
                 ? BoxDecoration(
-                    color:
-                        (color ?? Colors.blueGrey).withOpacity(0.1),
+                    color: (color ?? Colors.blueGrey).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   )
                 : null,
@@ -211,8 +206,7 @@ class ReconciliationTab extends StatelessWidget {
               '${val.abs().toStringAsFixed(3)} $unit',
               style: TextStyle(
                 fontSize: 13,
-                fontWeight:
-                    bold ? FontWeight.w800 : FontWeight.w600,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
                 color: textColor,
               ),
             ),

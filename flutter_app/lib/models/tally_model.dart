@@ -30,7 +30,12 @@ class TallySession {
   final String? lockedByName;
   final String? lockRemarks;
   final bool isForceLocked;
-  
+
+  // Inventory Snapshot
+  final bool inventoryUpdated;
+  final DateTime? inventoryUpdatedAt;
+  final String? inventorySnapshotId;
+
   // Timestamps
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -57,6 +62,9 @@ class TallySession {
     this.lockedByName,
     this.lockRemarks,
     this.isForceLocked = false,
+    this.inventoryUpdated = false,
+    this.inventoryUpdatedAt,
+    this.inventorySnapshotId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -139,7 +147,14 @@ class TallySession {
       lockedByName: (json['lockedBy'] is Map) ? (json['lockedBy'] as Map)['name'] as String? : null,
       lockRemarks: json['lockRemarks'],
       isForceLocked: json['isForceLocked'] ?? false,
-      createdAt: json['createdAt'] != null 
+      inventoryUpdated: json['inventoryUpdated'] ?? false,
+      inventoryUpdatedAt: json['inventoryUpdatedAt'] != null
+          ? DateTime.parse(json['inventoryUpdatedAt'])
+          : null,
+      inventorySnapshotId: json['inventorySnapshotId'] is String
+          ? json['inventorySnapshotId']
+          : (json['inventorySnapshotId']?['_id']),
+      createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt']) 
           : DateTime.now(),
       updatedAt: json['updatedAt'] != null 
@@ -169,6 +184,9 @@ class TallySession {
       'lockedBy': lockedBy,
       'lockRemarks': lockRemarks,
       'isForceLocked': isForceLocked,
+      'inventoryUpdated': inventoryUpdated,
+      'inventoryUpdatedAt': inventoryUpdatedAt?.toIso8601String(),
+      'inventorySnapshotId': inventorySnapshotId,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -233,6 +251,9 @@ class TallyItem {
     this.scannedAt,
     this.scannedBy,
   });
+
+  // Removed from stock (soft-deleted) during this tally's cleanup
+  bool get isRemoved => status == 'removed';
 
   factory TallyItem.fromJson(Map<String, dynamic> json) {
     return TallyItem(

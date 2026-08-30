@@ -4,6 +4,7 @@ import 'package:jewellery_stock_app/screens/item_list_screen.dart';
 import 'package:jewellery_stock_app/screens/settings_menu_screen.dart';
 import 'package:jewellery_stock_app/screens/booking_list_screen.dart';
 import 'package:jewellery_stock_app/widgets/custom_bottom_nav.dart';
+import 'package:jewellery_stock_app/services/push_notification_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -14,6 +15,15 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fire-and-forget: registers this device for push notifications now
+    // that we have an authenticated user. No-ops quietly if Firebase hasn't
+    // been set up yet.
+    PushNotificationService.instance.init();
+  }
 
   // Screens for each navigation item (Scanner removed - uses push navigation)
   final List<Widget> _screens = [

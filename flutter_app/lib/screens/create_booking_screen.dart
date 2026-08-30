@@ -4,6 +4,7 @@ import '../models/item_model.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final Item item;
@@ -48,7 +49,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         });
 
         if (mounted && response['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Booking created successfully'),
               backgroundColor: Colors.green,
@@ -59,9 +61,11 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+              content:
+                  Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -118,8 +122,9 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                 labelText: languageProvider.translate('customer_name'),
                 prefixIcon: const Icon(Icons.person),
               ),
-              validator: (value) =>
-                  value?.isEmpty ?? true ? languageProvider.translate('required_field') : null,
+              validator: (value) => value?.isEmpty ?? true
+                  ? languageProvider.translate('required_field')
+                  : null,
             ),
             const SizedBox(height: 16),
 

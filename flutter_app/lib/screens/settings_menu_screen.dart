@@ -12,6 +12,9 @@ import 'account_settings_screen.dart';
 import 'manage_users_screen.dart';
 import 'action_needed_items_screen.dart';
 import 'gst_config_screen.dart';
+import 'app_update_settings_screen.dart';
+import 'send_notification_screen.dart';
+import '../utils/app_toast.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
   const SettingsMenuScreen({super.key});
@@ -20,7 +23,7 @@ class SettingsMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
-    
+
     // Check if user is admin
     if (authProvider.user?.role != 'admin') {
       return Scaffold(
@@ -83,12 +86,13 @@ class SettingsMenuScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const AccountSettingsScreen()),
               );
             },
           ),
           const SizedBox(height: 12),
-          
+
           // Manage Users (Admin Only)
           if (authProvider.user?.role == 'admin')
             _buildSettingCard(
@@ -104,9 +108,8 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin')
-            const SizedBox(height: 12),
-          
+          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+
           // Action Needed Items (Admin Only)
           if (authProvider.user?.role == 'admin')
             _buildSettingCard(
@@ -124,9 +127,8 @@ class SettingsMenuScreen extends StatelessWidget {
                 );
               },
             ),
-          if (authProvider.user?.role == 'admin')
-            const SizedBox(height: 12),
-          
+          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+
           _buildSettingCard(
             context,
             languageProvider: languageProvider,
@@ -152,7 +154,8 @@ class SettingsMenuScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ContainerSettingsScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const ContainerSettingsScreen()),
               );
             },
           ),
@@ -199,13 +202,49 @@ class SettingsMenuScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const GstConfigScreen()),
+                  MaterialPageRoute(builder: (_) => const GstConfigScreen()),
                 );
               },
             ),
+          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+
+          // Send Notification (Admin Only)
           if (authProvider.user?.role == 'admin')
-            const SizedBox(height: 12),
+            _buildSettingCard(
+              context,
+              languageProvider: languageProvider,
+              title: 'Send Notification',
+              subtitle: 'Push a message to all users or a specific role',
+              icon: Icons.campaign_outlined,
+              color: const Color(0xFF2563EB),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const SendNotificationScreen()),
+                );
+              },
+            ),
+          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
+
+          // App Update Settings (Admin Only)
+          if (authProvider.user?.role == 'admin')
+            _buildSettingCard(
+              context,
+              languageProvider: languageProvider,
+              title: 'App Update Settings',
+              subtitle: 'Control the update-available popup users see',
+              icon: Icons.system_update_outlined,
+              color: const Color(0xFF7C3AED),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AppUpdateSettingsScreen()),
+                );
+              },
+            ),
+          if (authProvider.user?.role == 'admin') const SizedBox(height: 12),
           _buildSettingCard(
             context,
             languageProvider: languageProvider,
@@ -214,7 +253,8 @@ class SettingsMenuScreen extends StatelessWidget {
             icon: Icons.settings,
             color: Colors.purple,
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
+              showAppSnackBar(
+                context,
                 const SnackBar(content: Text('Coming soon!')),
               );
             },
@@ -262,7 +302,8 @@ class SettingsMenuScreen extends StatelessWidget {
               ],
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+            border:
+                Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -287,7 +328,8 @@ class SettingsMenuScreen extends StatelessWidget {
                         color: color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(icon, color: color, size: 22), // Reduced from 24
+                      child:
+                          Icon(icon, color: color, size: 22), // Reduced from 24
                     ),
                     const SizedBox(width: 12), // Reduced from 16
                     Expanded(
@@ -299,7 +341,8 @@ class SettingsMenuScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+                    Icon(Icons.chevron_right,
+                        color: Colors.grey[400], size: 20),
                   ],
                 ),
               ),

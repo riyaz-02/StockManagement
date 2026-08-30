@@ -14,20 +14,27 @@ import 'providers/store_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'utils/app_colors.dart';
+import 'utils/app_toast.dart';
+import 'services/push_notification_service.dart';
 
 /// Global route observer — used by scanner screens to stop/start the camera
 /// when navigating away and returning.
-final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Set preferred orientations
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
+  // No-ops quietly (returns false) if google-services.json hasn't been
+  // added yet — the rest of the app must keep working regardless.
+  await initializeFirebase();
+
   runApp(const MyApp());
 }
 
@@ -50,6 +57,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, child) {
           return MaterialApp(
+            navigatorKey: appNavigatorKey,
             title: 'Jewellery Stock Management',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(

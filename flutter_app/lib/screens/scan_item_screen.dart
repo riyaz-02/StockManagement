@@ -4,6 +4,7 @@ import '../providers/item_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/app_colors.dart';
 import 'item_details_screen.dart';
+import '../utils/app_toast.dart';
 
 class ScanItemScreen extends StatefulWidget {
   const ScanItemScreen({super.key});
@@ -29,7 +30,8 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
       if (item != null) {
         _showItemDetails(item);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Item not found'),
             backgroundColor: Colors.orange,
@@ -77,7 +79,7 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
               color: AppColors.primary.withOpacity(0.5),
             ),
             const SizedBox(height: 40),
-            
+
             const Text(
               'Enter Barcode Manually',
               style: TextStyle(
@@ -86,7 +88,7 @@ class _ScanItemScreenState extends State<ScanItemScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Manual Entry
             TextField(
               controller: _barcodeController,

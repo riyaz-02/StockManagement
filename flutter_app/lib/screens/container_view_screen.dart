@@ -13,6 +13,7 @@ import 'item_details_screen.dart';
 import 'quick_add_item_screen.dart';
 import 'edit_container_screen.dart';
 import '../utils/app_constants.dart';
+import '../utils/app_toast.dart';
 
 class ContainerViewScreen extends StatefulWidget {
   final models.ItemContainer container;
@@ -31,7 +32,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     super.initState();
     // Force fetch fresh container data to get updated slot information with images
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ContainerProvider>(context, listen: false).fetchContainer(widget.container.id);
+      Provider.of<ContainerProvider>(context, listen: false)
+          .fetchContainer(widget.container.id);
     });
   }
 
@@ -44,9 +46,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
         .replaceAll('-', ' ')
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .map((word) =>
+            word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join(' ');
   }
+
   Color _getCapacityColor(double percent) {
     if (percent >= 0.9) return Colors.red;
     if (percent >= 0.7) return Colors.orange;
@@ -101,16 +105,19 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context);
     // Use container from provider if available (updated version), otherwise widget.container
     final containerProvider = Provider.of<ContainerProvider>(context);
-    final container = (containerProvider.selectedContainer != null && 
-                       containerProvider.selectedContainer!.id == widget.container.id)
+    final container = (containerProvider.selectedContainer != null &&
+            containerProvider.selectedContainer!.id == widget.container.id)
         ? containerProvider.selectedContainer!
         : widget.container;
-        
-    final List<String> images = (container.image != null && container.image!.isNotEmpty)
-        ? [container.image!.startsWith('http') 
-            ? container.image! 
-            : '${AppConstants.baseUrl}${container.image}']
-        : [];
+
+    final List<String> images =
+        (container.image != null && container.image!.isNotEmpty)
+            ? [
+                container.image!.startsWith('http')
+                    ? container.image!
+                    : '${AppConstants.baseUrl}${container.image}'
+              ]
+            : [];
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -133,29 +140,34 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => EditContainerScreen(container: container),
+                    builder: (context) =>
+                        EditContainerScreen(container: container),
                   ),
                 );
                 // Refresh container data on return
                 if (mounted) {
-                  Provider.of<ContainerProvider>(context, listen: false).fetchContainer(widget.container.id);
+                  Provider.of<ContainerProvider>(context, listen: false)
+                      .fetchContainer(widget.container.id);
                 }
               },
             ),
         ],
       ),
-      bottomNavigationBar: container.isDeleted 
+      bottomNavigationBar: container.isDeleted
           ? Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5)),
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5)),
                 ],
               ),
               child: Row(
                 children: [
-                   Expanded(
+                  Expanded(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -164,13 +176,17 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       icon: const Icon(Icons.restore),
                       label: const Text('RESTORE'),
                       onPressed: () async {
-                        final provider = Provider.of<ContainerProvider>(context, listen: false);
-                        final success = await provider.restoreContainer(container.id);
+                        final provider = Provider.of<ContainerProvider>(context,
+                            listen: false);
+                        final success =
+                            await provider.restoreContainer(container.id);
                         if (success && mounted) {
-                           Navigator.pop(context); // Go back to Recycle Bin list
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             SnackBar(content: Text('Restored ${container.name}')),
-                           );
+                          Navigator.pop(context); // Go back to Recycle Bin list
+                          showAppSnackBar(
+                            context,
+                            SnackBar(
+                                content: Text('Restored ${container.name}')),
+                          );
                         }
                       },
                     ),
@@ -186,22 +202,32 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       label: const Text('DELETE'),
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Delete Forever?'),
-                              content: Text('Permanently delete "${container.name}"? This cannot be undone.'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                TextButton(onPressed: () => Navigator.pop(ctx, true), style: TextButton.styleFrom(foregroundColor: Colors.red), child: const Text('Delete')),
-                              ],
-                            ),
-                          );
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Forever?'),
+                            content: Text(
+                                'Permanently delete "${container.name}"? This cannot be undone.'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: Colors.red),
+                                  child: const Text('Delete')),
+                            ],
+                          ),
+                        );
 
-                          if (confirm == true) {
-                            final provider = Provider.of<ContainerProvider>(context, listen: false);
-                            await provider.deleteContainerPermanently(container.id);
-                            if (mounted) Navigator.pop(context);
-                          }
+                        if (confirm == true) {
+                          final provider = Provider.of<ContainerProvider>(
+                              context,
+                              listen: false);
+                          await provider
+                              .deleteContainerPermanently(container.id);
+                          if (mounted) Navigator.pop(context);
+                        }
                       },
                     ),
                   ),
@@ -230,17 +256,20 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                             height: 180,
                             child: PageView.builder(
                               itemCount: images.length,
-                              onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                              onPageChanged: (index) =>
+                                  setState(() => _currentImageIndex = index),
                               itemBuilder: (context, index) {
                                 return GestureDetector(
-                                  onTap: () => _showFullScreenImage(context, images),
+                                  onTap: () =>
+                                      _showFullScreenImage(context, images),
                                   child: Container(
                                     color: Colors.grey[200],
                                     child: Image.network(
                                       images[index],
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Center(
-                                        child: Icon(Icons.inventory_2, size: 60, color: Colors.grey[400]),
+                                        child: Icon(Icons.inventory_2,
+                                            size: 60, color: Colors.grey[400]),
                                       ),
                                     ),
                                   ),
@@ -258,19 +287,35 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                             child: BackdropFilter(
                               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      (container.isDeleted ? Colors.red : (container.isActive ? AppColors.statusActive : Colors.grey)).withOpacity(0.9),
-                                      (container.isDeleted ? Colors.red : (container.isActive ? AppColors.statusActive : Colors.grey)).withOpacity(0.7),
+                                      (container.isDeleted
+                                              ? Colors.red
+                                              : (container.isActive
+                                                  ? AppColors.statusActive
+                                                  : Colors.grey))
+                                          .withOpacity(0.9),
+                                      (container.isDeleted
+                                              ? Colors.red
+                                              : (container.isActive
+                                                  ? AppColors.statusActive
+                                                  : Colors.grey))
+                                          .withOpacity(0.7),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.3)),
                                 ),
                                 child: Text(
-                                  container.isDeleted ? 'DELETED' : (container.isActive ? 'ACTIVE' : 'INACTIVE'),
+                                  container.isDeleted
+                                      ? 'DELETED'
+                                      : (container.isActive
+                                          ? 'ACTIVE'
+                                          : 'INACTIVE'),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -291,7 +336,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(images.length, (index) {
                                 return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 3),
                                   width: _currentImageIndex == index ? 16 : 6,
                                   height: 6,
                                   decoration: BoxDecoration(
@@ -328,7 +374,9 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1.5),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -337,10 +385,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                               RotatedBox(
                                 quarterTurns: 3,
                                 child: Text(
-                                  container.qrCode?.isNotEmpty == true 
+                                  container.qrCode?.isNotEmpty == true
                                       ? container.qrCode!
-                                      : (container.id.length > 8 
-                                          ? container.id.substring(container.id.length - 8)
+                                      : (container.id.length > 8
+                                          ? container.id.substring(
+                                              container.id.length - 8)
                                           : container.id),
                                   style: const TextStyle(
                                     fontSize: 9,
@@ -412,7 +461,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                 ),
                 color: Colors.white,
                 child: Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
                     initiallyExpanded: true,
                     title: Row(
@@ -433,15 +483,19 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                         ),
                         // Compact percentage chip in title
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _getCapacityColor(container.occupiedSlots / container.capacity).withOpacity(0.1),
+                            color: _getCapacityColor(container.occupiedSlots /
+                                    container.capacity)
+                                .withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${container.occupiedSlots}/${container.capacity}  (${((container.occupiedSlots / container.capacity) * 100).toInt()}%)',
                             style: TextStyle(
-                              color: _getCapacityColor(container.occupiedSlots / container.capacity),
+                              color: _getCapacityColor(
+                                  container.occupiedSlots / container.capacity),
                               fontWeight: FontWeight.bold,
                               fontSize: 10,
                             ),
@@ -451,34 +505,41 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     ),
                     childrenPadding: const EdgeInsets.all(12),
                     children: [
-                       // Progress Bar
-                       ClipRRect(
-                         borderRadius: BorderRadius.circular(8),
-                         child: LinearProgressIndicator(
-                           value: container.occupiedSlots / container.capacity,
-                           backgroundColor: Colors.grey[100],
-                           color: _getCapacityColor(container.occupiedSlots / container.capacity),
-                           minHeight: 8,
-                         ),
-                       ),
-                       const SizedBox(height: 16),
-                       // Details Grid
-                       GridView.count(
-                         shrinkWrap: true,
-                         physics: const NeverScrollableScrollPhysics(),
-                         crossAxisCount: 2,
-                         childAspectRatio: 3,
-                         mainAxisSpacing: 8,
-                         crossAxisSpacing: 8,
-                         children: [
-                           _buildDetailItem(Icons.category_outlined, 'Type', container.type),
-                           _buildDetailItem(Icons.scale_outlined, 'Weight', container.weightCategory),
-                           _buildDetailItem(Icons.diamond_outlined, 'Metal', container.metalType.join(', ')),
-                           _buildDetailItem(Icons.verified_outlined, 'Purity', container.purity.join(', ')),
-                           _buildDetailItem(Icons.grid_view, 'Layout', container.layoutType),
-                           _buildDetailItem(Icons.check_circle_outline, 'Allowed', container.allowedItemTypes.join(', ')),
-                         ],
-                       ),
+                      // Progress Bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: container.occupiedSlots / container.capacity,
+                          backgroundColor: Colors.grey[100],
+                          color: _getCapacityColor(
+                              container.occupiedSlots / container.capacity),
+                          minHeight: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Details Grid
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        childAspectRatio: 3,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        children: [
+                          _buildDetailItem(
+                              Icons.category_outlined, 'Type', container.type),
+                          _buildDetailItem(Icons.scale_outlined, 'Weight',
+                              container.weightCategory),
+                          _buildDetailItem(Icons.diamond_outlined, 'Metal',
+                              container.metalType.join(', ')),
+                          _buildDetailItem(Icons.verified_outlined, 'Purity',
+                              container.purity.join(', ')),
+                          _buildDetailItem(
+                              Icons.grid_view, 'Layout', container.layoutType),
+                          _buildDetailItem(Icons.check_circle_outline,
+                              'Allowed', container.allowedItemTypes.join(', ')),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -493,10 +554,9 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                   const Text(
                     'Slots Layout',
                     style: TextStyle(
-                        fontSize: 14, 
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87
-                    ),
+                        color: Colors.black87),
                   ),
                   const SizedBox(height: 8),
                   // Legend
@@ -514,13 +574,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[200]!)
-                    ),
+                        side: BorderSide(color: Colors.grey[200]!)),
                     color: Colors.white,
                     child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: _buildSlotsGrid(container)
-                    ),
+                        child: _buildSlotsGrid(container)),
                   ),
                 ],
               ),
@@ -544,14 +602,16 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.grey)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w500, color: Colors.grey)),
       ],
     );
   }
 
   Widget _buildSlotsGrid(models.ItemContainer container) {
     final columns = container.layoutType == 'linear' ? 3 : 4;
-    
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -569,10 +629,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
     );
   }
 
-  Widget _buildSlotItem(models.ContainerSlot slot, models.ItemContainer container) {
+  Widget _buildSlotItem(
+      models.ContainerSlot slot, models.ItemContainer container) {
     Color slotColor;
     IconData? icon;
-    
+
     if (slot.isReserved) {
       slotColor = AppColors.slotReserved;
       icon = Icons.lock;
@@ -592,31 +653,41 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
             String? itemId;
             final dynamic rawItemId = slot.itemId;
             if (rawItemId == null) return;
-            
+
             if (rawItemId is String) {
-               if (rawItemId.startsWith('{')) {
-                 final idMatch = RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
-                 itemId = idMatch?.group(1);
-               } else {
-                 itemId = rawItemId;
-               }
+              if (rawItemId.startsWith('{')) {
+                final idMatch =
+                    RegExp(r'_id:\s*([a-f0-9]+)').firstMatch(rawItemId);
+                itemId = idMatch?.group(1);
+              } else {
+                itemId = rawItemId;
+              }
             } else if (rawItemId is Map) {
-               if (rawItemId.containsKey('_id')) itemId = rawItemId['_id'].toString();
-               else if (rawItemId.containsKey('id')) itemId = rawItemId['id'].toString();
+              if (rawItemId.containsKey('_id'))
+                itemId = rawItemId['_id'].toString();
+              else if (rawItemId.containsKey('id'))
+                itemId = rawItemId['id'].toString();
             }
 
             if (itemId != null && itemId.isNotEmpty && itemId != 'null') {
-                final apiService = ApiService();
-                final response = await apiService.getItem(itemId);
-                if (mounted && response['success'] == true) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: Item.fromJson(response['data']['item']))));
-                }
+              final apiService = ApiService();
+              final response = await apiService.getItem(itemId);
+              if (mounted && response['success'] == true) {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ItemDetailsScreen(
+                            item: Item.fromJson(response['data']['item']))));
+              }
             }
-          } catch (e) { print(e); }
+          } catch (e) {
+            print(e);
+          }
         } else {
           // Empty Slot Tap
           if (container.isLocked) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+              context,
               const SnackBar(
                 content: Text('Container is LOCKED. unlock to add items.'),
                 backgroundColor: Colors.orange,
@@ -636,7 +707,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
             );
             // Refresh container on return
             if (mounted) {
-              Provider.of<ContainerProvider>(context, listen: false).fetchContainer(container.id);
+              Provider.of<ContainerProvider>(context, listen: false)
+                  .fetchContainer(container.id);
             }
           }
         }
@@ -658,10 +730,12 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
             fit: StackFit.expand,
             children: [
               // Background - Item photo for occupied slots
-              if (slot.isOccupied && slot.itemImage != null && slot.itemImage!.isNotEmpty)
+              if (slot.isOccupied &&
+                  slot.itemImage != null &&
+                  slot.itemImage!.isNotEmpty)
                 Image.network(
-                  slot.itemImage!.startsWith('http') 
-                      ? slot.itemImage! 
+                  slot.itemImage!.startsWith('http')
+                      ? slot.itemImage!
                       : '${AppConstants.baseUrl}${slot.itemImage}',
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, loadingProgress) {
@@ -680,7 +754,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       child: Center(
                         child: CircularProgressIndicator(
                           value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
                               : null,
                           color: Colors.white.withOpacity(0.8),
                           strokeWidth: 2.5,
@@ -689,7 +764,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print('Error loading image for slot ${slot.slotNumber}: $error');
+                    print(
+                        'Error loading image for slot ${slot.slotNumber}: $error');
                     print('Image URL: ${slot.itemImage}');
                     return Container(
                       decoration: BoxDecoration(
@@ -725,9 +801,11 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     ),
                   ),
                 ),
-              
+
               // Subtle overlay for occupied slots to ensure text readability
-              if (slot.isOccupied && slot.itemImage != null && slot.itemImage!.isNotEmpty)
+              if (slot.isOccupied &&
+                  slot.itemImage != null &&
+                  slot.itemImage!.isNotEmpty)
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -740,20 +818,20 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     ),
                   ),
                 ),
-              
+
               // Border
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: slot.isOccupied 
-                        ? Colors.white.withOpacity(0.4) 
+                    color: slot.isOccupied
+                        ? Colors.white.withOpacity(0.4)
                         : slotColor.withOpacity(0.4),
                     width: 2,
                   ),
                 ),
               ),
-              
+
               // Content
               Padding(
                 padding: const EdgeInsets.all(8),
@@ -765,9 +843,10 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                     Align(
                       alignment: Alignment.topLeft,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: slot.isOccupied 
+                          color: slot.isOccupied
                               ? Colors.white.withOpacity(0.95)
                               : Colors.black.withOpacity(0.75),
                           borderRadius: BorderRadius.circular(6),
@@ -782,14 +861,15 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                         child: Text(
                           slot.slotNumber.toString(),
                           style: TextStyle(
-                            color: slot.isOccupied ? Colors.black87 : Colors.white,
+                            color:
+                                slot.isOccupied ? Colors.black87 : Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
                         ),
                       ),
                     ),
-                    
+
                     // Center: Icon and status for empty/reserved
                     if (!slot.isOccupied)
                       Expanded(
@@ -819,7 +899,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                                 ),
                               if (icon != null) const SizedBox(height: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.9),
                                   borderRadius: BorderRadius.circular(6),
@@ -839,11 +920,12 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       )
                     else
                       const Spacer(),
-                    
+
                     // Bottom: Weight for occupied slots
                     if (slot.isOccupied && slot.itemWeight != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(6),
@@ -916,7 +998,8 @@ class _ContainerViewScreenState extends State<ContainerViewScreen> {
                       border: Border.all(color: Colors.white.withOpacity(0.2)),
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      icon: const Icon(Icons.close,
+                          color: Colors.white, size: 28),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),

@@ -9,6 +9,7 @@ import 'container_view_screen.dart';
 import 'item_details_screen.dart';
 import '../services/api_service.dart';
 import '../models/item_model.dart';
+import '../utils/app_toast.dart';
 
 class RecycleBinScreen extends StatefulWidget {
   const RecycleBinScreen({super.key});
@@ -30,7 +31,9 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   void _loadData() {
     setState(() {
-      _deletedContainersFuture = Provider.of<ContainerProvider>(context, listen: false).fetchDeletedContainers();
+      _deletedContainersFuture =
+          Provider.of<ContainerProvider>(context, listen: false)
+              .fetchDeletedContainers();
       _deletedItemsFuture = _apiService.getDeletedItems();
     });
   }
@@ -38,32 +41,35 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   Future<void> _handleRestoreItem(Item item) async {
     try {
       // Fetch all containers to check if previous container is valid
-      final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+      final containerProvider =
+          Provider.of<ContainerProvider>(context, listen: false);
       await containerProvider.fetchContainers();
-      
+
       final containers = containerProvider.containers;
-      
+
       // Check if item has a previous container
       if (item.containerId != null && item.containerId!.isNotEmpty) {
         // Find the previous container
-        final previousContainer = containers.where((c) => c.id == item.containerId).firstOrNull;
-        
-        if (previousContainer != null && 
-            previousContainer.isActive && 
-            !previousContainer.isLocked && 
+        final previousContainer =
+            containers.where((c) => c.id == item.containerId).firstOrNull;
+
+        if (previousContainer != null &&
+            previousContainer.isActive &&
+            !previousContainer.isLocked &&
             previousContainer.availableSlots > 0) {
           // Previous container is valid, restore directly
-          await _restoreItemToContainer(item, item.containerId!, item.slotNumber);
+          await _restoreItemToContainer(
+              item, item.containerId!, item.slotNumber);
           return;
         }
       }
-      
+
       // Previous container is invalid or doesn't exist, show container selection dialog
       await _showContainerSelectionDialog(item);
-      
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error checking containers: $e'),
             backgroundColor: Colors.red,
@@ -74,23 +80,28 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   }
 
   Future<void> _showContainerSelectionDialog(Item item) async {
-    final containerProvider = Provider.of<ContainerProvider>(context, listen: false);
+    final containerProvider =
+        Provider.of<ContainerProvider>(context, listen: false);
     final containers = containerProvider.containers;
-    
+
     // Filter assignable containers for this item
     final assignableContainers = containers.where((c) {
-      return c.isActive && 
-             !c.isLocked && 
-             c.availableSlots > 0 &&
-             c.metalType.any((m) => m.toLowerCase() == item.metalType.toLowerCase()) &&
-             c.allowedItemTypes.any((t) => t.toLowerCase() == item.itemType.toLowerCase());
+      return c.isActive &&
+          !c.isLocked &&
+          c.availableSlots > 0 &&
+          c.metalType
+              .any((m) => m.toLowerCase() == item.metalType.toLowerCase()) &&
+          c.allowedItemTypes
+              .any((t) => t.toLowerCase() == item.itemType.toLowerCase());
     }).toList();
-    
+
     if (assignableContainers.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
-            content: Text('No valid containers available for this item. Please create or unlock a suitable container first.'),
+            content: Text(
+                'No valid containers available for this item. Please create or unlock a suitable container first.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -98,11 +109,11 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
       }
       return;
     }
-    
+
     // Show dialog to select container
     String? selectedContainerId;
     int? selectedSlotNumber;
-    
+
     await showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -160,7 +171,8 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
             onPressed: () {
               Navigator.pop(dialogContext);
               if (selectedContainerId != null) {
-                _restoreItemToContainer(item, selectedContainerId!, selectedSlotNumber);
+                _restoreItemToContainer(
+                    item, selectedContainerId!, selectedSlotNumber);
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
@@ -171,13 +183,16 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
     );
   }
 
-  Future<void> _restoreItemToContainer(Item item, String containerId, int? slotNumber) async {
+  Future<void> _restoreItemToContainer(
+      Item item, String containerId, int? slotNumber) async {
     try {
-      final response = await _apiService.restoreItem(item.id, containerId, slotNumber);
-      
+      final response =
+          await _apiService.restoreItem(item.id, containerId, slotNumber);
+
       if (mounted) {
         if (response['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text('${item.name} restored successfully'),
               backgroundColor: Colors.green,
@@ -185,7 +200,8 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
           );
           _loadData(); // Refresh the list
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(response['message'] ?? 'Failed to restore item'),
               backgroundColor: Colors.red,
@@ -195,7 +211,8 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error restoring item: $e'),
             backgroundColor: Colors.red,
@@ -300,10 +317,11 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.red.withOpacity(0.3)),
                 ),
-                child: const Icon(Icons.inventory_2_outlined, color: Colors.red, size: 30),
+                child: const Icon(Icons.inventory_2_outlined,
+                    color: Colors.red, size: 30),
               ),
               const SizedBox(width: 16),
-              
+
               // Container Details
               Expanded(
                 child: Column(
@@ -336,7 +354,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                   ],
                 ),
               ),
-              
+
               // Deleted Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -374,9 +392,9 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
         }
 
         final response = snapshot.data;
-        
+
         // The API returns { success: true, data: { items: [...] } }
-        final List items = (response?['data'] is Map) 
+        final List items = (response?['data'] is Map)
             ? (response?['data']['items'] as List?) ?? []
             : [];
 
@@ -406,7 +424,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
         imageUrl = path;
       } else {
         String cleanPath = path.replaceAll('\\', '/');
-        imageUrl = '${AppConstants.baseUrl}/$cleanPath'; 
+        imageUrl = '${AppConstants.baseUrl}/$cleanPath';
       }
     }
 
@@ -439,14 +457,16 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                   border: Border.all(color: Colors.red.withOpacity(0.3)),
                 ),
                 child: ClipRRect(
-                   borderRadius: BorderRadius.circular(12),
-                   child: imageUrl != null 
-                       ? Image.network(
-                           imageUrl, 
-                           fit: BoxFit.cover,
-                           errorBuilder: (_,__,___) => const Icon(Icons.broken_image, color: Colors.red),
-                         )
-                       : const Icon(Icons.diamond_outlined, size: 30, color: Colors.red),
+                  borderRadius: BorderRadius.circular(12),
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.broken_image, color: Colors.red),
+                        )
+                      : const Icon(Icons.diamond_outlined,
+                          size: 30, color: Colors.red),
                 ),
               ),
               const SizedBox(width: 16),
@@ -489,11 +509,13 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                         ),
                         // Deleted Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.red.withOpacity(0.5)),
+                            border:
+                                Border.all(color: Colors.red.withOpacity(0.5)),
                           ),
                           child: const Text(
                             'Deleted',
@@ -513,13 +535,15 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                       children: [
                         _buildCompactSpec(Icons.scale, '${item.netWeight}g'),
                         const SizedBox(width: 12),
-                        _buildCompactSpec(Icons.category, _formatText(item.itemType)),
+                        _buildCompactSpec(
+                            Icons.category, _formatText(item.itemType)),
                         const SizedBox(width: 12),
-                        _buildCompactSpec(Icons.diamond, _formatText(item.metalType)),
+                        _buildCompactSpec(
+                            Icons.diamond, _formatText(item.metalType)),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    
+
                     // Restore Button
                     SizedBox(
                       width: double.infinity,
@@ -563,8 +587,9 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   String _formatText(String text) {
     if (text.isEmpty) return text;
-    return text.split('_').map((word) => 
-      word[0].toUpperCase() + word.substring(1).toLowerCase()
-    ).join(' ');
+    return text
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
   }
 }

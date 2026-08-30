@@ -35,13 +35,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       setState(() => _isUploadingImage = true);
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Upload to Cloudinary with 'users' folder
       final result = await _apiService.uploadImage(image, folder: 'users');
 
       if (result['success'] == true) {
         final imageUrl = result['data']['url'];
-        
+
         // Update user profile with new image
         final updateResult = await _apiService.updateUser(
           authProvider.user!.id,
@@ -51,7 +51,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         if (updateResult['success'] == true) {
           // Update local user data
           await authProvider.refreshUser();
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showMaterialBanner(
               MaterialBanner(
@@ -60,7 +60,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 leading: const Icon(Icons.check_circle, color: Colors.green),
                 actions: [
                   TextButton(
-                    onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                    onPressed: () => ScaffoldMessenger.of(context)
+                        .hideCurrentMaterialBanner(),
                     child: const Text('DISMISS'),
                   ),
                 ],
@@ -132,18 +133,21 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       ],
                     ),
                     child: ClipOval(
-                      child: user.profileImage != null && user.profileImage!.isNotEmpty
+                      child: user.profileImage != null &&
+                              user.profileImage!.isNotEmpty
                           ? Image.network(
                               user.profileImage!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey[200],
-                                child: Icon(Icons.person, size: 60, color: Colors.grey[400]),
+                                child: Icon(Icons.person,
+                                    size: 60, color: Colors.grey[400]),
                               ),
                             )
                           : Container(
                               color: AppColors.primary.withOpacity(0.1),
-                              child: Icon(Icons.person, size: 60, color: AppColors.primary),
+                              child: Icon(Icons.person,
+                                  size: 60, color: AppColors.primary),
                             ),
                     ),
                   ),
@@ -171,7 +175,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        child: const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 20),
                       ),
                     ),
                   ),
@@ -185,11 +190,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               languageProvider: languageProvider,
               title: 'Personal Information',
               children: [
-                _buildInfoRow(Icons.person_outline, languageProvider.t('name'), user.name),
+                _buildInfoRow(Icons.person_outline, languageProvider.t('name'),
+                    user.name),
                 const Divider(height: 24),
                 _buildInfoRow(Icons.phone_outlined, 'Mobile', user.mobile),
                 const Divider(height: 24),
-                _buildInfoRow(Icons.badge_outlined, languageProvider.t('role'), user.role.toUpperCase()),
+                _buildInfoRow(Icons.badge_outlined, languageProvider.t('role'),
+                    user.role.toUpperCase()),
                 const Divider(height: 24),
                 _buildInfoRow(
                   Icons.calendar_today_outlined,
@@ -211,7 +218,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   onTap: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen()),
                     );
                   },
                 ),
@@ -222,7 +230,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const ChangePasswordScreen()),
                     );
                   },
                 ),
@@ -244,7 +253,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, true),
-                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            style: TextButton.styleFrom(
+                                foregroundColor: Colors.red),
                             child: Text(languageProvider.t('logout')),
                           ),
                         ],
@@ -254,7 +264,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     if (confirm == true && mounted) {
                       await authProvider.logout();
                       if (mounted) {
-                        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/login', (route) => false);
                       }
                     }
                   },
@@ -267,7 +278,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     );
   }
 
-  Widget _buildInfoCard({required LanguageProvider languageProvider, required String title, required List<Widget> children}) {
+  Widget _buildInfoCard(
+      {required LanguageProvider languageProvider,
+      required String title,
+      required List<Widget> children}) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -342,7 +356,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     Color? color,
   }) {
     final actionColor = color ?? AppColors.primary;
-    
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -370,7 +384,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/tally_model.dart';
+import '../models/inventory_snapshot_model.dart';
 
 class TallyProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -11,12 +12,20 @@ class TallyProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Inventory snapshot state
+  List<InventorySnapshotSummary> _inventorySnapshots = [];
+  InventorySnapshot? _currentSnapshot;
+  bool _isSnapshotLoading = false;
+
   // Getters
   List<TallySession> get tallySessions => _tallySessions;
   TallySession? get currentTally => _currentTally;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasTallySessions => _tallySessions.isNotEmpty;
+  List<InventorySnapshotSummary> get inventorySnapshots => _inventorySnapshots;
+  InventorySnapshot? get currentSnapshot => _currentSnapshot;
+  bool get isSnapshotLoading => _isSnapshotLoading;
 
   // Get active tally
   TallySession? get activeTally {
@@ -239,6 +248,133 @@ class TallyProvider with ChangeNotifier {
     }
 
     _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  // Remove a single unscanned item from stock + tally (admin only)
+  Future<bool> removeUnscannedItem(String tallyId, String itemId) async {
+    _error = null;
+
+    try {
+      final response = await _apiService.removeUnscannedTallyItem(tallyId, itemId);
+      if (response['success'] == true) {
+        await fetchTallySession(tallyId);
+        return true;
+      }
+      _error = response['message'] ?? 'Failed to remove item';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Remove all (or a subset of) unscanned items from stock + tally (admin only)
+  Future<int?> removeAllUnscannedItems(String tallyId, {List<String>? itemIds}) async {
+    _error = null;
+
+    try {
+      final response = await _apiService.removeAllUnscannedTallyItems(tallyId, itemIds: itemIds);
+      if (response['success'] == true) {
+        await fetchTallySession(tallyId);
+        return response['data']?['removedCount'] as int? ?? 0;
+      }
+      _error = response['message'] ?? 'Failed to remove items';
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // Add a just-created item (forgotten during stock entry) into an active tally
+  Future<bool> addItemToTally(String tallyId, String barcode) async {
+    _error = null;
+
+    try {
+      final response = await _apiService.addItemToTally(tallyId, barcode);
+      if (response['success'] == true) {
+        await fetchTallySession(tallyId);
+        return true;
+      }
+      _error = response['message'] ?? 'Failed to add item to tally';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Generate a saved inventory snapshot from a locked tally
+  Future<bool> updateInventory(String tallyId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateTallyInventory(tallyId);
+      if (response['success'] == true) {
+        await fetchTallySession(tallyId);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      _error = response['message'] ?? 'Failed to update inventory';
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  // Fetch inventory snapshot history
+  Future<void> fetchInventorySnapshots() async {
+    _isSnapshotLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.getInventorySnapshots();
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data']['snapshots'] ?? [];
+        _inventorySnapshots = data.map((json) => InventorySnapshotSummary.fromJson(json)).toList();
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+    }
+
+    _isSnapshotLoading = false;
+    notifyListeners();
+  }
+
+  // Fetch single inventory snapshot
+  Future<InventorySnapshot?> fetchInventorySnapshot(String id) async {
+    _isSnapshotLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.getInventorySnapshot(id);
+      if (response['success'] == true) {
+        _currentSnapshot = InventorySnapshot.fromJson(response['data']['snapshot']);
+        _isSnapshotLoading = false;
+        notifyListeners();
+        return _currentSnapshot;
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+    }
+
+    _isSnapshotLoading = false;
     notifyListeners();
     return null;
   }

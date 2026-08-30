@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class ContainerSettingsScreen extends StatefulWidget {
   const ContainerSettingsScreen({super.key});
 
   @override
-  State<ContainerSettingsScreen> createState() => _ContainerSettingsScreenState();
+  State<ContainerSettingsScreen> createState() =>
+      _ContainerSettingsScreenState();
 }
 
 class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
@@ -16,7 +18,8 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      Provider.of<SettingsProvider>(context, listen: false).fetchContainerSettings();
+      Provider.of<SettingsProvider>(context, listen: false)
+          .fetchContainerSettings();
     });
   }
 
@@ -50,8 +53,10 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
                 title: 'Container Types',
                 icon: Icons.inventory_2_outlined,
                 items: provider.containerTypes,
-                onAdd: () => _showAddDialog(context, 'Container Type', 'container', 'containerTypes'),
-                onDelete: (value) => _deleteValue(context, 'container', 'containerTypes', value),
+                onAdd: () => _showAddDialog(
+                    context, 'Container Type', 'container', 'containerTypes'),
+                onDelete: (value) =>
+                    _deleteValue(context, 'container', 'containerTypes', value),
               ),
               const SizedBox(height: 12),
               _buildSettingSection(
@@ -59,8 +64,10 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
                 title: 'Weight Categories',
                 icon: Icons.scale_outlined,
                 items: provider.weightCategories,
-                onAdd: () => _showAddDialog(context, 'Weight Category', 'container', 'weightCategories'),
-                onDelete: (value) => _deleteValue(context, 'container', 'weightCategories', value),
+                onAdd: () => _showAddDialog(context, 'Weight Category',
+                    'container', 'weightCategories'),
+                onDelete: (value) => _deleteValue(
+                    context, 'container', 'weightCategories', value),
               ),
               const SizedBox(height: 12),
               _buildSettingSection(
@@ -68,8 +75,10 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
                 title: 'Layout Types',
                 icon: Icons.view_module_outlined,
                 items: provider.layoutTypes,
-                onAdd: () => _showAddDialog(context, 'Layout Type', 'container', 'layoutTypes'),
-                onDelete: (value) => _deleteValue(context, 'container', 'layoutTypes', value),
+                onAdd: () => _showAddDialog(
+                    context, 'Layout Type', 'container', 'layoutTypes'),
+                onDelete: (value) =>
+                    _deleteValue(context, 'container', 'layoutTypes', value),
               ),
             ],
           );
@@ -102,7 +111,8 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
               ],
             ),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+            border:
+                Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -153,7 +163,8 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
                   children: items.map((item) {
                     return Chip(
                       label: Text(
-                        item[0].toUpperCase() + item.substring(1).replaceAll('-', ' '),
+                        item[0].toUpperCase() +
+                            item.substring(1).replaceAll('-', ' '),
                         style: const TextStyle(fontSize: 13),
                       ),
                       deleteIcon: const Icon(Icons.close, size: 18),
@@ -173,7 +184,8 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
     );
   }
 
-  void _showAddDialog(BuildContext context, String itemName, String category, String type) {
+  void _showAddDialog(
+      BuildContext context, String itemName, String category, String type) {
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -198,14 +210,19 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
                 Navigator.pop(dialogContext);
-                final value = controller.text.trim().toLowerCase().replaceAll(' ', '-');
-                final provider = Provider.of<SettingsProvider>(context, listen: false);
+                final value =
+                    controller.text.trim().toLowerCase().replaceAll(' ', '-');
+                final provider =
+                    Provider.of<SettingsProvider>(context, listen: false);
                 final success = await provider.addValue(category, type, value);
-                
+
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  showAppSnackBar(
+                    context,
                     SnackBar(
-                      content: Text(success ? '$itemName added successfully' : 'Failed to add $itemName'),
+                      content: Text(success
+                          ? '$itemName added successfully'
+                          : 'Failed to add $itemName'),
                       backgroundColor: success ? Colors.green : Colors.red,
                     ),
                   );
@@ -219,7 +236,8 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
     );
   }
 
-  void _deleteValue(BuildContext context, String category, String type, String value) {
+  void _deleteValue(
+      BuildContext context, String category, String type, String value) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -241,13 +259,16 @@ class _ContainerSettingsScreenState extends State<ContainerSettingsScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final provider = Provider.of<SettingsProvider>(context, listen: false);
+              final provider =
+                  Provider.of<SettingsProvider>(context, listen: false);
               final success = await provider.deleteValue(category, type, value);
-              
+
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                showAppSnackBar(
+                  context,
                   SnackBar(
-                    content: Text(success ? 'Deleted successfully' : 'Failed to delete'),
+                    content: Text(
+                        success ? 'Deleted successfully' : 'Failed to delete'),
                     backgroundColor: success ? Colors.red : Colors.grey,
                   ),
                 );

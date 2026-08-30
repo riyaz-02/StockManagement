@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class RepairScreen extends StatefulWidget {
   const RepairScreen({super.key});
@@ -35,7 +36,8 @@ class _RepairScreenState extends State<RepairScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
@@ -121,7 +123,8 @@ class _RepairScreenState extends State<RepairScreen> {
                                   child: ElevatedButton.icon(
                                     icon: const Icon(Icons.check_circle),
                                     label: const Text('Mark as Returned'),
-                                    onPressed: () => _returnFromRepair(repair['_id']),
+                                    onPressed: () =>
+                                        _returnFromRepair(repair['_id']),
                                   ),
                                 ),
                               ],
@@ -173,7 +176,8 @@ class _RepairScreenState extends State<RepairScreen> {
     try {
       final response = await _apiService.returnFromRepair(repairLogId);
       if (response['success'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Item returned from repair successfully'),
             backgroundColor: Colors.green,
@@ -183,9 +187,11 @@ class _RepairScreenState extends State<RepairScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
-            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+            content:
+                Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );

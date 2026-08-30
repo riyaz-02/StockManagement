@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -55,8 +56,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (result['success'] == true) {
           // Refresh user data
           await authProvider.refreshUser();
-          
-          ScaffoldMessenger.of(context).showSnackBar(
+
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Profile updated successfully'),
               backgroundColor: Colors.green,
@@ -64,7 +66,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           );
           Navigator.pop(context);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(result['message'] ?? 'Failed to update profile'),
               backgroundColor: Colors.red,
@@ -74,7 +77,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
@@ -91,7 +95,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(

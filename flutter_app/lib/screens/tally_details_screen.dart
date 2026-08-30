@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/tally_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/tally_model.dart';
 import '../services/api_service.dart';
 import 'live_scanner_screen.dart';
+import 'barcode_scanner_for_assignment.dart';
+import 'quick_add_item_screen.dart';
+import 'inventory_snapshot_screen.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import 'package:intl/intl.dart';
+import '../utils/app_toast.dart';
 
 class TallyDetailsScreen extends StatefulWidget {
   final String tallyId;
@@ -24,7 +29,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
   String _selectedFilter = 'All';
   final _barcodeController = TextEditingController();
   final _focusNode = FocusNode();
-  
+
   // Dynamic metal types
   List<String> _metalTypes = [];
 
@@ -43,15 +48,16 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
 
   Future<void> _loadMetalTypesAndTally() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final apiService = ApiService();
-      
+
       // Fetch metal types from settings
       final settingsResponse = await apiService.getSettings('item');
       if (settingsResponse['success'] == true) {
-        final Map<String, dynamic> settingsData = settingsResponse['data'] ?? {};
-        
+        final Map<String, dynamic> settingsData =
+            settingsResponse['data'] ?? {};
+
         // Check if metalTypes exists in the map
         if (settingsData.containsKey('metalTypes')) {
           final List<dynamic> values = settingsData['metalTypes'] ?? [];
@@ -63,7 +69,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       if (_metalTypes.isEmpty) {
         _metalTypes = ['gold', 'silver'];
       }
-      
+
       // Load tally data
       await _loadTally();
     } catch (e) {
@@ -81,14 +87,17 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       _tally = tally;
       _isLoading = false;
     });
-    
+
     // Log to verify data is loaded
-    print('[TALLY DETAILS] Loaded tally: ${_tally?.scannedItemsCount}/${_tally?.expectedItems}');
-    print('[TALLY DETAILS] Gold: ${_tally?.scannedGoldWeight}g, Silver: ${_tally?.scannedSilverWeight}g');
+    print(
+        '[TALLY DETAILS] Loaded tally: ${_tally?.scannedItemsCount}/${_tally?.expectedItems}');
+    print(
+        '[TALLY DETAILS] Gold: ${_tally?.scannedGoldWeight}g, Silver: ${_tally?.scannedSilverWeight}g');
     print('[TALLY DETAILS] MetalData count: ${_tally?.metalData?.length}');
     if (_tally?.metalData != null && _tally!.metalData.isNotEmpty) {
       for (var md in _tally!.metalData) {
-        print('[TALLY DETAILS]   ${md.metalType}: ${md.scannedWeight}/${md.expectedWeight}g');
+        print(
+            '[TALLY DETAILS]   ${md.metalType}: ${md.scannedWeight}/${md.expectedWeight}g');
       }
     }
   }
@@ -102,10 +111,13 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     if (mounted) {
       if (result != null) {
         final isOutOfStock = result['isOutOfStock'] ?? false;
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text(
-              isOutOfStock ? '⚠️ Out of stock - weight excluded' : '✓ Item scanned',
+              isOutOfStock
+                  ? '⚠️ Out of stock - weight excluded'
+                  : '✓ Item scanned',
             ),
             backgroundColor: isOutOfStock ? Colors.orange : Colors.green,
             duration: const Duration(seconds: 1),
@@ -115,7 +127,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         _focusNode.requestFocus();
         await _loadTally();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text(tallyProvider.error ?? 'Scan failed'),
             backgroundColor: Colors.red,
@@ -137,7 +150,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         context: context,
         builder: (context) => _buildForceLockDialog(itemsLeft),
       );
-      
+
       if (result == null) return;
       remarks = result;
     } else {
@@ -153,22 +166,25 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               child: const Text('Lock'),
             ),
           ],
         ),
       );
-      
+
       if (confirmed != true) return;
     }
 
     final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
-    final success = await tallyProvider.lockTally(widget.tallyId, remarks: remarks);
+    final success =
+        await tallyProvider.lockTally(widget.tallyId, remarks: remarks);
 
     if (mounted) {
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           const SnackBar(
             content: Text('Tally locked successfully!'),
             backgroundColor: Colors.green,
@@ -176,7 +192,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         );
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text(tallyProvider.error ?? 'Failed to lock'),
             backgroundColor: Colors.red,
@@ -188,7 +205,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
 
   Widget _buildForceLockDialog(int itemsLeft) {
     final remarksController = TextEditingController();
-    
+
     return AlertDialog(
       title: const Text('Force Lock'),
       content: Column(
@@ -197,7 +214,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         children: [
           Text(
             '$itemsLeft items not scanned',
-            style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.orange, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -218,7 +236,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         ElevatedButton(
           onPressed: () {
             if (remarksController.text.trim().isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              showAppSnackBar(
+                context,
                 const SnackBar(content: Text('Remarks required')),
               );
               return;
@@ -232,12 +251,11 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     );
   }
 
-
   Future<void> _openFullScreenScanner() async {
     if (_tally?.isLocked ?? true) return;
 
     print('[TALLY DETAILS] Opening scanner...');
-    
+
     // Navigate to live scanner screen (with weight verification support)
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -253,6 +271,230 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       print('[TALLY DETAILS] Tally reloaded, forcing UI rebuild');
       // Force rebuild to show updated data
       setState(() {});
+    }
+  }
+
+  bool get _isAdmin {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    return auth.user?.isAdmin ?? false;
+  }
+
+  Future<void> _deleteUnscannedItem(TallyItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Item?'),
+        content: Text(
+          'Barcode ${item.barcode} was not scanned in this tally. It will be marked '
+          'not-in-stock and moved to the Recycle Bin. You can restore it from there '
+          'if this was a mistake.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+    final success =
+        await tallyProvider.removeUnscannedItem(widget.tallyId, item.itemId);
+
+    if (!mounted) return;
+    if (success) {
+      await _loadTally();
+      showAppSnackBar(
+        context,
+        const SnackBar(
+            content: Text('Item removed from stock'),
+            backgroundColor: Colors.green),
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        SnackBar(
+            content: Text(tallyProvider.error ?? 'Failed to remove item'),
+            backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _deleteAllUnscanned() async {
+    final unscanned =
+        _tally!.items.where((i) => !i.isScanned && !i.isRemoved).toList();
+    if (unscanned.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete All Unscanned?'),
+        content: Text(
+          '${unscanned.length} item(s) were not scanned in this tally. All of them will '
+          'be marked not-in-stock and moved to the Recycle Bin. This cannot be undone in bulk '
+          '(items can only be restored one at a time from the Recycle Bin).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Delete All (${unscanned.length})'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+    final removedCount =
+        await tallyProvider.removeAllUnscannedItems(widget.tallyId);
+
+    if (!mounted) return;
+    if (removedCount != null) {
+      await _loadTally();
+      showAppSnackBar(
+        context,
+        SnackBar(
+            content: Text('$removedCount item(s) removed from stock'),
+            backgroundColor: Colors.green),
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        SnackBar(
+            content: Text(tallyProvider.error ?? 'Failed to remove items'),
+            backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _addMissingItem() async {
+    final barcode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+          builder: (context) => const BarcodeScannerForAssignment()),
+    );
+    if (barcode == null || barcode.isEmpty || !mounted) return;
+
+    // If the barcode is already registered, this isn't the "forgot to add" case —
+    // point the user at normal scanning instead.
+    try {
+      final existing = await ApiService().getItemByBarcode(barcode);
+      if (existing['success'] == true) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          const SnackBar(
+              content:
+                  Text('This item already exists — scan it normally instead.')),
+        );
+        return;
+      }
+    } catch (_) {
+      // Not found — expected path, fall through to quick-add.
+    }
+
+    if (!mounted) return;
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+          builder: (context) => QuickAddItemScreen(barcode: barcode)),
+    );
+    if (created != true || !mounted) return;
+
+    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+    final success = await tallyProvider.addItemToTally(widget.tallyId, barcode);
+
+    if (!mounted) return;
+    if (success) {
+      await _loadTally();
+      showAppSnackBar(
+        context,
+        const SnackBar(
+            content: Text('Item added to tally'),
+            backgroundColor: Colors.green),
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        SnackBar(
+            content: Text(tallyProvider.error ??
+                'Item created, but failed to add to tally')),
+      );
+    }
+  }
+
+  Future<void> _updateInventory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Inventory?'),
+        content: const Text(
+          'This saves a snapshot of the current confirmed stock (by metal, item, and '
+          'container) as a permanent inventory record you can look back on later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
+    final success = await tallyProvider.updateInventory(widget.tallyId);
+
+    if (!mounted) return;
+    if (success) {
+      await _loadTally();
+      final snapshotId = _tally?.inventorySnapshotId;
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: const Text('Inventory updated'),
+          backgroundColor: Colors.green,
+          action: snapshotId != null
+              ? SnackBarAction(
+                  label: 'VIEW',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            InventorySnapshotScreen(snapshotId: snapshotId),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        ),
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        SnackBar(
+            content: Text(tallyProvider.error ?? 'Failed to update inventory'),
+            backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -296,7 +538,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
             ),
             Text(
               DateFormat('dd MMM yyyy').format(_tally!.date),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+              style:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -341,15 +584,15 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                     minHeight: 6,
                     backgroundColor: Colors.grey[200],
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      progress >= 0.8 ? Colors.green : (progress >= 0.4 ? Colors.orange : Colors.red),
+                      progress >= 0.8
+                          ? Colors.green
+                          : (progress >= 0.4 ? Colors.orange : Colors.red),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
-
 
           // SCROLLABLE CONTENT
           Expanded(
@@ -371,13 +614,16 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                       children: [
                         // Header
                         InkWell(
-                          onTap: () => setState(() => _isItemsExpanded = !_isItemsExpanded),
+                          onTap: () => setState(
+                              () => _isItemsExpanded = !_isItemsExpanded),
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Row(
                               children: [
                                 Icon(
-                                  _isItemsExpanded ? Icons.expand_less : Icons.expand_more,
+                                  _isItemsExpanded
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
@@ -389,6 +635,17 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                                   ),
                                 ),
                                 const Spacer(),
+                                if (!isLocked)
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline,
+                                        size: 20),
+                                    color: AppColors.primary,
+                                    tooltip: 'Add missing item',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: _addMissingItem,
+                                  ),
+                                const SizedBox(width: 8),
                                 Text(
                                   'Tap to ${_isItemsExpanded ? 'Collapse' : 'Expand'}',
                                   style: TextStyle(
@@ -400,7 +657,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                             ),
                           ),
                         ),
-                        
+
                         // Expanded Content
                         if (_isItemsExpanded) ...[
                           const Divider(height: 1),
@@ -414,6 +671,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                   if (isLocked) ...[
                     const SizedBox(height: 8),
                     _buildLockInfo(),
+                    const SizedBox(height: 8),
+                    _buildInventorySection(),
                   ],
                 ],
               ),
@@ -563,7 +822,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
   Widget _buildMetalCards() {
     // Build cards from metalData array
     List<Widget> cards = [];
-    
+
     // If metalData is available, use it; otherwise fall back to legacy fields
     if (_tally!.metalData.isNotEmpty) {
       for (int i = 0; i < _tally!.metalData.length; i++) {
@@ -584,7 +843,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         final metal = _metalTypes[i];
         final scanned = _getMetalWeight(metal, true);
         final expected = _getMetalWeight(metal, false);
-        
+
         cards.add(
           _buildMetalCard(
             metal,
@@ -596,24 +855,26 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         );
       }
     }
-    
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: cards,
     );
   }
-  
+
   double _getMetalWeight(String metal, bool scanned) {
     // Legacy fallback - only used if metalData is not available
     if (metal.toLowerCase() == 'gold') {
       return scanned ? _tally!.scannedGoldWeight : _tally!.expectedGoldWeight;
     } else if (metal.toLowerCase() == 'silver') {
-      return scanned ? _tally!.scannedSilverWeight : _tally!.expectedSilverWeight;
+      return scanned
+          ? _tally!.scannedSilverWeight
+          : _tally!.expectedSilverWeight;
     }
     return 0.0;
   }
-  
+
   Color _getMetalColor(String metal) {
     switch (metal.toLowerCase()) {
       case 'gold':
@@ -628,7 +889,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         return AppColors.primary;
     }
   }
-  
+
   IconData _getMetalIcon(String metal) {
     switch (metal.toLowerCase()) {
       case 'gold':
@@ -653,15 +914,16 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
   ) {
     // Capitalize first letter for display
     final displayName = label[0].toUpperCase() + label.substring(1);
-    
+
     // Get item counts from metalData
     int scannedItemCount = 0;
     int expectedItemCount = 0;
-    
+
     if (_tally!.metalData.isNotEmpty) {
       final metalData = _tally!.metalData.firstWhere(
         (m) => m.metalType.toLowerCase() == label.toLowerCase(),
-        orElse: () => MetalData(metalType: label, expectedWeight: 0, expectedItemCount: 0),
+        orElse: () => MetalData(
+            metalType: label, expectedWeight: 0, expectedItemCount: 0),
       );
       scannedItemCount = metalData.scannedItemCount;
       expectedItemCount = metalData.expectedItemCount;
@@ -673,7 +935,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
 
     // Determine background color based on metal type
     Color bgColor;
-    
+
     switch (label.toLowerCase()) {
       case 'gold':
         bgColor = const Color(0xFFE5B80B); // Balanced gold color
@@ -729,7 +991,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(10),
@@ -760,9 +1023,10 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                       )
                     else
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: diff > 0 
+                          color: diff > 0
                               ? Colors.orange.withOpacity(0.3)
                               : Colors.green.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(8),
@@ -843,23 +1107,28 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
         ),
       );
     }
-    
+
     // Filter items based on selected filter
     List<TallyItem> filteredItems = _tally!.items;
-    
+
     if (_selectedFilter == 'Scanned') {
       filteredItems = filteredItems.where((i) => i.isScanned).toList();
     } else if (_selectedFilter == 'Not Scanned') {
-      filteredItems = filteredItems.where((i) => !i.isScanned).toList();
+      filteredItems =
+          filteredItems.where((i) => !i.isScanned && !i.isRemoved).toList();
     } else if (_selectedFilter == 'Out of Stock') {
-      filteredItems = filteredItems.where((i) => i.status == 'out_of_stock').toList();
+      filteredItems =
+          filteredItems.where((i) => i.status == 'out_of_stock').toList();
+    } else if (_selectedFilter == 'Removed') {
+      filteredItems = filteredItems.where((i) => i.isRemoved).toList();
     } else if (_selectedFilter != 'All') {
       // Filter by metal type
-      filteredItems = filteredItems.where((i) => 
-        i.metalType.toLowerCase() == _selectedFilter.toLowerCase()
-      ).toList();
+      filteredItems = filteredItems
+          .where(
+              (i) => i.metalType.toLowerCase() == _selectedFilter.toLowerCase())
+          .toList();
     }
-    
+
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -873,18 +1142,44 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                 _buildFilterChip('Scanned'),
                 _buildFilterChip('Not Scanned'),
                 _buildFilterChip('Out of Stock'),
+                _buildFilterChip('Removed'),
                 // Add metal type filters from metalData
                 ..._tally!.metalData.map((m) => _buildFilterChip(
-                  m.metalType[0].toUpperCase() + m.metalType.substring(1)
-                )),
+                    m.metalType[0].toUpperCase() + m.metalType.substring(1))),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          // Items count
-          Text(
-            '${filteredItems.length} items',
-            style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+          // Items count + bulk delete
+          Row(
+            children: [
+              Text(
+                '${filteredItems.length} items',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (_selectedFilter == 'Not Scanned' &&
+                  !_tally!.isLocked &&
+                  _isAdmin &&
+                  filteredItems.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _deleteAllUnscanned,
+                  icon: const Icon(Icons.delete_sweep,
+                      size: 16, color: Colors.red),
+                  label: Text(
+                    'Delete All (${filteredItems.length})',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           // Items list
@@ -893,29 +1188,46 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       ),
     );
   }
-  
+
   Widget _buildItemRow(TallyItem item) {
     final metalColor = _getMetalColor(item.metalType);
-    
+    final isRemoved = item.isRemoved;
+    final canDelete =
+        !_tally!.isLocked && !item.isScanned && !isRemoved && _isAdmin;
+
     return InkWell(
-      onTap: () => _showItemDetails(item),
+      onTap: isRemoved ? null : () => _showItemDetails(item),
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: item.isScanned ? Colors.green.withOpacity(0.05) : Colors.white,
+          color: isRemoved
+              ? Colors.grey.withOpacity(0.08)
+              : (item.isScanned
+                  ? Colors.green.withOpacity(0.05)
+                  : Colors.white),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: item.isScanned ? Colors.green.withOpacity(0.3) : Colors.grey[300]!,
+            color: isRemoved
+                ? Colors.grey[300]!
+                : (item.isScanned
+                    ? Colors.green.withOpacity(0.3)
+                    : Colors.grey[300]!),
           ),
         ),
         child: Row(
           children: [
             // Status icon
             Icon(
-              item.isScanned ? Icons.check_circle : Icons.circle_outlined,
+              isRemoved
+                  ? Icons.remove_circle_outline
+                  : (item.isScanned
+                      ? Icons.check_circle
+                      : Icons.circle_outlined),
               size: 16,
-              color: item.isScanned ? Colors.green : Colors.grey[400],
+              color: isRemoved
+                  ? Colors.grey[500]
+                  : (item.isScanned ? Colors.green : Colors.grey[400]),
             ),
             const SizedBox(width: 8),
             // Barcode
@@ -923,63 +1235,99 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
               flex: 2,
               child: Text(
                 item.barcode,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isRemoved ? Colors.grey[500] : null,
+                  decoration: isRemoved ? TextDecoration.lineThrough : null,
+                ),
               ),
             ),
             // Metal type
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: metalColor.withOpacity(0.1),
+                color: metalColor.withOpacity(isRemoved ? 0.05 : 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 item.metalType[0].toUpperCase() + item.metalType.substring(1),
-                style: TextStyle(fontSize: 10, color: metalColor, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isRemoved ? Colors.grey[500] : metalColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             // Weight
             Text(
               '${item.weight.toStringAsFixed(1)}g',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: isRemoved ? Colors.grey[400] : Colors.grey),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 16, color: Colors.grey[400]),
+            if (isRemoved)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Removed',
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600),
+                ),
+              )
+            else if (canDelete)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 18, color: Colors.red),
+                tooltip: 'Delete (not in stock)',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _deleteUnscannedItem(item),
+              )
+            else
+              Icon(Icons.chevron_right, size: 16, color: Colors.grey[400]),
           ],
         ),
       ),
     );
   }
-  
+
   Future<void> _showItemDetails(TallyItem item) async {
     print('=== SHOW ITEM DETAILS ===');
     print('Item ID: ${item.itemId}');
     print('Barcode: ${item.barcode}');
-    
+
     // Fetch full item details from API
     final apiService = ApiService();
-    
+
     try {
       print('Fetching item details from API...');
       final response = await apiService.getItemById(item.itemId);
-      
+
       print('API Response:');
       print('  success: ${response['success']}');
       print('  data type: ${response['data']?.runtimeType}');
       print('  data: ${response['data']}');
-      
+
       if (response['success'] != true) {
         print('ERROR: API returned success = false');
         print('  message: ${response['message']}');
         return;
       }
-      
+
       if (!mounted) {
         print('ERROR: Widget not mounted');
         return;
       }
-      
+
       // IMPORTANT: Item data is nested inside 'item' key
       final itemData = response['data']['item'];
       print('Item Data Fields:');
@@ -996,7 +1344,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       print('  huid: ${itemData['huid']}');
       print('  numberOfPieces: ${itemData['numberOfPieces']}');
       print('  status: ${itemData['status']}');
-      
+
       if (itemData['images'] != null) {
         final images = itemData['images'] as List;
         print('Images array length: ${images.length}');
@@ -1005,9 +1353,9 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
           print('Full image URL: ${AppConstants.baseUrl}/${images[0]}');
         }
       }
-      
+
       print('Opening modal...');
-      
+
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -1028,511 +1376,610 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                 builder: (context, scrollController) => Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-              child: Column(
-                children: [
-                  // Handle bar
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  // Content
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // Header with barcode and status
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
+                  child: Column(
+                    children: [
+                      // Handle bar
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      // Content
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            // Header with barcode and status
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Item Details',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                // Barcode and Status in same row
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.grey[300]!),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Item Details',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      const SizedBox(height: 8),
+                                      // Barcode and Status in same row
+                                      Row(
                                         children: [
-                                          Icon(Icons.qr_code, size: 14, color: Colors.grey[700]),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            item.barcode,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.grey[800],
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[100],
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              border: Border.all(
+                                                  color: Colors.grey[300]!),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.qr_code,
+                                                    size: 14,
+                                                    color: Colors.grey[700]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  item.barcode,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // Status badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  itemData['status'] == 'active'
+                                                      ? Colors.green
+                                                      : Colors.grey,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              itemData['status']
+                                                      ?.toString()
+                                                      .toUpperCase() ??
+                                                  'UNKNOWN',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Status badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: itemData['status'] == 'active' ? Colors.green : Colors.grey,
-                                        borderRadius: BorderRadius.circular(6),
+                                    ],
+                                  ),
+                                ),
+                                // Scan status badge (right side)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: item.isScanned
+                                        ? Colors.green
+                                        : Colors.orange,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        item.isScanned
+                                            ? Icons.check_circle
+                                            : Icons.pending,
+                                        size: 14,
+                                        color: Colors.white,
                                       ),
-                                      child: Text(
-                                        itemData['status']?.toString().toUpperCase() ?? 'UNKNOWN',
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        item.isScanned
+                                            ? 'Scanned'
+                                            : 'Not Scanned',
                                         style: const TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 11,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Split Image Area - Item Image (Left) + Container Image (Right) - No labels
+                            Row(
+                              children: [
+                                // Item Image (Left)
+                                Expanded(
+                                  child: itemData['images'] != null &&
+                                          (itemData['images'] as List)
+                                              .isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.network(
+                                            '${AppConstants.baseUrl}/${itemData['images'][0]}',
+                                            height: 110,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return Container(
+                                                height: 110,
+                                                color: Colors.grey[200],
+                                                child: const Center(
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                            strokeWidth: 2)),
+                                              );
+                                            },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                height: 110,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[200],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                        Icons
+                                                            .image_not_supported,
+                                                        size: 28,
+                                                        color:
+                                                            Colors.grey[400]),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      'No image',
+                                                      style: TextStyle(
+                                                          fontSize: 9,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : Container(
+                                          height: 110,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.image,
+                                                  size: 28,
+                                                  color: Colors.grey[400]),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'No image',
+                                                style: TextStyle(
+                                                    fontSize: 9,
+                                                    color: Colors.grey[600]),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(width: 10),
+                                // Container Image (Right)
+                                Expanded(
+                                  child: itemData['containerId'] != null &&
+                                          itemData['containerId']['image'] !=
+                                              null &&
+                                          itemData['containerId']['image']
+                                              .toString()
+                                              .isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.network(
+                                            '${AppConstants.baseUrl}${itemData['containerId']['image']}',
+                                            height: 110,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return Container(
+                                                height: 110,
+                                                color: Colors.grey[200],
+                                                child: const Center(
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                            strokeWidth: 2)),
+                                              );
+                                            },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                height: 110,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[200],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.inventory_2,
+                                                        size: 28,
+                                                        color:
+                                                            Colors.grey[400]),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      'No image',
+                                                      style: TextStyle(
+                                                          fontSize: 9,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : Container(
+                                          height: 110,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.inventory_2,
+                                                  size: 28,
+                                                  color: Colors.grey[400]),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'No image',
+                                                style: TextStyle(
+                                                    fontSize: 9,
+                                                    color: Colors.grey[600]),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Location (IMPORTANT) - Container info is already in response
+                            if (itemData['containerId'] != null)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color:
+                                          AppColors.primary.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.location_on,
+                                        color: AppColors.primary, size: 16),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Location',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            itemData['containerId']['name'] ??
+                                                'Unknown',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                          if (itemData['slotNumber'] != null)
+                                            Text(
+                                              'Slot ${itemData['slotNumber']}',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+
+                            // Details Grid - Ultra compact
+                            if (itemData['name'] != null &&
+                                itemData['name'].toString().isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                margin: const EdgeInsets.only(bottom: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[200]!),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'Name',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        itemData['name'],
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          // Scan status badge (right side)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: item.isScanned ? Colors.green : Colors.orange,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  item.isScanned ? Icons.check_circle : Icons.pending,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.isScanned ? 'Scanned' : 'Not Scanned',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                        const SizedBox(height: 10),
-                        
-                        // Split Image Area - Item Image (Left) + Container Image (Right) - No labels
-                        Row(
-                          children: [
-                            // Item Image (Left)
-                            Expanded(
-                              child: itemData['images'] != null && (itemData['images'] as List).isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        '${AppConstants.baseUrl}/${itemData['images'][0]}',
-                                        height: 110,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (context, child, loadingProgress) {
-                                          if (loadingProgress == null) return child;
-                                          return Container(
-                                            height: 110,
-                                            color: Colors.grey[200],
-                                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            height: 110,
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey[200],
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(Icons.image_not_supported, size: 28, color: Colors.grey[400]),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'No image',
-                                                  style: TextStyle(fontSize: 9, color: Colors.grey[600]),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    )
-                                  : Container(
-                                      height: 110,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.image, size: 28, color: Colors.grey[400]),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'No image',
-                                            style: TextStyle(fontSize: 9, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Container Image (Right)
-                            Expanded(
-                              child: itemData['containerId'] != null && 
-                                     itemData['containerId']['image'] != null && 
-                                     itemData['containerId']['image'].toString().isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        '${AppConstants.baseUrl}${itemData['containerId']['image']}',
-                                        height: 110,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (context, child, loadingProgress) {
-                                          if (loadingProgress == null) return child;
-                                          return Container(
-                                            height: 110,
-                                            color: Colors.grey[200],
-                                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            height: 110,
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey[200],
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(Icons.inventory_2, size: 28, color: Colors.grey[400]),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'No image',
-                                                  style: TextStyle(fontSize: 9, color: Colors.grey[600]),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    )
-                                  : Container(
-                                      height: 110,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.inventory_2, size: 28, color: Colors.grey[400]),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'No image',
-                                            style: TextStyle(fontSize: 9, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        
-                        // Location (IMPORTANT) - Container info is already in response
-                        if (itemData['containerId'] != null)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.location_on, color: AppColors.primary, size: 16),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Location',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        itemData['containerId']['name'] ?? 'Unknown',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      if (itemData['slotNumber'] != null)
-                                        Text(
-                                          'Slot ${itemData['slotNumber']}',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 8),
-                        
-                        // Details Grid - Ultra compact
-                        if (itemData['name'] != null && itemData['name'].toString().isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(bottom: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    'Name',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    itemData['name'],
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        
-                        // Row 1: Metal Type + Purity
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildCompactDetail('Metal Type', item.metalType[0].toUpperCase() + item.metalType.substring(1)),
                               ),
-                              Container(
-                                width: 1,
-                                height: 26,
-                                color: Colors.grey[300],
+
+                            // Row 1: Metal Type + Purity
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              margin: const EdgeInsets.only(bottom: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[200]!),
                               ),
-                              Expanded(
-                                child: _buildCompactDetail('Purity', itemData['purity'] ?? '-'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        
-                        // Row 2: Net Weight (Highlighted) + Item Type
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(6),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildCompactDetail(
+                                        'Metal Type',
+                                        item.metalType[0].toUpperCase() +
+                                            item.metalType.substring(1)),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Net Weight',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        '${itemData['netWeight']?.toStringAsFixed(3) ?? '0'}g',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 26,
-                                color: Colors.grey[300],
-                              ),
-                              Expanded(
-                                child: _buildCompactDetail('Item Type', itemData['itemType'] ?? '-'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        
-                        // Row 3: Weight Category + Pieces (if available)
-                        if (itemData['weightCategory'] != null || itemData['numberOfPieces'] != null)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(bottom: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: itemData['weightCategory'] != null && itemData['weightCategory'].toString().isNotEmpty
-                                      ? _buildCompactDetail('Weight Category', itemData['weightCategory'])
-                                      : const SizedBox.shrink(),
-                                ),
-                                if (itemData['weightCategory'] != null && itemData['numberOfPieces'] != null)
                                   Container(
                                     width: 1,
                                     height: 26,
                                     color: Colors.grey[300],
                                   ),
-                                Expanded(
-                                  child: itemData['numberOfPieces'] != null
-                                      ? _buildCompactDetail('Pieces', itemData['numberOfPieces'].toString())
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        
-                        // Row 4: HUID (if available)
-                        if (itemData['huid'] != null && itemData['huid'].toString().isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(bottom: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    'HUID',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                  Expanded(
+                                    child: _buildCompactDetail(
+                                        'Purity', itemData['purity'] ?? '-'),
                                   ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    itemData['huid'],
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        
-                        const SizedBox(height: 10),
-                        
-                        // Close button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 45,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                ],
                               ),
                             ),
-                            child: const Text(
-                              'Close',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+
+                            // Row 2: Net Weight (Highlighted) + Item Type
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              margin: const EdgeInsets.only(bottom: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[200]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Net Weight',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${itemData['netWeight']?.toStringAsFixed(3) ?? '0'}g',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 26,
+                                    color: Colors.grey[300],
+                                  ),
+                                  Expanded(
+                                    child: _buildCompactDetail('Item Type',
+                                        itemData['itemType'] ?? '-'),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+
+                            // Row 3: Weight Category + Pieces (if available)
+                            if (itemData['weightCategory'] != null ||
+                                itemData['numberOfPieces'] != null)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                margin: const EdgeInsets.only(bottom: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[200]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child:
+                                          itemData['weightCategory'] != null &&
+                                                  itemData['weightCategory']
+                                                      .toString()
+                                                      .isNotEmpty
+                                              ? _buildCompactDetail(
+                                                  'Weight Category',
+                                                  itemData['weightCategory'])
+                                              : const SizedBox.shrink(),
+                                    ),
+                                    if (itemData['weightCategory'] != null &&
+                                        itemData['numberOfPieces'] != null)
+                                      Container(
+                                        width: 1,
+                                        height: 26,
+                                        color: Colors.grey[300],
+                                      ),
+                                    Expanded(
+                                      child: itemData['numberOfPieces'] != null
+                                          ? _buildCompactDetail(
+                                              'Pieces',
+                                              itemData['numberOfPieces']
+                                                  .toString())
+                                          : const SizedBox.shrink(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Row 4: HUID (if available)
+                            if (itemData['huid'] != null &&
+                                itemData['huid'].toString().isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                margin: const EdgeInsets.only(bottom: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[200]!),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'HUID',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        itemData['huid'],
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            const SizedBox(height: 10),
+
+                            // Close button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 45,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Close',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
                 ),
               ),
             ),
@@ -1544,7 +1991,8 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       print('Error: $e');
       print('Stack trace: $stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Failed to load item details: $e'),
             backgroundColor: Colors.red,
@@ -1553,20 +2001,20 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       }
     }
   }
-  
+
   Future<String?> _getContainerName(dynamic containerId) async {
     print('=== GET CONTAINER NAME ===');
     print('Container ID: $containerId');
     print('Container ID type: ${containerId?.runtimeType}');
-    
+
     if (containerId == null) {
       print('Container ID is null');
       return null;
     }
-    
+
     try {
       final apiService = ApiService();
-      
+
       // Handle different ID formats
       String? id;
       if (containerId is String) {
@@ -1574,21 +2022,21 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       } else if (containerId is Map) {
         id = containerId['\$oid'] ?? containerId['_id'];
       }
-      
+
       print('Extracted ID: $id');
-      
+
       if (id == null) {
         print('Could not extract ID from containerId');
         return 'Unknown Location';
       }
-      
+
       print('Fetching container with ID: $id');
       final response = await apiService.getContainer(id);
-      
+
       print('Container API Response:');
       print('  success: ${response['success']}');
       print('  data: ${response['data']}');
-      
+
       if (response['success'] == true) {
         final containerName = response['data']['name'];
         print('Container name: $containerName');
@@ -1600,13 +2048,13 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     }
     return 'Unknown Location';
   }
-  
+
   Future<String?> _getContainerImage(dynamic containerId) async {
     if (containerId == null) return null;
-    
+
     try {
       final apiService = ApiService();
-      
+
       // Handle different ID formats
       String? id;
       if (containerId is String) {
@@ -1614,11 +2062,11 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       } else if (containerId is Map) {
         id = containerId['\$oid'] ?? containerId['_id'];
       }
-      
+
       if (id == null) return null;
-      
+
       final response = await apiService.getContainer(id);
-      
+
       if (response['success'] == true && response['data']['image'] != null) {
         return response['data']['image'];
       }
@@ -1627,7 +2075,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
     }
     return null;
   }
-  
+
   Widget _buildCompactDetail(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -1654,7 +2102,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
       ),
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1780,6 +2228,64 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildInventorySection() {
+    if (_tally!.inventoryUpdated) {
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.inventory_2, color: Colors.green, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _tally!.inventoryUpdatedAt != null
+                    ? 'Inventory updated on ${DateFormat('dd MMM yyyy, HH:mm').format(_tally!.inventoryUpdatedAt!)}'
+                    : 'Inventory updated',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green),
+              ),
+            ),
+            if (_tally!.inventorySnapshotId != null)
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => InventorySnapshotScreen(
+                          snapshotId: _tally!.inventorySnapshotId!),
+                    ),
+                  );
+                },
+                child: const Text('VIEW'),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: ElevatedButton.icon(
+        onPressed: _updateInventory,
+        icon: const Icon(Icons.inventory_2_outlined, size: 18),
+        label: const Text(
+          'UPDATE INVENTORY',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
       ),
     );
   }

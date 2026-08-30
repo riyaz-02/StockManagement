@@ -6,6 +6,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_constants.dart';
 import '../models/item_model.dart';
 import 'item_details_screen.dart';
+import '../utils/app_toast.dart';
 
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key});
@@ -29,7 +30,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
   Future<void> _loadBookings() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _apiService.getBookings(status: _filter == 'all' ? null : _filter);
+      final response = await _apiService.getBookings(
+          status: _filter == 'all' ? null : _filter);
       if (response['success'] == true) {
         setState(() {
           _bookings = response['data']['bookings'];
@@ -39,7 +41,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
@@ -92,7 +95,7 @@ class _BookingListScreenState extends State<BookingListScreen> {
               ],
             ),
           ),
-          
+
           // Bookings List
           Expanded(
             child: _isLoading
@@ -102,11 +105,13 @@ class _BookingListScreenState extends State<BookingListScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.bookmark_border, size: 64, color: Colors.grey),
+                            Icon(Icons.bookmark_border,
+                                size: 64, color: Colors.grey),
                             const SizedBox(height: 16),
                             Text(
                               'No bookings found',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
+                              style:
+                                  TextStyle(fontSize: 18, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -192,7 +197,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Item Image
-                    if (item['images'] != null && (item['images'] as List).isNotEmpty)
+                    if (item['images'] != null &&
+                        (item['images'] as List).isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
@@ -200,11 +206,13 @@ class _BookingListScreenState extends State<BookingListScreen> {
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
                             width: 80,
                             height: 80,
                             color: Colors.grey[200],
-                            child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                            child: const Icon(Icons.image_not_supported,
+                                color: Colors.grey),
                           ),
                         ),
                       )
@@ -216,7 +224,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.inventory_2, color: Colors.grey, size: 40),
+                        child: const Icon(Icons.inventory_2,
+                            color: Colors.grey, size: 40),
                       ),
                     const SizedBox(width: 16),
                     // Item Details
@@ -234,16 +243,19 @@ class _BookingListScreenState extends State<BookingListScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Barcode: ${item['barcode'] ?? 'N/A'}',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13),
                           ),
                           Text(
                             'Weight: ${item['netWeight']}g',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13),
                           ),
                           if (item['metalType'] != null)
                             Text(
                               '${item['metalType']} • ${item['purity'] ?? ''}',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 13),
                             ),
                         ],
                       ),
@@ -253,17 +265,22 @@ class _BookingListScreenState extends State<BookingListScreen> {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
-                
+
                 // Booking Details
-                _buildDetailRow('Advance Amount', '₹${booking['advanceAmount']}'),
-                _buildDetailRow('Booking Date', _formatDate(booking['bookingDate'])),
-                _buildDetailRow('Expiry Date', _formatDate(booking['expiryDate'])),
-                if (item['containerId'] != null && item['containerId']['name'] != null)
-                  _buildDetailRow('Location', '${item['containerId']['name']} - Slot ${item['slotNumber'] ?? 'N/A'}'),
+                _buildDetailRow(
+                    'Advance Amount', '₹${booking['advanceAmount']}'),
+                _buildDetailRow(
+                    'Booking Date', _formatDate(booking['bookingDate'])),
+                _buildDetailRow(
+                    'Expiry Date', _formatDate(booking['expiryDate'])),
+                if (item['containerId'] != null &&
+                    item['containerId']['name'] != null)
+                  _buildDetailRow('Location',
+                      '${item['containerId']['name']} - Slot ${item['slotNumber'] ?? 'N/A'}'),
                 if (booking['remarks'] != null && booking['remarks'].isNotEmpty)
                   _buildDetailRow('Remarks', booking['remarks']),
                 const SizedBox(height: 16),
-                
+
                 // View Item Details Button
                 SizedBox(
                   width: double.infinity,
@@ -276,7 +293,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ItemDetailsScreen(item: itemModel),
+                          builder: (context) =>
+                              ItemDetailsScreen(item: itemModel),
                         ),
                       );
                     },
@@ -286,7 +304,7 @@ class _BookingListScreenState extends State<BookingListScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Action Buttons
                 if (isActive)
                   Row(
@@ -391,7 +409,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
       try {
         final response = await _apiService.cancelBooking(bookingId);
         if (response['success'] == true && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Booking cancelled successfully'),
               backgroundColor: Colors.green,
@@ -401,9 +420,11 @@ class _BookingListScreenState extends State<BookingListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+              content:
+                  Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -435,7 +456,8 @@ class _BookingListScreenState extends State<BookingListScreen> {
       try {
         final response = await _apiService.completeBooking(bookingId);
         if (response['success'] == true && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(
               content: Text('Booking completed. Item marked as sold.'),
               backgroundColor: Colors.green,
@@ -445,9 +467,11 @@ class _BookingListScreenState extends State<BookingListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+              content:
+                  Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
               backgroundColor: Colors.red,
             ),
           );

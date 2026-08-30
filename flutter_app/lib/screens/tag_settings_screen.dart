@@ -4,6 +4,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import 'blank_tag_printing_screen.dart';
+import '../utils/app_toast.dart';
 
 class TagSettingsScreen extends StatefulWidget {
   const TagSettingsScreen({Key? key}) : super(key: key);
@@ -15,7 +16,7 @@ class TagSettingsScreen extends StatefulWidget {
 class _TagSettingsScreenState extends State<TagSettingsScreen> {
   final _widthController = TextEditingController(text: '50');
   final _heightController = TextEditingController(text: '30');
-  
+
   Map<String, Color> _purityColors = {};
   bool _isLoading = true;
   bool _isSaving = false;
@@ -28,16 +29,17 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
 
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
       final settings = await settingsProvider.getTagSettings();
-      
+
       if (settings != null && mounted) {
         setState(() {
           _widthController.text = settings['tagWidth']?.toString() ?? '50';
           _heightController.text = settings['tagHeight']?.toString() ?? '30';
-          
+
           // Load purity colors
           final purityColors = settings['purityColors'] as List? ?? [];
           _purityColors = {};
@@ -50,8 +52,11 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading settings: $e'), backgroundColor: Colors.red),
+        showAppSnackBar(
+          context,
+          SnackBar(
+              content: Text('Error loading settings: $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -63,30 +68,39 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
 
   Future<void> _saveSettings() async {
     setState(() => _isSaving = true);
-    
+
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-      
-      final purityColorsList = _purityColors.entries.map((e) => {
-        'purity': e.key,
-        'color': _colorToHex(e.value),
-      }).toList();
-      
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
+
+      final purityColorsList = _purityColors.entries
+          .map((e) => {
+                'purity': e.key,
+                'color': _colorToHex(e.value),
+              })
+          .toList();
+
       await settingsProvider.updateTagSettings(
         tagWidth: double.parse(_widthController.text),
         tagHeight: double.parse(_heightController.text),
         purityColors: purityColorsList,
       );
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tag settings saved successfully'), backgroundColor: Colors.green),
+        showAppSnackBar(
+          context,
+          const SnackBar(
+              content: Text('Tag settings saved successfully'),
+              backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving settings: $e'), backgroundColor: Colors.red),
+        showAppSnackBar(
+          context,
+          SnackBar(
+              content: Text('Error saving settings: $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -141,7 +155,8 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Tag Printing Settings', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Tag Printing Settings',
+            style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -161,7 +176,8 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const BlankTagPrintingScreen(),
+                            builder: (context) =>
+                                const BlankTagPrintingScreen(),
                           ),
                         );
                       },
@@ -224,11 +240,13 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Tag Size Section
-                  const Text('Tag Size (mm)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Tag Size (mm)',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -241,7 +259,10 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                             suffixText: 'mm',
                           ),
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+\.?\d{0,2}'))
+                          ],
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -254,25 +275,32 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                             suffixText: 'mm',
                           ),
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+\.?\d{0,2}'))
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Purity Colors Section
-                  const Text('Purity Colors', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Purity Colors',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  const Text('Tap to change color for each purity', style: TextStyle(color: Colors.grey)),
+                  const Text('Tap to change color for each purity',
+                      style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 16),
-                  
+
                   if (_purityColors.isEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32),
-                        child: Text('No purity options found. Add purities in Item Settings first.'),
+                        child: Text(
+                            'No purity options found. Add purities in Item Settings first.'),
                       ),
                     )
                   else
@@ -289,16 +317,18 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          title: Text(entry.key,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text(_colorToHex(entry.value)),
                           trailing: const Icon(Icons.edit, color: Colors.blue),
                           onTap: () => _pickColor(entry.key, entry.value),
                         ),
                       );
                     }).toList(),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Save Button
                   SizedBox(
                     width: double.infinity,
@@ -308,15 +338,19 @@ class _TagSettingsScreenState extends State<TagSettingsScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2196F3),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       child: _isSaving
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text('Save Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          : const Text('Save Settings',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],

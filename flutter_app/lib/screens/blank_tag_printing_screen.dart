@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:printing/printing.dart';
 import '../providers/settings_provider.dart';
 import '../services/api_service.dart';
+import '../utils/app_toast.dart';
 
 class BlankTagPrintingScreen extends StatefulWidget {
   const BlankTagPrintingScreen({Key? key}) : super(key: key);
@@ -28,17 +29,18 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
 
   Future<void> _loadPurities() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
       final settings = await settingsProvider.getTagSettings();
-      
+
       if (settings != null && mounted) {
         final purityColors = settings['purityColors'] as List? ?? [];
-        
+
         setState(() {
           _purities = purityColors.map((pc) => pc['purity'] as String).toList();
-          
+
           // Initialize controllers and colors
           for (var pc in purityColors) {
             final purity = pc['purity'] as String;
@@ -49,8 +51,11 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading purities: $e'), backgroundColor: Colors.red),
+        showAppSnackBar(
+          context,
+          SnackBar(
+              content: Text('Error loading purities: $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -77,7 +82,8 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
     // Validate that at least one purity has count > 0
     final totalCount = _getTotalCount();
     if (totalCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(
           content: Text('Please enter at least one tag count'),
           backgroundColor: Colors.orange,
@@ -112,7 +118,8 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
           filename: 'blank-tags-${DateTime.now().millisecondsSinceEpoch}.pdf',
         );
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('✓ Generated $totalCount blank tags successfully'),
             backgroundColor: Colors.green,
@@ -128,7 +135,8 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
     } catch (e) {
       print('[Blank Tags] Error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error generating PDF: $e'),
             backgroundColor: Colors.red,
@@ -251,14 +259,17 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
                                         keyboardType: TextInputType.number,
                                         textAlign: TextAlign.center,
                                         inputFormatters: [
-                                          FilteringTextInputFormatter.digitsOnly,
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
                                         ],
                                         decoration: InputDecoration(
                                           labelText: 'Count',
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
                                             horizontal: 12,
                                             vertical: 12,
                                           ),
@@ -306,7 +317,8 @@ class _BlankTagPrintingScreenState extends State<BlankTagPrintingScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.label, color: Colors.green[700], size: 20),
+                              Icon(Icons.label,
+                                  color: Colors.green[700], size: 20),
                               const SizedBox(width: 8),
                               Text(
                                 'Total: $totalCount tags',

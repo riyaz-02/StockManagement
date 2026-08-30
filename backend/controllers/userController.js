@@ -277,3 +277,49 @@ exports.changePassword = async (req, res) => {
         });
     }
 };
+
+// @desc    Register/refresh the calling device's FCM push token
+// @route   PUT /api/users/fcm-token
+// @access  Private
+exports.registerFcmToken = async (req, res) => {
+    try {
+        const { token, platform } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide a token'
+            });
+        }
+
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        const existing = user.fcmTokens.find(t => t.token === token);
+        if (existing) {
+            existing.platform = platform || existing.platform;
+            existing.updatedAt = new Date();
+        } else {
+            user.fcmTokens.push({ token, platform: platform || 'android', updatedAt: new Date() });
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Device registered for notifications'
+        });
+    } catch (error) {
+        console.error('Register FCM token error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while registering device'
+        });
+    }
+};

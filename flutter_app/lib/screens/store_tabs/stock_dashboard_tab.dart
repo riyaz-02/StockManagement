@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/store_provider.dart';
 import '../../models/store_models.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/app_toast.dart';
 
 class StockDashboardTab extends StatelessWidget {
   const StockDashboardTab({super.key});
@@ -32,7 +33,8 @@ class StockDashboardTab extends StatelessWidget {
                   .where((m) =>
                       (store.totalStock[m] ?? 0) > 0 ||
                       (store.barcodedStock[m] != null))
-                  .map((metal) => _buildMetalSummaryCard(context, metal, store)),
+                  .map(
+                      (metal) => _buildMetalSummaryCard(context, metal, store)),
 
               if (store.totalStock.isEmpty)
                 _buildEmptyCard('No stock data available'),
@@ -54,9 +56,11 @@ class StockDashboardTab extends StatelessWidget {
               const SizedBox(height: 8),
 
               if (store.bulkWeights.isEmpty)
-                _buildEmptyCard('No bulk weight entries yet.\nTap Add to enter raw/reserved gold.'),
+                _buildEmptyCard(
+                    'No bulk weight entries yet.\nTap Add to enter raw/reserved gold.'),
 
-              ...store.bulkWeights.map((bw) => _buildBulkWeightCard(context, bw, store)),
+              ...store.bulkWeights
+                  .map((bw) => _buildBulkWeightCard(context, bw, store)),
             ],
           ),
         );
@@ -171,8 +175,7 @@ class StockDashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _miniStat(
-      String label, String value, String subtitle, Color color) {
+  Widget _miniStat(String label, String value, String subtitle, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -218,8 +221,7 @@ class StockDashboardTab extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit_outlined, size: 18),
-              onPressed: () =>
-                  _showEditBulkWeightDialog(context, bw, store),
+              onPressed: () => _showEditBulkWeightDialog(context, bw, store),
               color: Colors.blueGrey,
             ),
             IconButton(
@@ -282,8 +284,7 @@ class StockDashboardTab extends StatelessWidget {
                 items: metals
                     .map((m) => DropdownMenuItem(
                         value: m,
-                        child: Text(
-                            m[0].toUpperCase() + m.substring(1))))
+                        child: Text(m[0].toUpperCase() + m.substring(1))))
                     .toList(),
                 onChanged: (v) => setSheetState(() => selectedMetal = v!),
               ),
@@ -312,13 +313,17 @@ class StockDashboardTab extends StatelessWidget {
                     : () async {
                         final w = double.tryParse(weightController.text);
                         if (w == null || w <= 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                              content: Text('Enter a valid weight')));
+                          showAppSnackBar(
+                              context,
+                              const SnackBar(
+                                  content: Text('Enter a valid weight')));
                           return;
                         }
                         if (descController.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                              content: Text('Description is required')));
+                          showAppSnackBar(
+                              context,
+                              const SnackBar(
+                                  content: Text('Description is required')));
                           return;
                         }
                         setSheetState(() => isSaving = true);
@@ -338,20 +343,22 @@ class StockDashboardTab extends StatelessWidget {
                         }
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(ok
-                                ? 'Bulk weight ${existing == null ? 'added' : 'updated'}'
-                                : 'Failed to save'),
-                            backgroundColor: ok ? Colors.green : Colors.red,
-                          ));
+                          showAppSnackBar(
+                              context,
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Bulk weight ${existing == null ? 'added' : 'updated'}'
+                                    : 'Failed to save'),
+                                backgroundColor: ok ? Colors.green : Colors.red,
+                              ));
                         }
                       },
                 child: isSaving
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child:
-                            CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : Text(existing == null ? 'Add' : 'Update'),
               ),
               const SizedBox(height: 20),
@@ -379,10 +386,12 @@ class StockDashboardTab extends StatelessWidget {
               Navigator.pop(context);
               final ok = await store.deleteBulkWeight(bw.id);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(ok ? 'Entry removed' : 'Failed to remove'),
-                  backgroundColor: ok ? Colors.green : Colors.red,
-                ));
+                showAppSnackBar(
+                    context,
+                    SnackBar(
+                      content: Text(ok ? 'Entry removed' : 'Failed to remove'),
+                      backgroundColor: ok ? Colors.green : Colors.red,
+                    ));
               }
             },
             child: const Text('Remove'),
@@ -412,8 +421,7 @@ class StockDashboardTab extends StatelessWidget {
             style: TextStyle(color: Colors.grey[500], fontSize: 13)),
       );
 
-  Widget _buildError(
-      BuildContext context, String error, StoreProvider store) {
+  Widget _buildError(BuildContext context, String error, StoreProvider store) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -425,8 +433,7 @@ class StockDashboardTab extends StatelessWidget {
               style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 16),
           ElevatedButton(
-              onPressed: store.fetchStockDashboard,
-              child: const Text('Retry')),
+              onPressed: store.fetchStockDashboard, child: const Text('Retry')),
         ],
       ),
     );

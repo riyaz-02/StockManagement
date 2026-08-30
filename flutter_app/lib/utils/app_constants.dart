@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class AppConstants {
   // ── Environment Switch ──────────────────────────────────────────────────
   // Set to true for local development, false for production.
-  static const bool _useLocalBackend = true;
+  static const bool _useLocalBackend = false;
 
   // ── Production URL ──────────────────────────────────────────────────────
   // Production API domain. Point api.laltuguineapalace.com to the EC2 public IP
@@ -45,16 +45,25 @@ class AppConstants {
   }
 
   // Health-check — same host as baseUrl
-  static String get healthCheckUrl => '${baseUrl.replaceAll('/api', '')}/api/auth/me';
-  
+  // NOTE: must strip only a trailing "/api" suffix, not every occurrence —
+  // baseUrl is typically "https://api.<domain>/api", and a naive
+  // baseUrl.replaceAll('/api', '') also matches the "/api" that's part of
+  // the "api." subdomain, mangling the host entirely.
+  static String get healthCheckUrl {
+    final withoutApiSuffix = baseUrl.endsWith('/api')
+        ? baseUrl.substring(0, baseUrl.length - 4)
+        : baseUrl;
+    return '$withoutApiSuffix/api/auth/me';
+  }
+
   static const int connectionTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;
-  
+
   // Storage Keys
   static const String keyToken = 'auth_token';
   static const String keyUser = 'user_data';
   static const String keyLanguage = 'app_language';
-  
+
   // Item Types
   static const List<String> itemTypes = [
     'ring',
@@ -66,7 +75,7 @@ class AppConstants {
     'bangle',
     'other',
   ];
-  
+
   // Metal Types
   static const List<String> metalTypes = [
     'gold',
@@ -75,7 +84,7 @@ class AppConstants {
     'gold-coated',
     'platinum',
   ];
-  
+
   // Purity Options
   static const List<String> purityOptions = [
     '916',
@@ -86,7 +95,7 @@ class AppConstants {
     'silver999',
     'platinum950',
   ];
-  
+
   // Item Status
   static const List<String> itemStatuses = [
     'active',
@@ -97,7 +106,7 @@ class AppConstants {
     'no_sell',
     'action_needed',
   ];
-  
+
   // Container Types
   static const List<String> containerTypes = [
     'ring_box',
@@ -106,7 +115,7 @@ class AppConstants {
     'hand_model',
     'custom',
   ];
-  
+
   // Weight Categories
   static const List<String> weightCategories = [
     'Light',
@@ -114,17 +123,17 @@ class AppConstants {
     'Heavy',
     'Mixed',
   ];
-  
+
   // Layout Types
   static const List<String> layoutTypes = [
     'grid',
     'linear',
     'hand_model',
   ];
-  
+
   // Pagination
   static const int itemsPerPage = 20;
-  
+
   // Image
   static const int maxImageSize = 5 * 1024 * 1024; // 5MB
   static const List<String> allowedImageFormats = ['jpg', 'jpeg', 'png'];

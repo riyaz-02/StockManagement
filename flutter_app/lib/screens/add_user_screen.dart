@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_toast.dart';
 
 class AddUserScreen extends StatefulWidget {
   const AddUserScreen({super.key});
@@ -57,7 +58,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             const SnackBar(content: Text('Image uploaded successfully')),
           );
         }
@@ -86,15 +88,18 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
       if (mounted) {
         if (result['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
-              content: Text('User ${_nameController.text} created successfully'),
+              content:
+                  Text('User ${_nameController.text} created successfully'),
               backgroundColor: Colors.green,
             ),
           );
           Navigator.pop(context, true); // Return true to indicate success
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+            context,
             SnackBar(
               content: Text(result['message'] ?? 'Failed to create user'),
               backgroundColor: Colors.red,
@@ -104,7 +109,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
@@ -157,12 +163,14 @@ class _AddUserScreenState extends State<AddUserScreen> {
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey[200],
-                                child: Icon(Icons.person, size: 50, color: Colors.grey[400]),
+                                child: Icon(Icons.person,
+                                    size: 50, color: Colors.grey[400]),
                               ),
                             )
                           : Container(
                               color: AppColors.primary.withOpacity(0.1),
-                              child: Icon(Icons.person, size: 50, color: AppColors.primary),
+                              child: Icon(Icons.person,
+                                  size: 50, color: AppColors.primary),
                             ),
                     ),
                   ),
@@ -174,7 +182,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
                           color: Colors.black54,
                         ),
                         child: const Center(
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
                         ),
                       ),
                     ),
@@ -190,7 +199,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                        child: const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 16),
                       ),
                     ),
                   ),
@@ -260,8 +270,11 @@ class _AddUserScreenState extends State<AddUserScreen> {
                 labelText: 'Password *',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  icon: Icon(_obscurePassword
+                      ? Icons.visibility_off
+                      : Icons.visibility),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -319,7 +332,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                      Icon(Icons.info_outline,
+                          size: 16, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Text(
                         'Role Permissions',
@@ -332,7 +346,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _buildRoleInfo('Admin', 'Full access to all features and settings'),
+                  _buildRoleInfo(
+                      'Admin', 'Full access to all features and settings'),
                   _buildRoleInfo('Staff', 'Can manage items and containers'),
                   _buildRoleInfo('Viewer', 'Read-only access to view data'),
                 ],

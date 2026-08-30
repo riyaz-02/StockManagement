@@ -5,6 +5,12 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.laltuguineapalace.stock"
     compileSdk = 35
@@ -13,6 +19,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        // Required by flutter_local_notifications (used for foreground push
+        // notification display).
+        coreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -27,15 +36,40 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            // Real release signing when key.properties/the keystore exist
+            // (so users can install updates over the previously-distributed
+            // APK without uninstalling first); falls back to the debug key
+            // only if that file is ever missing, so `flutter run --release`
+            // still works in a fresh checkout.
+            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
 
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
 flutter {
     source = "../.."
+}
+
+// Push notifications (Firebase Cloud Messaging): only applied once
+// google-services.json exists, so the app keeps building normally before
+// that file is added.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
 }

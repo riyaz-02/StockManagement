@@ -1,0 +1,1 @@
+F:\StockManagement\flutter_app\build\app\intermediates\cxx\RelWithDebInfo\5v183i3x\obj\arm64-v8a

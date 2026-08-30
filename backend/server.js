@@ -10,6 +10,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const compression = require('compression');
 const logger = require('./config/logger');
+const { createIdleShutdown } = require('./config/idleShutdown');
 
 // Load environment variables
 dotenv.config();
@@ -36,6 +37,7 @@ const invoiceRoutes  = require('./routes/invoice.routes');
 
 // Initialize express app
 const app = express();
+const idleShutdown = createIdleShutdown();
 
 // ======================
 // PROXY CONFIGURATION
@@ -145,6 +147,9 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
   stream: logger.stream
 }));
 
+// Optional EC2 cost saver: stop the server after a short idle window in production.
+app.use(idleShutdown.middleware);
+
 // Serve static files (uploaded images)
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -163,6 +168,7 @@ const { connectPrimary, connectShopmanage } = require('./config/db');
 Promise.all([connectPrimary(), connectShopmanage()])
   .then(() => {
     logger.info('✅ All database connections established');
+    require('./config/scheduledNotifications').startScheduledNotifications();
   })
   .catch((err) => {
     logger.error('❌ Database connection error:', err.message);
@@ -220,6 +226,9 @@ app.use('/api/tag-settings', require('./routes/tagSettings.routes'));
 app.use('/api/tag-print', require('./routes/tagPrint.routes'));
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', cloudinaryRoutes);
+app.use('/api/inventory-snapshots', require('./routes/inventory.routes'));
+app.use('/api/app-version', require('./routes/appVersion.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
 app.use('/api/test', require('./routes/test.routes'));
 // Store management (shopmanage DB)
 app.use('/api/purchases', purchaseRoutes);
@@ -247,6 +256,7 @@ const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
   logger.info(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  idleShutdown.start();
 });
 
 // Handle unhandled promise rejections

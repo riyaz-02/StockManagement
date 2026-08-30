@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
+import '../utils/app_toast.dart';
 
 class TagPrintPreviewScreen extends StatefulWidget {
   final List<Item> items;
@@ -35,7 +36,7 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(context, 
           SnackBar(
             content: Text('Print recorded for ${widget.items.length} items'),
             backgroundColor: Colors.green,
@@ -45,7 +46,7 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(context, 
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
@@ -70,7 +71,7 @@ class _TagPrintPreviewScreenState extends State<TagPrintPreviewScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(context, 
           SnackBar(
             content: Text('Error sharing PDF: $e'),
             backgroundColor: Colors.red,
