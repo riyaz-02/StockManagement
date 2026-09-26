@@ -9,12 +9,21 @@ import 'storage_service.dart';
 class ApiService {
   final StorageService _storage = StorageService();
 
+  /// The branch an admin has switched to ('' = the whole firm). Sent as `X-Branch`; the server ignores it for staff who
+  /// lack every-branch access, so it can never widen what someone may see.
+  static String activeBranch = '';
+
+  /// The GST registration (GSTIN) the GST Summary shows: '' = the firm's default, 'ALL' = every registration (only the
+  /// summary / register / export can add them up; returns, credit and filings always belong to one GSTIN).
+  static String activeGstin = '';
+
   // Get headers with auth token
   Future<Map<String, String>> _getHeaders() async {
     final token = await _storage.getToken();
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+      if (activeBranch.isNotEmpty) 'X-Branch': activeBranch,
     };
   }
 
@@ -594,6 +603,9 @@ class ApiService {
   // ==================== TALLY METHODS ====================
 
   // Create new tally session
+  Future<Map<String, dynamic>> tallyPreview() async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/tally/preview'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> tallySummary(String id) async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/tally/$id/summary'), headers: await _getHeaders()));
+
   Future<Map<String, dynamic>> createTally(Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/tally'),
@@ -1391,54 +1403,6 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  // ── Invoice (GST Sales) ────────────────────────────────────────────────────
-
-  Future<Map<String, dynamic>> getNextInvoiceNumber() async {
-    final response = await http.get(
-      Uri.parse('${AppConstants.baseUrl}/invoices/next-number'),
-      headers: await _getHeaders(),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse('${AppConstants.baseUrl}/invoices'),
-      headers: await _getHeaders(),
-      body: json.encode(data),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> updateInvoiceById(
-      String id, Map<String, dynamic> data) async {
-    final response = await http.put(
-      Uri.parse('${AppConstants.baseUrl}/invoices/$id'),
-      headers: await _getHeaders(),
-      body: json.encode(data),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> deleteInvoiceById(String id) async {
-    final response = await http.delete(
-      Uri.parse('${AppConstants.baseUrl}/invoices/$id'),
-      headers: await _getHeaders(),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> getInvoices({
-    Map<String, String>? queryParams,
-  }) async {
-    var uri = Uri.parse('${AppConstants.baseUrl}/invoices');
-    if (queryParams != null && queryParams.isNotEmpty) {
-      uri = uri.replace(queryParameters: queryParams);
-    }
-    final response = await http.get(uri, headers: await _getHeaders());
-    return _handleResponse(response);
-  }
-
   // ── App Version (update nudge) ─────────────────────────────────────────────
   // Public endpoint — checked at splash, before login is guaranteed.
   Future<Map<String, dynamic>> getAppVersion() async {
@@ -1486,5 +1450,308 @@ class ApiService {
       headers: await _getHeaders(),
     );
     return _handleResponse(response);
+  }
+  // ── User Directory (customers / staff / suppliers / karigars) ─────────────
+
+  Future<Map<String, dynamic>> getDirectorySummary() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/summary'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Type-ahead over customers by phone digits, customer code or name. Used for
+  /// live duplicate detection and the "referred by" picker.
+  Future<Map<String, dynamic>> lookupCustomers(String q, {String? exclude}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/directory/customers/lookup')
+        .replace(queryParameters: {'q': q, if (exclude != null) 'exclude': exclude});
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  /// English -> Bengali for a customer's name / nickname / address (server-side).
+  Future<Map<String, dynamic>> translateToBengali(Map<String, String> texts) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/directory/translate'),
+      headers: await _getHeaders(),
+      body: json.encode(texts),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Pincode -> state / district / city. Throws when not found.
+  Future<Map<String, dynamic>> lookupPincode(String pin) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/lookup/pincode/$pin'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// IFSC -> bank / branch / city. Throws when not found.
+  Future<Map<String, dynamic>> lookupIfsc(String code) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/lookup/ifsc/$code'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Guarded update of a directory record. Like [createDirectoryRecord] it does
+  /// not throw on 4xx: check `success`, `statusCode` and `conflict`.
+  /// [path] is e.g. `customers/<id>` or `staff/profile/<id>`.
+  Future<Map<String, dynamic>> updateDirectoryRecord(
+      String path, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/directory/$path'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    try {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      body['statusCode'] = response.statusCode;
+      return body;
+    } catch (_) {
+      throw Exception('Unexpected server response (${response.statusCode})');
+    }
+  }
+
+  /// Who changed this record, and how (newest first).
+  Future<Map<String, dynamic>> getDirectoryHistory(String entity, String id) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/history/$entity/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Branches / shops (includes the built-in "main" branch as the first item).
+  Future<Map<String, dynamic>> getDirectoryBranches() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/branches'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// [kind] is one of: customers, staff, suppliers, karigars.
+  Future<Map<String, dynamic>> getDirectoryList(
+    String kind, {
+    String q = '',
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/directory/$kind').replace(
+      queryParameters: {
+        if (q.isNotEmpty) 'q': q,
+        'page': '$page',
+        'limit': '$limit',
+      },
+    );
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  /// [path] is the record path after /directory/, e.g. `customers/<id>` or
+  /// `staff/login/<id>`.
+  Future<Map<String, dynamic>> getDirectoryRecord(String path) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/directory/$path'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Insert-only. Unlike other calls this does not throw on 4xx so the UI can
+  /// react to a 409 duplicate warning; check `success` and `statusCode`.
+  Future<Map<String, dynamic>> createDirectoryRecord(
+      String kind, Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/directory/$kind'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+    try {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      body['statusCode'] = response.statusCode;
+      return body;
+    } catch (_) {
+      throw Exception('Unexpected server response (${response.statusCode})');
+    }
+  }
+  // ── GST billing ───────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> billingMeta() async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/billing/meta'),
+      headers: await _getHeaders()));
+
+  Future<Map<String, dynamic>> billingStats({String? from, String? to}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/billing/stats').replace(
+        queryParameters: {if (from != null) 'from': from, if (to != null) 'to': to});
+    return _handleResponse(await http.get(uri, headers: await _getHeaders()));
+  }
+
+  /// Balances shown while billing a saved customer (wallet, due, recent bills).
+  Future<Map<String, dynamic>> billingCustomerSummary(String customerId) async =>
+      _handleResponse(await http.get(
+          Uri.parse('${AppConstants.baseUrl}/billing/customer/$customerId'),
+          headers: await _getHeaders()));
+
+  Future<Map<String, dynamic>> billingList(
+      {String q = '', String status = 'all', int page = 1, int limit = 20}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/billing/invoices').replace(
+        queryParameters: {
+      if (q.isNotEmpty) 'q': q,
+      'status': status,
+      'page': '$page',
+      'limit': '$limit',
+    });
+    return _handleResponse(await http.get(uri, headers: await _getHeaders()));
+  }
+
+  Future<Map<String, dynamic>> billingInvoice(String id) async => _handleResponse(
+      await http.get(Uri.parse('${AppConstants.baseUrl}/billing/invoices/$id'),
+          headers: await _getHeaders()));
+
+  /// Saves an invoice. Does not throw on 4xx (so the screen can show the
+  /// server's message); check `success`. Safe to retry with the same
+  /// `requestId`: the server will never create a second invoice.
+  Future<Map<String, dynamic>> billingCreate(Map<String, dynamic> body) async =>
+      _postTolerant('${AppConstants.baseUrl}/billing/invoices', body);
+
+  /// How much cash can still be taken today from this customer / mobile (Income Tax Act s.269ST: below Rs 2,00,000 a day).
+  Future<Map<String, dynamic>> billingCashToday({String customerId = '', String mobile = ''}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/billing/cash-today').replace(queryParameters: {
+      if (customerId.isNotEmpty) 'customerId': customerId,
+      if (mobile.isNotEmpty) 'mobile': mobile,
+    });
+    return _handleResponse(await http.get(uri, headers: await _getHeaders()));
+  }
+
+  /// Counts a print on the server (shared with the website): ORIGINAL first, then DUPLICATE.
+  Future<Map<String, dynamic>> billingPrint(String id) async =>
+      _postTolerant('${AppConstants.baseUrl}/billing/invoices/$id/print', {});
+
+  Future<Map<String, dynamic>> billingPay(String id, Map<String, dynamic> body) async =>
+      _postTolerant('${AppConstants.baseUrl}/billing/invoices/$id/payments', body);
+
+  /// Making charge per gram of the last sale of the same kind of piece (Stock Setting rule "last entry").
+  Future<Map<String, dynamic>> billingLastMaking({required String name, String metal = '', bool userWise = false}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/billing/last-making').replace(queryParameters: {'name': name, if (metal.isNotEmpty) 'metal': metal, if (userWise) 'userWise': '1'});
+    return _handleResponse(await http.get(uri, headers: await _getHeaders()));
+  }
+
+  // ── Credit notes (returns / refunds) ───────────────────────────────────────
+  Future<Map<String, dynamic>> creditNoteState(String invoiceId) async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/credit-notes/invoice/$invoiceId'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> creditNotePreview(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/credit-notes/preview', body);
+  Future<Map<String, dynamic>> creditNoteCreate(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/credit-notes', body);
+
+  // ── Old metal / raw metal ──────────────────────────────────────────────────
+  Future<Map<String, dynamic>> oldMetalList({String kind = '', String q = '', String used = '', String status = ''}) async {
+    final qp = {if (kind.isNotEmpty) 'kind': kind, if (q.isNotEmpty) 'q': q, if (used.isNotEmpty) 'used': used, if (status.isNotEmpty) 'status': status};
+    return _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/old-metal').replace(queryParameters: qp.isEmpty ? null : qp), headers: await _getHeaders()));
+  }
+
+  /// Received old metal of this customer that is not yet adjusted on a bill.
+  Future<Map<String, dynamic>> oldMetalAvailable({String customerId = '', String mobile = '', String name = ''}) async {
+    final qp = {if (customerId.isNotEmpty) 'customerId': customerId, if (mobile.isNotEmpty) 'mobile': mobile, if (name.isNotEmpty) 'name': name};
+    return _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/old-metal/available').replace(queryParameters: qp), headers: await _getHeaders()));
+  }
+  Future<Map<String, dynamic>> oldMetalCreate(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/old-metal', body);
+  Future<Map<String, dynamic>> oldMetalCancel(String id) => _sendTolerant('POST', '${AppConstants.baseUrl}/old-metal/$id/cancel', {});
+
+  // ── Stock Setting (valuation / wastage / labour rules) ─────────────────────
+  Future<Map<String, dynamic>> stockSettings() async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/stock-settings'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> stockSettingsSave(Map<String, dynamic> changes) => _sendTolerant('PUT', '${AppConstants.baseUrl}/stock-settings', changes);
+  Future<Map<String, dynamic>> stockSettingsReset() => _sendTolerant('POST', '${AppConstants.baseUrl}/stock-settings/reset', {});
+
+  // ── Customer orders ────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> orders({String q = '', String status = ''}) async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/orders').replace(queryParameters: {if (q.isNotEmpty) 'q': q, if (status.isNotEmpty) 'status': status}), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> order(String id) async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/orders/$id'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> orderCreate(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/orders', body);
+  Future<Map<String, dynamic>> orderAdvance(String id, Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/orders/$id/advance', body);
+  Future<Map<String, dynamic>> orderStatus(String id, Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/orders/$id/status', body);
+  Future<Map<String, dynamic>> orderCancel(String id, Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/orders/$id/cancel', body);
+
+  // ── Estimates (price quotations) ───────────────────────────────────────────
+  Future<Map<String, dynamic>> estimates({String q = '', String status = ''}) async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/estimates').replace(queryParameters: {if (q.isNotEmpty) 'q': q, if (status.isNotEmpty) 'status': status}), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> estimate(String id) async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/estimates/$id'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> estimateCreate(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/estimates', body);
+  Future<Map<String, dynamic>> estimateConverted(String id, String invoiceNumber) => _sendTolerant('POST', '${AppConstants.baseUrl}/estimates/$id/converted', {'invoiceNumber': invoiceNumber});
+  Future<Map<String, dynamic>> estimateCancel(String id) async => _handleResponse(await http.delete(Uri.parse('${AppConstants.baseUrl}/estimates/$id'), headers: await _getHeaders()));
+
+  // ── Today's rate, expenses, Day Book, pending dues ─────────────────────────
+  Future<Map<String, dynamic>> rates() async => _handleResponse(await http.get(Uri.parse('${AppConstants.baseUrl}/rates'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> ratesSave(Map<String, dynamic> body) => _sendTolerant('PUT', '${AppConstants.baseUrl}/rates', body);
+  Future<Map<String, dynamic>> expenses({String? from, String? to}) async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/expenses').replace(queryParameters: {if (from != null) 'from': from, if (to != null) 'to': to}), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> expenseCreate(Map<String, dynamic> body) => _sendTolerant('POST', '${AppConstants.baseUrl}/expenses', body);
+  Future<Map<String, dynamic>> expenseCancel(String id) async => _handleResponse(await http.delete(Uri.parse('${AppConstants.baseUrl}/expenses/$id'), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> billingDues({String q = ''}) async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/billing/dues').replace(queryParameters: {if (q.isNotEmpty) 'q': q}), headers: await _getHeaders()));
+  Future<Map<String, dynamic>> billingDayBook({String? from, String? to}) async => _handleResponse(await http.get(
+      Uri.parse('${AppConstants.baseUrl}/billing/daybook').replace(queryParameters: {if (from != null) 'from': from, if (to != null) 'to': to}), headers: await _getHeaders()));
+
+  // ── GST Summary (reports, returns, ITC, due dates, filings) ────────────────
+  /// `one`: the call belongs to a single GSTIN, so "all registrations" falls back to the firm's default one.
+  Map<String, String> _gstScope(Map<String, String>? q, {bool one = false}) => {
+        ...?q,
+        if (activeGstin.isNotEmpty && !(one && activeGstin == 'ALL')) 'gstin': activeGstin,
+      };
+
+  Future<Map<String, dynamic>> _gstGet(String path, {Map<String, String>? q, bool one = false}) async {
+    final scoped = _gstScope(q, one: one);
+    final uri = Uri.parse('${AppConstants.baseUrl}/gst-reports/$path').replace(queryParameters: scoped.isEmpty ? null : scoped);
+    return _handleResponse(await http.get(uri, headers: await _getHeaders()));
+  }
+
+  String _gstUrl(String path) {
+    final g = _gstScope(null, one: true)['gstin'];
+    return '${AppConstants.baseUrl}/gst-reports/$path${g == null ? '' : '?gstin=${Uri.encodeQueryComponent(g)}'}';
+  }
+
+  Future<Map<String, dynamic>> gstSettings() => _gstGet('settings');
+  Future<Map<String, dynamic>> gstSummary(Map<String, String> q) => _gstGet('summary', q: q);
+  Future<Map<String, dynamic>> gstRegister(Map<String, String> q) => _gstGet('register', q: q);
+  Future<Map<String, dynamic>> gstReturns(String period) => _gstGet('returns', q: {'period': period}, one: true);
+  Future<Map<String, dynamic>> gstItc() => _gstGet('itc', one: true);
+  Future<Map<String, dynamic>> gstCalendar() => _gstGet('calendar', one: true);
+  Future<Map<String, dynamic>> gstFilings() => _gstGet('filings', one: true);
+  Future<Map<String, dynamic>> gstExport(Map<String, String> q) => _gstGet('export', q: q);
+
+  /// Every invoice of one month plus its totals: the data behind the printable "GST Invoice Record".
+  Future<Map<String, dynamic>> gstMonthlyRecord(int year, int month) => _gstGet('monthly-record', q: {'year': '$year', 'month': '$month'}, one: true);
+
+  Future<Map<String, dynamic>> gstUpdateSettings(Map<String, dynamic> body) => _sendTolerant('PUT', _gstUrl('settings'), body);
+  Future<Map<String, dynamic>> gstCreateFiling(Map<String, dynamic> body) => _sendTolerant('POST', _gstUrl('filings'), body);
+  Future<Map<String, dynamic>> gstUpdateFiling(String id, Map<String, dynamic> body) => _sendTolerant('PUT', _gstUrl('filings/$id'), body);
+
+  Future<Map<String, dynamic>> _sendTolerant(String method, String url, Map<String, dynamic> body) async {
+    final headers = await _getHeaders();
+    final response = method == 'PUT'
+        ? await http.put(Uri.parse(url), headers: headers, body: json.encode(body))
+        : await http.post(Uri.parse(url), headers: headers, body: json.encode(body));
+    try {
+      final decoded = json.decode(response.body) as Map<String, dynamic>;
+      decoded['statusCode'] = response.statusCode;
+      return decoded;
+    } catch (_) {
+      throw Exception('Unexpected server response (${response.statusCode})');
+    }
+  }
+
+  Future<Map<String, dynamic>> _postTolerant(String url, Map<String, dynamic> body) async {
+    final response = await http.post(Uri.parse(url),
+        headers: await _getHeaders(), body: json.encode(body));
+    try {
+      final decoded = json.decode(response.body) as Map<String, dynamic>;
+      decoded['statusCode'] = response.statusCode;
+      return decoded;
+    } catch (_) {
+      throw Exception('Unexpected server response (${response.statusCode})');
+    }
   }
 }

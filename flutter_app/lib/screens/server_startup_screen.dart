@@ -1,3 +1,4 @@
+import '../services/server_health.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
@@ -21,12 +22,14 @@ class ServerStartupScreen extends StatefulWidget {
 }
 
 class _ServerStartupScreenState extends State<ServerStartupScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   _ServerState _state = _ServerState.idle;
   String _statusMessage = 'অ্যাপ ব্যবহার করতে সার্ভার চালু করুন';
   int _pollCount = 0;
-  static const int _maxPolls = 36; // 36 × 5s = 3 minutes max
+  static const int _maxPolls = 48; // 48 × 5s = 4 minutes max
   Timer? _pollTimer;
+  bool _checkingServer = false;
+  bool _navigating = false;
   String _appVersionText = '';
 
   late AnimationController _pulseController;
@@ -38,6 +41,7 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -46,6 +50,9 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadAppVersionText();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_startPassiveMonitoring());
+    });
   }
 
   Future<void> _loadAppVersionText() async {
@@ -61,59 +68,109 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
-  // ── Check if server is reachable ──────────────────────────────────────────
-  Future<bool> _isServerOnline() async {
-    try {
-      final response = await http
-          .get(Uri.parse(AppConstants.healthCheckUrl))
-          .timeout(const Duration(seconds: 6));
-      // 200 = OK, 401 = unauthorized (server up, no token) — both mean online
-      return response.statusCode < 500;
-    } catch (_) {
-      return false;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_tick());
     }
   }
 
-  // ── Start polling loop ────────────────────────────────────────────────────
-  void _startPolling() {
-    _pollCount = 0;
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      _pollCount++;
+  // ── Check if server is reachable ──────────────────────────────────────────
+  // One shared checker (services/server_health.dart): retries, understands "starting", remembers a working address.
+  ServerState _last = ServerState.offline;
+
+  Future<bool> _isServerOnline({int attempts = 1}) async {
+    _last = await ServerHealth.check(attempts: attempts);
+    return _last == ServerState.online;
+  }
+
+  // ONE timer drives everything: it checks every few seconds, never two checks at once, and never a second timer.
+  void _restartTimer(Duration every) {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(every, (_) => unawaited(_tick()));
+  }
+
+  Future<void> _startPassiveMonitoring() async {
+    // The server may already be up (or started by someone else): check straight away, with retries, then keep watching.
+    if (await _isServerOnline(attempts: 3)) {
+      await _continueWhenOnline();
+      return;
+    }
+    if (!mounted || _navigating) return;
+    if (_last == ServerState.starting) _showStarting();
+    _restartTimer(const Duration(seconds: 5));
+  }
+
+  void _showStarting() {
+    if (!mounted || _navigating) return;
+    setState(() {
+      _state = _ServerState.starting;
+      _statusMessage = 'সার্ভার চালু হচ্ছে...\nঅনুগ্রহ করে অপেক্ষা করুন';
+    });
+  }
+
+  Future<void> _tick() async {
+    if (!mounted || _checkingServer || _navigating) return;
+    _checkingServer = true;
+    try {
       final online = await _isServerOnline();
-
       if (!mounted) return;
-
       if (online) {
-        _pollTimer?.cancel();
-        setState(() {
-          _state = _ServerState.online;
-          _statusMessage = 'সার্ভার চালু হয়েছে! এগিয়ে যাচ্ছি...';
-        });
-        await Future.delayed(const Duration(milliseconds: 1200));
-        _navigateNext();
-      } else if (_pollCount >= _maxPolls) {
+        await _continueWhenOnline();
+        return;
+      }
+      if (_state != _ServerState.starting && _state != _ServerState.error) {
+        // passive watching: nothing to show, keep waiting for the user to tap Start (or for the server to appear)
+        if (_last == ServerState.starting) _showStarting();
+        return;
+      }
+      _pollCount++;
+      if (_pollCount >= _maxPolls) {
         _pollTimer?.cancel();
         setState(() {
           _state = _ServerState.error;
-          _statusMessage =
-              'সার্ভার চালু করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।';
+          _statusMessage = 'সার্ভার চালু করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।';
         });
       } else {
         final secondsWaited = _pollCount * 5;
         setState(() {
-          _statusMessage =
-              'সার্ভার চালু হচ্ছে... ($secondsWaited সেকেন্ড হয়েছে)';
+          _statusMessage = _last == ServerState.starting
+              ? 'সার্ভার প্রায় তৈরি... ($secondsWaited সেকেন্ড হয়েছে)'
+              : 'সার্ভার চালু হচ্ছে... ($secondsWaited সেকেন্ড হয়েছে)';
         });
       }
+    } finally {
+      _checkingServer = false;
+    }
+  }
+
+  Future<void> _continueWhenOnline() async {
+    if (!mounted || _navigating) return;
+
+    _navigating = true;
+    _pollTimer?.cancel();
+    setState(() {
+      _state = _ServerState.online;
+      _statusMessage = 'সার্ভার চালু হয়েছে! এগিয়ে যাচ্ছি...';
     });
+    await Future.delayed(const Duration(milliseconds: 400));
+    await _navigateNext();
+  }
+
+  // ── Start polling loop (after the wake request) ───────────────────────────
+  void _startPolling() {
+    _pollCount = 0;
+    _restartTimer(const Duration(seconds: 5));
   }
 
   void _applyLambdaBackendUrl(http.Response response) {
+    if (AppConstants.isLocal) return;
     if (response.body.trim().isEmpty) return;
 
     try {
@@ -122,7 +179,7 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
 
       final apiUrl = body['apiUrl'] ?? body['baseUrl'] ?? body['backendUrl'];
       if (apiUrl is String && apiUrl.trim().isNotEmpty) {
-        AppConstants.setRuntimeProductionUrl(apiUrl);
+        unawaited(ServerHealth.remember(apiUrl));
       }
     } catch (_) {
       // Older Lambda versions may return plain text. Startup polling still works.
@@ -131,17 +188,29 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
 
   // ── Call Lambda to start EC2 ──────────────────────────────────────────────
   Future<void> _startServer() async {
+    if (_navigating) return;
+
     setState(() {
       _state = _ServerState.starting;
       _statusMessage = 'সার্ভার চালু করার অনুরোধ পাঠানো হচ্ছে...';
       _pollCount = 0;
     });
 
+    // The server may have been started outside the app. In that case there is
+    // no reason to invoke Lambda or wait for the first polling interval.
+    if (await _isServerOnline(attempts: 2)) {
+      await _continueWhenOnline();
+      return;
+    }
+
     try {
-      final response = await http
-          .get(Uri.parse(AppConstants.lambdaStartUrl))
-          .timeout(const Duration(seconds: 35));
-      _applyLambdaBackendUrl(response);
+      // Local-dev builds never wake (or otherwise contact) production.
+      if (!AppConstants.isLocal) {
+        final response = await http
+            .get(Uri.parse(AppConstants.lambdaStartUrl))
+            .timeout(const Duration(seconds: 35));
+        _applyLambdaBackendUrl(response);
+      }
     } catch (_) {
       // Ignore — Lambda may time out before EC2 finishes starting
     }

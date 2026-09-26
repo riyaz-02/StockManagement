@@ -163,11 +163,32 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Dual-DB: jewellery_stock (primary) + shopmanage (store management)
-const { connectPrimary, connectShopmanage } = require('./config/db');
+const { connectPrimary, connectShopmanage, connectLgpAdmin } = require('./config/db');
 
-Promise.all([connectPrimary(), connectShopmanage()])
+// The server answers /health as soon as it listens, but says "starting" (503) until every database is connected, so the
+// app never opens onto a server that cannot yet log anyone in. A database that is slow at boot (the machine has just
+// started) is retried a few times before giving up, instead of killing the process on the first hiccup.
+let dbReady = false;
+const withRetry = async (name, fn, tries = 4) => {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i >= tries) throw err;
+      logger.warn(`[DB] ${name} not ready (attempt ${i}/${tries}): ${err.message}. Retrying...`);
+      await new Promise((r) => setTimeout(r, 1500 * i));
+    }
+  }
+};
+
+Promise.all([
+  withRetry('jewellery_stock', connectPrimary),
+  withRetry('shopmanage', connectShopmanage),
+  withRetry('lgp admin', connectLgpAdmin),
+])
   .then(() => {
-    logger.info('✅ All database connections established');
+    dbReady = true;
+    logger.info(`✅ All database connections established (${process.uptime().toFixed(1)}s after start)`);
     require('./config/scheduledNotifications').startScheduledNotifications();
   })
   .catch((err) => {
@@ -195,8 +216,9 @@ require('./config/cloudinary');
 // HEALTH CHECK
 // ======================
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
+  res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? 'ok' : 'starting',
+    ready: dbReady,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
@@ -236,6 +258,19 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/stock',     stockRoutes);
 app.use('/api/gst',       gstRoutes);
 app.use('/api/invoices',  invoiceRoutes);
+app.use('/api/directory', require('./routes/directory.routes'));
+app.use('/api/billing', require('./routes/billing.routes'));
+app.use('/api/gst-reports', require('./routes/gstReports.routes'));
+app.use('/api/stock-settings', require('./routes/stockSettings.routes'));
+app.use('/api/old-metal', require('./routes/oldMetal.routes'));
+app.use('/api/credit-notes', require('./routes/creditNote.routes'));
+app.use('/api/rates', require('./routes/rate.routes'));
+app.use('/api/estimates', require('./routes/estimate.routes'));
+app.use('/api/orders', require('./routes/order.routes'));
+app.use('/api/expenses', require('./routes/expense.routes'));
+app.use('/api/admin', require('./routes/admin.routes'));
+// Static admin dashboard (its own login; every data call is JWT + admin-role protected)
+app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
 
 // ======================
 // ERROR HANDLING

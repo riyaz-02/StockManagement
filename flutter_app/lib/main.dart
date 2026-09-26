@@ -66,18 +66,35 @@ class MyApp extends StatelessWidget {
                 seedColor: AppColors.primary,
                 brightness: Brightness.light,
               ),
+              // Compact, professional density app-wide (phones and tablets).
+              visualDensity: VisualDensity.compact,
+              // Text is shrunk app-wide via the text scaler in `builder` below
+              // (not TextTheme.apply(fontSizeFactor), which asserts on styles
+              // that carry no explicit fontSize).
               textTheme: GoogleFonts.poppinsTextTheme(),
+              listTileTheme: const ListTileThemeData(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                minVerticalPadding: 4,
+              ),
+              dividerTheme: const DividerThemeData(space: 1, thickness: 0.6),
               appBarTheme: AppBarTheme(
                 elevation: 0,
                 centerTitle: true,
+                toolbarHeight: 48,
+                // Deliberately NO titleTextStyle here: a theme-level style is not
+                // tinted by each screen's foregroundColor, which made titles on
+                // light app bars white. The default (Poppins titleLarge, scaled
+                // down by the text scaler) follows foregroundColor correctly.
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 systemOverlayStyle: SystemUiOverlayStyle.light,
               ),
               cardTheme: CardTheme(
-                elevation: 2,
+                elevation: 1,
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
               elevatedButtonTheme: ElevatedButtonThemeData(
@@ -85,49 +102,72 @@ class MyApp extends StatelessWidget {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
+                    horizontal: 22,
+                    vertical: 11,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   textStyle: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               inputDecorationTheme: InputDecorationTheme(
+                isDense: true,
                 filled: true,
                 fillColor: Colors.grey[100],
+                labelStyle: const TextStyle(fontSize: 13),
+                hintStyle: const TextStyle(fontSize: 13),
+                errorStyle: const TextStyle(fontSize: 11, height: 1.1),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
                     color: AppColors.primary,
-                    width: 2,
+                    width: 1.5,
                   ),
                 ),
                 errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(
                     color: Colors.red,
-                    width: 2,
+                    width: 1.5,
                   ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
+                  horizontal: 14,
+                  vertical: 11,
                 ),
               ),
             ),
+            // Keep layouts tidy: clamp OS font scaling, and stop content from
+            // stretching edge-to-edge on very wide tablets/desktop.
+            builder: (context, child) {
+              final mq = MediaQuery.of(context);
+              // OS font size, kept within a sane range, then ~9% smaller for a
+              // compact, professional look everywhere (including hard-coded sizes).
+              final scale =
+                  mq.textScaler.scale(1.0).clamp(0.9, 1.15).toDouble() * 0.91;
+              return MediaQuery(
+                data: mq.copyWith(textScaler: TextScaler.linear(scale)),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1100),
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                ),
+              );
+            },
             home: const SplashScreen(),
             navigatorObservers: [routeObserver],
           );

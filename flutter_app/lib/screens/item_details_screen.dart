@@ -10,10 +10,13 @@ import '../utils/app_constants.dart';
 import 'create_booking_screen.dart';
 import 'send_to_repair_screen.dart';
 import 'quick_add_item_screen.dart';
+import 'create_invoice_screen.dart';
+import '../providers/auth_provider.dart';
 import 'container_view_screen.dart';
 
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
+import '../widgets/customer_field.dart';
 
 class ItemDetailsScreen extends StatefulWidget {
   final Item item;
@@ -469,6 +472,18 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           ),
                         ),
 
+                        // Row 4b: optional billing detail (only what was recorded)
+                        if ((_item.grossWeight ?? 0) > 0 || (_item.stoneValue ?? 0) > 0 || (_item.makingCharge ?? 0) > 0) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            if ((_item.grossWeight ?? 0) > 0) Expanded(child: _buildCompactBox(Icons.scale, 'Gross / Less', '${_item.grossWeight!.toStringAsFixed(3)}g${(_item.lessWeight ?? 0) > 0 ? ' / ${_item.lessWeight!.toStringAsFixed(3)}g' : ''}', Colors.indigo)),
+                            if ((_item.grossWeight ?? 0) > 0 && ((_item.stoneValue ?? 0) > 0 || (_item.makingCharge ?? 0) > 0)) const SizedBox(width: 8),
+                            if ((_item.makingCharge ?? 0) > 0) Expanded(child: _buildCompactBox(Icons.handyman, 'Making', '₹${_item.makingCharge!.toStringAsFixed(2)}', Colors.brown)),
+                            if ((_item.makingCharge ?? 0) > 0 && (_item.stoneValue ?? 0) > 0) const SizedBox(width: 8),
+                            if ((_item.stoneValue ?? 0) > 0) Expanded(child: _buildCompactBox(Icons.auto_awesome, _item.stoneNote.isEmpty ? 'Stones' : _item.stoneNote, '₹${_item.stoneValue!.toStringAsFixed(2)}', Colors.purple)),
+                          ]),
+                        ],
+
                         // Row 5: Location (Container) - Tappable
                         if (widget.item.containerId != null) ...[
                           const SizedBox(height: 8),
@@ -621,7 +636,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           Icons.sell_outlined,
                           'Sell',
                           AppColors.success,
-                          () => _showSellBottomSheet(),
+                          () => _sellOnInvoice(),
                         ),
                         _buildIconButton(
                           Icons.output_outlined,
@@ -1118,7 +1133,20 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     }
   }
 
-  // Sell Bottom Sheet
+  /// "Sell": a GST bill with this piece already on it. Saving the bill takes the piece out of stock.
+  void _sellOnInvoice() {
+    if (!context.read<AuthProvider>().can('billing.create')) {
+      showAppSnackBar(context, const SnackBar(content: Text('You do not have permission to create bills')));
+      return;
+    }
+    if (_item.status == 'sold') {
+      showAppSnackBar(context, const SnackBar(content: Text('This stock is already sold')));
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CreateInvoiceScreen(initialItemCode: _item.barcode)));
+  }
+
+  // Sell Bottom Sheet (the old quick sale, no longer used)
   void _showSellBottomSheet() {
     final nameController = TextEditingController();
     final mobileController = TextEditingController();
@@ -1154,12 +1182,11 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.phone))),
                   const SizedBox(height: 12),
-                  TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                          labelText: 'Customer Name',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person))),
+                  CustomerField(
+                      name: nameController,
+                      mobile: mobileController,
+                      address: addressController,
+                      decoration: (l) => InputDecoration(labelText: l, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.person))),
                   const SizedBox(height: 12),
                   TextField(
                       controller: addressController,
@@ -2146,12 +2173,11 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.phone))),
               const SizedBox(height: 12),
-              TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                      labelText: 'Customer Name',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person))),
+              CustomerField(
+                  name: nameController,
+                  mobile: mobileController,
+                  address: addressController,
+                  decoration: (l) => InputDecoration(labelText: l, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.person))),
               const SizedBox(height: 12),
               TextField(
                   controller: addressController,
@@ -2255,13 +2281,12 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.phone))),
                 const SizedBox(height: 12),
-                TextField(
+                CustomerField(
                     enabled: !viewOnly,
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                        labelText: 'Customer Name',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person))),
+                    name: nameController,
+                    mobile: mobileController,
+                    address: addressController,
+                    decoration: (l) => InputDecoration(labelText: l, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.person))),
                 const SizedBox(height: 12),
                 TextField(
                     enabled: !viewOnly,

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Environment Console</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #1a1c20; --mute: #6b7280; --line: #e3e5ea;
+    --ok: #15803d; --okbg: #dcfce7; --bad: #b91c1c; --badbg: #fee2e2; --warn: #b45309; --warnbg: #fef3c7;
+    --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --card:#181b21; --ink:#e8eaee; --mute:#9aa1ad; --line:#2a2e37;
+            --ok:#4ade80; --okbg:#0f2a1a; --bad:#f87171; --badbg:#2d1414; --warn:#fbbf24; --warnbg:#2d2410; --accent:#60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:18px 24px; border-bottom:1px solid var(--line); background:var(--card); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .sp { flex:1; }
+  main { padding:20px 24px; max-width:1200px; margin:0 auto; }
+  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h2 { font-size:15px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .url { color:var(--mute); font-size:12px; word-break:break-all; margin-bottom:10px; }
+  h3 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:16px 0 6px; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:4px 0; vertical-align:top; border-bottom:1px solid var(--line); }
+  td:first-child { color:var(--mute); width:42%; }
+  tr:last-child td { border-bottom:0; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:600; }
+  .ok { background:var(--okbg); color:var(--ok); } .bad { background:var(--badbg); color:var(--bad); } .warn { background:var(--warnbg); color:var(--warn); }
+  input, button { font:inherit; }
+  input { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); margin-bottom:8px; }
+  button { padding:8px 14px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .err { color:var(--bad); margin:6px 0; font-size:13px; }
+  .diff li { margin:4px 0; }
+  .empty { color:var(--mute); padding:8px 0; }
+  code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Environment Console</h1>
+  <span class="pill warn">read-only</span>
+  <span class="sp"></span>
+  <button class="ghost" id="refresh">Refresh all</button>
+  <button class="ghost" id="add">+ Add environment</button>
+</header>
+<main>
+  <div id="diff"></div>
+  <div class="grid" id="envs"></div>
+  <p class="empty">Shows what each server is running and whether its config and databases are healthy. Secret values are never displayed — only whether a key is set. Passwords are never stored; sign-in tokens live in this tab only.</p>
+</main>
+
+<script>
+// Wake URL is the same Lambda the mobile app calls when the EC2 server is asleep.
+const WAKE_URL = 'https://45skg376c6xml6yifrzyct75rm0isktv.lambda-url.ap-south-1.on.aws/';
+const DEFAULTS = [
+  { name: 'Local (this server)', base: location.origin },
+  { name: 'Production', base: 'https://api.laltuguineapalace.com', wake: true },
+];
+
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function load(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
+function tokenOf(base) { try { return sessionStorage.getItem('tok:' + base); } catch { return null; } }
+function setToken(base, t) { try { t ? sessionStorage.setItem('tok:' + base, t) : sessionStorage.removeItem('tok:' + base); } catch {} }
+
+let envs = load('envs', DEFAULTS);
+const results = {}; // base -> { status | error }
+const errors = {};  // base -> login error text
+
+async function api(base, path, opts = {}) {
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const res = await fetch(base + path, { ...opts, signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', ...(tokenOf(base) ? { Authorization: 'Bearer ' + tokenOf(base) } : {}) } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { const e = new Error(body.message || ('HTTP ' + res.status)); e.status = res.status; throw e; }
+    return body;
+  } finally { clearTimeout(timer); }
+}
+
+async function fetchStatus(env) {
+  if (!tokenOf(env.base)) { results[env.base] = null; return; }
+  try {
+    results[env.base] = { status: (await api(env.base, '/api/admin/status')).data };
+  } catch (e) {
+    if (e.status === 401) { setToken(env.base, null); results[env.base] = null; errors[env.base] = 'Session expired — sign in again.'; }
+    else if (e.status === 403) { setToken(env.base, null); results[env.base] = null; errors[env.base] = 'This account is not an admin.'; }
+    else results[env.base] = { error: e.name === 'AbortError' ? 'No response (server may be asleep or unreachable)' : e.message };
+  }
+}
+
+async function login(env, mobile, password) {
+  errors[env.base] = '';
+  try {
+    const body = await api(env.base, '/api/auth/login', { method: 'POST', body: JSON.stringify({ mobile, password }) });
+    setToken(env.base, body.data.token);
+    await fetchStatus(env);
+  } catch (e) { errors[env.base] = e.name === 'AbortError' ? 'Server did not respond — it may be asleep.' : e.message; }
+  render();
+}
+
+function ago(sec) {
+  if (sec < 90) return sec + 's'; if (sec < 5400) return Math.round(sec / 60) + ' min';
+  if (sec < 172800) return (sec / 3600).toFixed(1) + ' h'; return Math.round(sec / 86400) + ' d';
+}
+const pill = (ok, yes, no) => `<span class="pill ${ok ? 'ok' : 'bad'}">${esc(ok ? yes : no)}</span>`;
+
+function cardHtml(env, i) {
+  const r = results[env.base];
+  let inner;
+  if (r && r.status) {
+    const s = r.status, a = s.app;
+    const missing = s.env.filter((e) => e.required && !e.set);
+    inner = `
+      <h3>Server</h3>
+      <table>
+        <tr><td>Commit</td><td><code>${esc(a.commit || 'unknown')}</code> ${esc(a.branch || '')}<br><span class="url">${esc(a.message || '')}</span></td></tr>
+        <tr><td>Version</td><td>${esc(a.version)} · Node ${esc(a.node)}</td></tr>
+        <tr><td>Mode</td><td>${esc(a.environment)}</td></tr>
+        <tr><td>Uptime</td><td>${ago(a.uptimeSec)}</td></tr>
+        <tr><td>Permissions</td><td>${s.permissionCount} keys · <code>${esc(s.permissionsHash)}</code></td></tr>
+      </table>
+      <h3>Databases</h3>
+      <table>${s.databases.map((d) => `<tr><td>${esc(d.label)}</td><td>${
+        d.configured ? pill(d.state === 'connected', d.state === 'connected' ? 'connected' : d.state, d.state) +
+          (d.pingMs != null ? ` ${d.pingMs} ms` : '') + (d.db ? `<br><span class="url">${esc(d.db)}</span>` : '')
+        : '<span class="pill warn">not configured</span>'}</td></tr>`).join('')}</table>
+      <h3>Config keys ${missing.length ? '<span class="pill bad">' + missing.length + ' required missing</span>' : ''}</h3>
+      <table>${s.env.map((e) => `<tr><td><code>${esc(e.key)}</code></td><td>${
+        e.set ? '<span class="pill ok">set</span>' : `<span class="pill ${e.required ? 'bad' : 'warn'}">missing</span>`}</td></tr>`).join('')}</table>`;
+  } else if (r && r.error) {
+    inner = `<div class="err">${esc(r.error)}</div>
+      ${env.wake ? '<button class="ghost" data-wake="' + i + '">Wake server</button>' : ''}
+      <button class="ghost" data-retry="${i}">Retry</button>`;
+  } else {
+    inner = `<form data-login="${i}">
+        ${errors[env.base] ? '<div class="err">' + esc(errors[env.base]) + '</div>' : ''}
+        <input name="mobile" placeholder="Admin mobile" autocomplete="username" inputmode="numeric">
+        <input name="password" type="password" placeholder="Password" autocomplete="current-password">
+        <div class="row"><button type="submit">Sign in</button>${env.wake ? '<button type="button" class="ghost" data-wake="' + i + '">Wake server</button>' : ''}</div>
+      </form>`;
+  }
+  const removable = i > 1;
+  return `<section class="card"><h2>${esc(env.name)} ${r && r.status ? pill(true, 'online', '') : ''}</h2>
+    <div class="url">${esc(env.base)}</div>${inner}
+    <div style="margin-top:10px">${tokenOf(env.base) ? `<button class="ghost" data-logout="${i}">Sign out</button>` : ''}
+    ${removable ? `<button class="ghost" data-remove="${i}">Remove</button>` : ''}</div></section>`;
+}
+
+function diffHtml() {
+  const live = envs.map((e) => ({ e, s: results[e.base] && results[e.base].status })).filter((x) => x.s);
+  if (live.length < 2) return '';
+  const [a, b] = live, items = [];
+  const cmp = (label, x, y) => { if (String(x) !== String(y)) items.push(`<li><b>${esc(label)}</b>: ${esc(a.e.name)} <code>${esc(x)}</code> vs ${esc(b.e.name)} <code>${esc(y)}</code></li>`); };
+  cmp('Commit', a.s.app.commit, b.s.app.commit);
+  cmp('Version', a.s.app.version, b.s.app.version);
+  cmp('Permission definitions', a.s.permissionsHash, b.s.permissionsHash);
+  const keys = new Set([...a.s.env, ...b.s.env].map((k) => k.key));
+  for (const k of keys) {
+    const x = a.s.env.find((e) => e.key === k), y = b.s.env.find((e) => e.key === k);
+    if (!!(x && x.set) !== !!(y && y.set)) items.push(`<li><b>Config <code>${esc(k)}</code></b>: set on ${esc((x && x.set) ? a.e.name : b.e.name)} only</li>`);
+  }
+  for (const d of [...a.s.databases.map((d) => [a.e, d]), ...b.s.databases.map((d) => [b.e, d])]) {
+    if (d[1].configured && d[1].state !== 'connected') items.push(`<li><b>${esc(d[0].name)}</b>: ${esc(d[1].label)} is ${esc(d[1].state)}</li>`);
+  }
+  return `<section class="card" style="margin-bottom:16px"><h2>${items.length ? 'Differences' : 'In sync'} ${pill(!items.length, 'no differences', items.length + ' found')}</h2>
+    ${items.length ? '<ul class="diff">' + items.join('') + '</ul><div class="url">Differences are expected while a change is still only in development. Deploying the newer commit to the other side clears them.</div>' : '<div class="url">Same commit, same permission definitions, same config keys, all databases healthy.</div>'}</section>`;
+}
+
+function render() {
+  $('#envs').innerHTML = envs.map(cardHtml).join('');
+  $('#diff').innerHTML = diffHtml();
+}
+
+document.addEventListener('submit', (ev) => {
+  const f = ev.target.closest('[data-login]'); if (!f) return;
+  ev.preventDefault();
+  const env = envs[+f.dataset.login];
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Signing in…';
+  login(env, f.mobile.value.trim(), f.password.value);
+});
+
+document.addEventListener('click', async (ev) => {
+  const t = ev.target, d = t.dataset || {};
+  if (d.wake != null) { t.disabled = true; t.textContent = 'Waking… (up to ~2 min)'; try { await fetch(WAKE_URL, { mode: 'no-cors' }); } catch {} return; }
+  if (d.retry != null) { await fetchStatus(envs[+d.retry]); render(); }
+  if (d.logout != null) { setToken(envs[+d.logout].base, null); results[envs[+d.logout].base] = null; render(); }
+  if (d.remove != null) { envs.splice(+d.remove, 1); save('envs', envs); render(); }
+});
+
+$('#refresh').onclick = async () => { await Promise.all(envs.map(fetchStatus)); render(); };
+$('#add').onclick = () => {
+  const name = prompt('Name (e.g. Staging)'); if (!name) return;
+  const base = (prompt('Base URL (e.g. https://staging.example.com)') || '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(base)) return alert('URL must start with http:// or https://');
+  envs.push({ name, base }); save('envs', envs); render();
+};
+
+(async () => { render(); await Promise.all(envs.map(fetchStatus)); render(); })();
+</script>
+</body>
+</html>

@@ -80,6 +80,14 @@ const GROUPS = [
         ],
     },
     {
+        group: 'GST Reports',
+        keys: [
+            { key: 'gst.viewReports', label: 'View GST summary, returns, ITC and due dates' },
+            { key: 'gst.manageFilings', label: 'Record filed GST returns' },
+            { key: 'gst.editSettings', label: 'Change GST filing settings and reminders' },
+        ],
+    },
+    {
         group: 'Purchases',
         keys: [
             { key: 'purchases.view', label: 'View purchases', viewerDefault: true },
@@ -115,6 +123,42 @@ const GROUPS = [
         keys: [
             { key: 'settings.manageItemTypes', label: 'Manage item type/metal/purity settings' },
             { key: 'settings.manageContainerTypes', label: 'Manage container type settings' },
+            { key: 'settings.manageStockRules', label: 'Change Stock Setting rules (valuation, wastage, labour ...)' },
+        ],
+    },
+    {
+        group: 'User Directory',
+        keys: [
+            { key: 'directory.view', label: 'View customers, suppliers and karigars', viewerDefault: true },
+            { key: 'directory.create', label: 'Add customers, suppliers and karigars' },
+            { key: 'directory.viewStaff', label: 'View staff directory (personal & bank details)' },
+            { key: 'directory.createStaff', label: 'Add staff profiles' },
+            { key: 'directory.edit', label: 'Edit customers, suppliers and karigars' },
+            { key: 'directory.editStaff', label: 'Edit staff profiles' },
+            { key: 'directory.manageBranches', label: 'Add and manage branches / shops' },
+        ],
+    },
+    {
+        group: 'Branches',
+        keys: [
+            { key: 'branches.viewAll', label: 'See stock and records of every branch (and switch branch)' },
+        ],
+    },
+    {
+        group: 'Billing (GST invoices)',
+        keys: [
+            { key: 'billing.view', label: 'View GST invoices (own branch)', viewerDefault: true },
+            { key: 'billing.create', label: 'Create GST invoices' },
+            { key: 'billing.receivePayment', label: 'Record payments against invoices' },
+            { key: 'billing.viewAllBranches', label: 'See invoices of every branch' },
+            { key: 'billing.creditNote', label: 'Issue credit notes (returns / refunds)' },
+        ],
+    },
+    {
+        group: 'Old metal',
+        keys: [
+            { key: 'oldMetal.view', label: 'View old metal / raw metal entries', viewerDefault: true },
+            { key: 'oldMetal.create', label: 'Receive old metal / raw metal and cancel entries' },
         ],
     },
     {
@@ -138,6 +182,21 @@ const GROUPS = [
         ],
     },
     {
+        group: 'Money',
+        keys: [
+            { key: 'rates.edit', label: "Change today's gold / silver rate" },
+            { key: 'expenses.view', label: 'See expenses' },
+            { key: 'expenses.create', label: 'Add expenses' },
+            { key: 'expenses.delete', label: 'Cancel expenses' },
+            { key: 'estimates.view', label: 'See estimates (price quotations)' },
+            { key: 'estimates.create', label: 'Make and cancel estimates' },
+            { key: 'orders.view', label: 'See customer orders' },
+            { key: 'orders.create', label: 'Take orders, add advance, update progress' },
+            { key: 'orders.cancel', label: 'Cancel orders (returns the advance)' },
+            { key: 'daybook.view', label: 'See the Day Book (money in / out)' },
+        ],
+    },
+    {
         group: 'App Updates',
         keys: [
             { key: 'appUpdate.manage', label: 'Manage app update settings' },
@@ -151,11 +210,25 @@ const ALL_KEYS = ALL_KEY_DEFS.map(k => k.key);
 
 // Keys that stay false by default for Manager/Staff (admin-only in practice).
 const ADMIN_ONLY_KEYS = [
+    'settings.manageStockRules',
+    'directory.viewStaff',
+    'directory.createStaff',
+    'directory.manageBranches',
+    'billing.viewAllBranches',
+    'billing.creditNote',
+    'branches.viewAll',
+    'gst.viewReports',
+    'gst.manageFilings',
+    'gst.editSettings',
+    'directory.editStaff',
     'users.manage',
     'users.resetPassword',
     'notifications.send',
     'notifications.viewHistory',
     'appUpdate.manage',
+    'expenses.delete',
+    'orders.cancel',
+    'daybook.view',
 ];
 
 function buildDefaultGrid(role) {

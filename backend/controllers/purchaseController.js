@@ -193,6 +193,44 @@ exports.getPurchase = async (req, res) => {
 };
 
 // ─── POST /api/purchases ──────────────────────────────────────────────────────
+// Price a purchase from its valuation input with the Stock Setting purchase rules. The goods carry the purchase GST (3%);
+// the hallmark fee is its own charge with its own GST when the rule "hallmark GST" is on (split CGST+SGST or IGST).
+async function priceValuation(valuationIn, txType) {
+    const Rules = require('../services/stockRules');
+    const stored = await require('../models/AppStockSettings').findOne({ key: 'main' }).lean();
+    const inp = { gross: valuationIn.gross, less: valuationIn.less, net: valuationIn.net, purity: valuationIn.purity, wastage: valuationIn.wastage, rate: valuationIn.rate, labourRate: valuationIn.labourRate, pieces: valuationIn.pieces, certification: valuationIn.certification, interstate: txType === 'inter-state' };
+    const out = require('../services/stockValuation').computePurchase(inp, Rules.resolve(stored));
+    if (!(out.net > 0) || !(Number(inp.rate) > 0) || !(out.goodsTaxable > 0)) return { error: 'Enter the weight and the rate for the valuation' };
+    const inter = txType === 'inter-state';
+    const hall = { charge: out.hallmarkCharge, gst: out.hallmarkGst, cgst: inter ? 0 : Math.round(out.hallmarkGst * 50) / 100, sgst: inter ? 0 : Math.round(out.hallmarkGst * 50) / 100, igst: inter ? out.hallmarkGst : 0 };
+    return { qty: out.net, rate: Number(inp.rate), totalAmount: out.goodsTaxable, valuation: { input: inp, result: out }, hall };
+}
+
+// The GST fields of a purchase: the goods at the purchase rate plus (if any) the hallmark fee and its GST (input credit too).
+function gstFields(gst, hall) {
+    const h = hall || { charge: 0, gst: 0, cgst: 0, sgst: 0, igst: 0 };
+    const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+    return {
+        transactionType: gst.cgst ? 'intra-state' : 'inter-state',
+        gstRate: gst.gstRate,
+        cgstAmount: r2((gst.cgst?.amount || 0) + h.cgst),
+        sgstAmount: r2((gst.sgst?.amount || 0) + h.sgst),
+        igstAmount: r2((gst.igst?.amount || 0) + h.igst),
+        totalGst: r2(gst.totalGst + h.gst),
+        totalPayable: r2(gst.totalPayable + h.charge + h.gst),
+        hsnCode: gst.hsnCode,
+        itcCgst: r2(gst.itcCgst + h.cgst),
+        itcSgst: r2(gst.itcSgst + h.sgst),
+        itcIgst: r2(gst.itcIgst + h.igst),
+        totalItc: r2(gst.totalItc + h.gst),
+        effectiveCost: r2(gst.effectiveCost + h.charge),
+        tdsApplicable: gst.tdsApplicable,
+        tdsRate: gst.tdsRate,
+        tdsAmount: gst.tdsAmount,
+        netPayable: r2(gst.netPayable + h.charge + h.gst),
+    };
+}
+
 exports.createPurchase = async (req, res) => {
     try {
         const Purchase    = getPurchaseModel();
@@ -209,6 +247,7 @@ exports.createPurchase = async (req, res) => {
             description = '',
             remarks = '',
             attachmentMeta = [],
+            valuation: valuationIn,
         } = req.body;
 
         // ── Mandatory field validation ─────────────────────────────────────
@@ -226,12 +265,22 @@ exports.createPurchase = async (req, res) => {
             });
         }
 
-        const qty     = parseFloat(quantity);
-        const rateVal = parseFloat(rate);
+        let qty     = parseFloat(quantity);
+        let rateVal = parseFloat(rate);
         // Use provided totalAmount (taxable value per invoice); else compute from qty × rate
-        const totalAmount = totalAmountRaw != null
+        let totalAmount = totalAmountRaw != null
             ? parseFloat(totalAmountRaw)
             : parseFloat((qty * rateVal).toFixed(2));
+
+        // Purchase valuation (Stock Setting > Purchase rules): the server works the amount out itself from the weights
+        const gstConfig = await getActiveGstConfig();
+        const txType = transactionType || gstConfig.defaultTransactionType || 'intra-state';
+        let valuation = null, hall = null;
+        if (valuationIn && typeof valuationIn === 'object') {
+            const v = await priceValuation(valuationIn, txType);
+            if (v.error) return res.status(400).json({ success: false, message: v.error });
+            qty = v.qty; rateVal = v.rate; totalAmount = v.totalAmount; valuation = v.valuation; hall = v.hall;
+        }
 
         // ── Duplicate invoice check (no self-exclusion needed for create) ──
         const existing = await Purchase.findOne({
@@ -247,9 +296,8 @@ exports.createPurchase = async (req, res) => {
         }
 
         // ── GST calculation ────────────────────────────────────────────────
-        const gstConfig = await getActiveGstConfig();
-        const txType = transactionType || gstConfig.defaultTransactionType || 'intra-state';
         const gst = calculateGST(parseFloat(totalAmount), gstConfig, txType);
+        const gf = gstFields(gst, hall);
 
         // ── Normalize dates to IST ─────────────────────────────────────────
         const normalizedInvoiceDate = normalizeToIST(invoiceDate);
@@ -268,25 +316,8 @@ exports.createPurchase = async (req, res) => {
             quantity: qty,
             rate: rateVal,
             totalAmount,
-            transactionType: gst.cgst ? 'intra-state' : 'inter-state',
-            gstRate: gst.gstRate,
-            cgstAmount: gst.cgst?.amount || 0,
-            sgstAmount: gst.sgst?.amount || 0,
-            igstAmount: gst.igst?.amount || 0,
-            totalGst: gst.totalGst,
-            totalPayable: gst.totalPayable,
-            hsnCode: gst.hsnCode,
-            // ITC — GST paid to supplier, claimable from credit ledger
-            itcCgst: gst.itcCgst,
-            itcSgst: gst.itcSgst,
-            itcIgst: gst.itcIgst,
-            totalItc: gst.totalItc,
-            effectiveCost: gst.effectiveCost,
-            // TDS (194Q)
-            tdsApplicable: gst.tdsApplicable,
-            tdsRate: gst.tdsRate,
-            tdsAmount: gst.tdsAmount,
-            netPayable: gst.netPayable,
+            valuation,
+            ...gf,      // GST, ITC (input credit), TDS 194Q and net payable, incl. the hallmark fee when there is one
             description: description.trim(),
             remarks: remarks.trim(),
             attachments,
@@ -367,6 +398,23 @@ exports.updatePurchase = async (req, res) => {
         // Sync flat URL array if attachmentMeta changed
         if (req.body.attachmentMeta) {
             purchase.attachments = req.body.attachmentMeta.map((a) => a.url);
+        }
+
+        // Change of the valuation: weights / purity / wastage / labour / rate. Amount, GST, input credit and the stock ledger are
+        // worked out again. Refused once the GSTR-3B of that period is filed (it would change a filed return).
+        if (req.body.valuation && typeof req.body.valuation === 'object') {
+            const GstSvc = require('../services/gstReports');
+            const { GstFiling } = require('../models/AppGst');
+            const ymd = new Date(purchase.invoiceDate.getTime() + 5.5 * 3600000).toISOString().slice(0, 10);
+            const keys = [GstSvc.periodKey('monthly', ymd), GstSvc.periodKey('quarterly', ymd)];
+            const filed = await GstFiling.findOne({ returnType: 'GSTR-3B', period: { $in: keys } }).lean();
+            if (filed) return res.status(409).json({ success: false, message: `The GSTR-3B for ${filed.period} is already filed. Record a correction in the next return instead of changing this purchase.` });
+            const gstConfig = await getActiveGstConfig();
+            const v = await priceValuation(req.body.valuation, purchase.transactionType || 'intra-state');
+            if (v.error) return res.status(400).json({ success: false, message: v.error });
+            const gst = calculateGST(v.totalAmount, gstConfig, purchase.transactionType || 'intra-state');
+            Object.assign(purchase, { quantity: v.qty, rate: v.rate, totalAmount: v.totalAmount, valuation: v.valuation }, gstFields(gst, v.hall));
+            await getStockEntryModel().updateMany({ referenceId: purchase._id, referenceType: 'purchase', status: 'active' }, { $set: { weightGrams: v.qty } });
         }
 
         purchase.updatedBy = req.user.id;

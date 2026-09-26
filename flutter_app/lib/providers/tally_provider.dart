@@ -91,10 +91,10 @@ class TallyProvider with ChangeNotifier {
   // Create new tally
   Future<TallySession?> createTally({
     required String description,
-    required int expectedItems,
-    required int expectedContainers,
-    required double expectedGoldWeight,
-    required double expectedSilverWeight,
+    int expectedItems = 0, // ignored by the server: it counts the stock itself
+    int expectedContainers = 0,
+    double expectedGoldWeight = 0,
+    double expectedSilverWeight = 0,
     DateTime? date,
     List<Map<String, dynamic>>? metalData, // NEW: Optional metal data array
   }) async {

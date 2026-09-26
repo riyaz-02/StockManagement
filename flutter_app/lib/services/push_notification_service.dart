@@ -2,7 +2,10 @@ import 'dart:developer' as developer;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+
+const _kPermissionRequestedKey = 'push_notification_permission_requested';
 
 /// Must be a top-level function (Firebase requirement) — handles messages
 /// that arrive while the app is fully backgrounded/terminated.
@@ -51,7 +54,18 @@ class PushNotificationService {
       );
 
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+      // Only ever prompt for permission once — after that, respect whatever
+      // the user chose (Android itself won't re-show the OS dialog after a
+      // denial anyway, but re-calling requestPermission on every app start
+      // still reads as "asking every time" to the user, so skip it outright
+      // once we know we've already asked.
+      final prefs = await SharedPreferences.getInstance();
+      final alreadyAsked = prefs.getBool(_kPermissionRequestedKey) ?? false;
+      if (!alreadyAsked) {
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
+        await prefs.setBool(_kPermissionRequestedKey, true);
+      }
 
       final token = await messaging.getToken();
       if (token != null) {

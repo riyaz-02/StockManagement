@@ -74,4 +74,5 @@ const inventorySnapshotSchema = new mongoose.Schema({
 
 inventorySnapshotSchema.index({ createdAt: -1 });
 
+inventorySnapshotSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('InventorySnapshot', inventorySnapshotSchema);

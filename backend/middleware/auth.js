@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const permissionCache = require('../config/permissionCache');
+const { runWith } = require('../utils/branchScope');
 
 const FULL_ACCESS_ROLES = ['admin', 'owner'];
 
@@ -42,7 +43,15 @@ exports.protect = async (req, res, next) => {
                 });
             }
 
-            next();
+            // Which branch(es) this request works on (see utils/branchScope.js)
+            const home = req.user.branchId || 'main';
+            const all = await exports.canSeeAllBranches(req.user);
+            const pick = String(req.headers['x-branch'] || '').trim();
+            let restrict = all ? null : [home];
+            let branchId = home;
+            if (all && pick && pick !== 'all') { restrict = [pick]; branchId = pick; }
+            req.branchScope = { branchId, restrict, all };
+            return runWith({ branchId, restrict }, () => next());
         } catch (err) {
             return res.status(401).json({
                 success: false,
@@ -83,6 +92,10 @@ exports.hasPermission = async (user, key) => {
     const grid = grids[user.role];
     return grid ? !!grid[key] : false;
 };
+
+// May this user see the whole firm (every branch), not just their own?
+exports.canSeeAllBranches = async (user) =>
+    (await exports.hasPermission(user, 'branches.viewAll')) || (await exports.hasPermission(user, 'billing.viewAllBranches'));
 
 // Require a specific granular permission (see config/permissions.js).
 // Must run after `protect` (needs req.user).

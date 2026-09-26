@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/customer_field.dart';
 import 'package:provider/provider.dart';
 import '../models/item_model.dart';
 import '../providers/language_provider.dart';
@@ -116,15 +117,12 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             const SizedBox(height: 24),
 
             // Customer Name
-            TextFormField(
-              controller: _customerNameController,
-              decoration: InputDecoration(
-                labelText: languageProvider.translate('customer_name'),
-                prefixIcon: const Icon(Icons.person),
-              ),
-              validator: (value) => value?.isEmpty ?? true
-                  ? languageProvider.translate('required_field')
-                  : null,
+            CustomerField(
+              name: _customerNameController,
+              mobile: _mobileController,
+              label: languageProvider.translate('customer_name'),
+              decoration: (l) => InputDecoration(labelText: l, prefixIcon: const Icon(Icons.person)),
+              validator: (value) => value?.isEmpty ?? true ? languageProvider.translate('required_field') : null,
             ),
             const SizedBox(height: 16),
 

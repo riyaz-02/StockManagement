@@ -3,8 +3,17 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
   // ── Environment Switch ──────────────────────────────────────────────────
-  // Set to true for local development, false for production.
-  static const bool _useLocalBackend = false;
+  // Chosen at build time, never by editing source:
+  //   flutter run                               -> production (default)
+  //   flutter run --dart-define=API_ENV=local   -> local backend
+  // Or just run dev-local.ps1 from the repo root, which does everything.
+  static const String _env =
+      String.fromEnvironment('API_ENV', defaultValue: 'prod');
+  static const bool _useLocalBackend = _env == 'local';
+
+  /// True in local-dev builds. Local builds must never contact production,
+  /// including the EC2 wake Lambda.
+  static bool get isLocal => _useLocalBackend;
 
   // ── Production URL ──────────────────────────────────────────────────────
   // Production API domain. Point api.laltuguineapalace.com to the EC2 public IP
@@ -23,8 +32,11 @@ class AppConstants {
   static String get _localUrl {
     if (kIsWeb) return 'http://localhost:5000/api';
     if (Platform.isAndroid) {
-      // Physical device — Wi-Fi IPv4 (run `ipconfig` to refresh if it changes)
-      return 'http://192.168.0.114:5000/api';
+      // Physical device over USB: dev-local.ps1 runs `adb reverse tcp:5000 tcp:5000`,
+      // so the phone's localhost is this PC. No Wi-Fi/firewall/IP changes needed.
+      // Override with --dart-define=LOCAL_API_URL=http://<pc-ip>:5000/api if needed.
+      return const String.fromEnvironment('LOCAL_API_URL',
+          defaultValue: 'http://127.0.0.1:5000/api');
       // Emulator fallback (uncomment if using Android emulator instead):
       // return 'http://10.0.2.2:5000/api';
     }
@@ -44,16 +56,13 @@ class AppConstants {
         : '${trimmedUrl.replaceAll(RegExp(r'/+$'), '')}/api';
   }
 
-  // Health-check — same host as baseUrl
-  // NOTE: must strip only a trailing "/api" suffix, not every occurrence —
-  // baseUrl is typically "https://api.<domain>/api", and a naive
-  // baseUrl.replaceAll('/api', '') also matches the "/api" that's part of
-  // the "api." subdomain, mangling the host entirely.
+  // Health-check — same host as baseUrl. Use the public health endpoint so
+  // startup detection is independent of login/token state.
   static String get healthCheckUrl {
     final withoutApiSuffix = baseUrl.endsWith('/api')
         ? baseUrl.substring(0, baseUrl.length - 4)
         : baseUrl;
-    return '$withoutApiSuffix/api/auth/me';
+    return '$withoutApiSuffix/health';
   }
 
   static const int connectionTimeout = 30000; // 30 seconds

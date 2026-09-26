@@ -12,6 +12,7 @@ class Purchase {
   final double quantity;         // Weight in grams
   final double rate;             // ₹ per gram
   final double totalAmount;      // Taxable value (as per supplier invoice)
+  final Map<String, dynamic>? valuation; // { input, result } when the amount was worked out from weights (Stock Setting > Purchase)
 
   // ── B2B GST fields ───────────────────────────────────────────────────────
   final String transactionType;  // 'intra-state' | 'inter-state'
@@ -83,6 +84,7 @@ class Purchase {
     this.createdAtIST,
     this.createdByName = '',
     required this.createdAt,
+    this.valuation,
   });
 
   factory Purchase.fromJson(Map<String, dynamic> json) {
@@ -100,6 +102,7 @@ class Purchase {
       quantity: (json['quantity'] ?? 0).toDouble(),
       rate: (json['rate'] ?? 0).toDouble(),
       totalAmount: totalAmount,
+      valuation: json['valuation'] is Map ? Map<String, dynamic>.from(json['valuation'] as Map) : null,
       transactionType: json['transactionType'] ?? 'intra-state',
       hsnCode: json['hsnCode'] ?? '7113',
       gstRate: (json['gstRate'] ?? 3.0).toDouble(),

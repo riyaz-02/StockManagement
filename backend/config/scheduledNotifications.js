@@ -84,6 +84,14 @@ async function runJobIfDue(job) {
 }
 
 function checkAllJobs() {
+    // GST due-date reminders: driven by the GST Summary settings (frequency, lead times), not a fixed date
+    require('../services/gstReminderJob').runGstReminders().catch(err => {
+        logger.error(`[Scheduler] GST reminders failed: ${err.message}`);
+    });
+    // pieces and old metal of invoices cancelled on the website go back to stock / become available again
+    require('../services/cancelReconcile').reconcileCancelled().catch(err => {
+        logger.error(`[Scheduler] cancel reconcile failed: ${err.message}`);
+    });
     JOBS.forEach(job => {
         runJobIfDue(job).catch(err => {
             logger.error(`[Scheduler] Job "${job.name}" failed: ${err.message}`);

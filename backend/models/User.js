@@ -28,6 +28,17 @@ const userSchema = new mongoose.Schema({
         enum: ['en', 'bn'],
         default: 'en'
     },
+    // Branch / shop this user works at. New directory records are filed under
+    // it automatically, so staff never have to pick a branch. 'main' is the
+    // built-in default (see utils/branches.js).
+    branchId: {
+        type: String,
+        default: 'main'
+    },
+    branchName: {
+        type: String,
+        default: 'Main branch'
+    },
     mobile: {
         type: String,
         required: [true, 'Mobile number is required'],

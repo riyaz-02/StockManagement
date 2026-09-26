@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_toast.dart';
+import '../widgets/branch_dropdown.dart';
 
 class AddUserScreen extends StatefulWidget {
   const AddUserScreen({super.key});
@@ -23,6 +24,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   String _selectedRole = 'staff';
+  String _branchId = 'main';
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   bool _isCreatingUser = false;
@@ -81,6 +83,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
         'mobile': _mobileController.text.trim(),
         'password': _passwordController.text,
         'role': _selectedRole,
+        'branchId': _branchId,
         if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl,
       };
 
@@ -318,6 +321,13 @@ class _AddUserScreenState extends State<AddUserScreen> {
                   setState(() => _selectedRole = value);
                 }
               },
+            ),
+            const SizedBox(height: 16),
+
+            // Branch: records this user creates are filed under it automatically
+            BranchDropdown(
+              value: _branchId,
+              onChanged: (v) => setState(() => _branchId = v),
             ),
             const SizedBox(height: 24),
 

@@ -3,131 +3,113 @@ const Item = require('../models/Item');
 const Container = require('../models/Container');
 const InventorySnapshot = require('../models/InventorySnapshot');
 const { softDeleteItemDoc } = require('./itemController');
+const Help = require('../services/tallyHelp');
+
+const SHOP_STATUSES = ['active', 'action_needed', 'in_stock', 'booked', 'wishlisted'];
+
+// The pieces of a session with their CURRENT state: where they sit now, and whether they left the shop since the tally began.
+async function loadPieces(session) {
+    const ids = (session.items || []).map((i) => i.itemId);
+    const docs = await Item.find({ _id: { $in: ids } }).select('barcode name netWeight metalType status containerId slotNumber').lean();
+    const byId = new Map(docs.map((d) => [String(d._id), d]));
+    const boxIds = [...new Set(docs.map((d) => String(d.containerId || '')).filter(Boolean))];
+    const boxes = boxIds.length ? await Container.find({ _id: { $in: boxIds } }).select('name').lean() : [];
+    const boxName = new Map(boxes.map((b) => [String(b._id), b.name]));
+    return (session.items || []).map((i) => {
+        const d = byId.get(String(i.itemId)) || {};
+        const cid = d.containerId ? String(d.containerId) : '';
+        return {
+            id: String(i.itemId), barcode: d.barcode || i.barcode, name: d.name || '', metalType: d.metalType || i.metalType, weight: d.netWeight != null ? d.netWeight : i.weight,
+            scanned: !!i.isScanned, gone: !d._id || Help.GONE.includes(d.status), status: d.status || 'deleted', containerId: cid, containerName: boxName.get(cid) || '', slot: d.slotNumber || null,
+        };
+    });
+}
+const findRow = (p) => ({ itemId: p.id, barcode: p.barcode, name: p.name, metalType: p.metalType, weight: p.weight, box: p.containerName || (p.containerId ? 'Box' : 'Not in any box'), slot: p.slot });
 
 // @desc    Create new tally session
 // @route   POST /api/tally
 // @access  Private/Staff/Admin
 exports.createTally = async (req, res) => {
     try {
-        const {
-            date,
-            description,
-            expectedItems,
-            expectedContainers,
-            expectedGoldWeight,
-            expectedSilverWeight,
-            metalData // NEW: Array of {metalType, expectedWeight, expectedItemCount}
-        } = req.body;
-
-        // Validate required fields
-        if (!description || expectedItems === undefined || expectedContainers === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide all required fields: description, expectedItems, expectedContainers'
-            });
+        // One tally at a time: two running together only confuses the counting.
+        const running = await TallySession.findOne({ status: 'active' }).select('description createdAt').lean();
+        if (running) {
+            return res.status(409).json({ success: false, message: `A tally is already running ("${running.description}"). Finish or lock it before starting another.`, existingId: running._id });
         }
 
-        // **DEBUG**: Log total items in database by status
-        const totalItems = await Item.countDocuments();
-        const statusCounts = {
-            active: await Item.countDocuments({ status: 'active' }),
-            in_stock: await Item.countDocuments({ status: 'in_stock' }),
-            booked: await Item.countDocuments({ status: 'booked' }),
-            wishlisted: await Item.countDocuments({ status: 'wishlisted' }),
-            sold: await Item.countDocuments({ status: 'sold' }),
-            with_customer: await Item.countDocuments({ status: 'with_customer' }),
-            repair: await Item.countDocuments({ status: 'repair' })
-        };
-
-        console.log('[TALLY CREATE DEBUG] ==================');
-        console.log('[TALLY CREATE DEBUG] Total items in DB:', totalItems);
-        console.log('[TALLY CREATE DEBUG] Items by status:', statusCounts);
-
-        // Fetch all items that are physically in the rack.
-        // action_needed items are quick-adds that are physically present but details pending.
-        const allItems = await Item.find({
-            status: { $in: ['active', 'action_needed', 'in_stock', 'booked', 'wishlisted'] }
-        })
-            .select('barcode metalType netWeight status')
-            .lean();
-
-        console.log(`[TALLY CREATE DEBUG] Query returned ${allItems.length} items`);
-        console.log('[TALLY CREATE DEBUG] Breakdown:', allItems.reduce((acc, item) => {
-            acc[item.status] = (acc[item.status] || 0) + 1;
-            return acc;
-        }, {}));
-        console.log('[TALLY CREATE DEBUG] ==================');
-
-        // Prepare items array with scan status
-        const itemsArray = allItems.map(item => ({
-            itemId: item._id,
-            barcode: item.barcode,
-            metalType: item.metalType,
-            weight: item.netWeight || 0,
-            isScanned: false,
-            status: item.status  // Keep original status (in_stock, booked, or wishlisted)
-        }));
-
-        // Prepare metalData array (use provided data or defaults)
-        let metalDataArray = metalData || [];
-
-        // If no metalData provided, create from legacy fields
-        if (metalDataArray.length === 0 && (expectedGoldWeight || expectedSilverWeight)) {
-            metalDataArray = [];
-            if (expectedGoldWeight) {
-                metalDataArray.push({
-                    metalType: 'gold',
-                    expectedWeight: expectedGoldWeight,
-                    expectedItemCount: allItems.filter(i => i.metalType?.toLowerCase() === 'gold').length,
-                    scannedWeight: 0,
-                    scannedItemCount: 0
-                });
-            }
-            if (expectedSilverWeight) {
-                metalDataArray.push({
-                    metalType: 'silver',
-                    expectedWeight: expectedSilverWeight,
-                    expectedItemCount: allItems.filter(i => i.metalType?.toLowerCase() === 'silver').length,
-                    scannedWeight: 0,
-                    scannedItemCount: 0
-                });
-            }
+        // What should be in the shop right now: worked out here from the stock itself (nothing to type, nothing to get wrong).
+        const allItems = await Item.find({ status: { $in: SHOP_STATUSES } }).select('barcode metalType netWeight status containerId').lean();
+        if (!allItems.length) {
+            return res.status(400).json({ success: false, message: 'There is no stock in the shop to tally yet.' });
         }
+        const itemsArray = allItems.map((item) => ({ itemId: item._id, barcode: item.barcode, metalType: item.metalType, weight: item.netWeight || 0, isScanned: false, status: item.status }));
 
-        // Create tally session
+        const metals = {};
+        for (const it of allItems) {
+            const m = String(it.metalType || 'other').toLowerCase();
+            metals[m] = metals[m] || { metalType: m, expectedWeight: 0, expectedItemCount: 0, scannedWeight: 0, scannedItemCount: 0 };
+            metals[m].expectedWeight = Help.r3(metals[m].expectedWeight + (it.netWeight || 0));
+            metals[m].expectedItemCount += 1;
+        }
+        const containers = new Set(allItems.map((i) => String(i.containerId || '')).filter(Boolean));
+        const today = new Date();
+        const ist = new Date(today.getTime() + 5.5 * 3600000);
+        const description = String((req.body || {}).description || '').trim() || `Stock tally ${String(ist.getUTCDate()).padStart(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][ist.getUTCMonth()]} ${ist.getUTCFullYear()}`;
+
         const tallySession = await TallySession.create({
-            date: date || new Date(),
-            description,
-            expectedItems,
-            expectedContainers,
-            expectedGoldWeight: expectedGoldWeight || 0,
-            expectedSilverWeight: expectedSilverWeight || 0,
-            createdBy: req.user.id,
-            status: 'active',
-            // NEW: Metal data array
-            metalData: metalDataArray,
-            // NEW: Items array
-            items: itemsArray,
-            // Initialize counters
-            scannedItemsCount: 0,
-            scannedGoldWeight: 0,
-            scannedSilverWeight: 0,
-            outOfStockCount: 0,
-            scannedItemIds: [],
-            scannedItemDetails: []
+            date: today, description,
+            expectedItems: allItems.length, expectedContainers: containers.size,
+            expectedGoldWeight: (metals.gold || {}).expectedWeight || 0, expectedSilverWeight: (metals.silver || {}).expectedWeight || 0,
+            createdBy: req.user.id, status: 'active',
+            metalData: Object.values(metals), items: itemsArray, expectedItemIds: allItems.map((i) => i._id),
+            scannedItemsCount: 0, scannedGoldWeight: 0, scannedSilverWeight: 0, outOfStockCount: 0, scannedItemIds: [], scannedItemDetails: [],
         });
-
-        res.status(201).json({
-            success: true,
-            message: 'Tally session created successfully',
-            data: { tallySession }
-        });
+        res.status(201).json({ success: true, message: 'Tally started', data: { tallySession } });
     } catch (error) {
         console.error('Create tally error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while creating tally session'
-        });
+        res.status(500).json({ success: false, message: 'Server error while creating tally session' });
+    }
+};
+
+// GET /api/tally/preview : what a new tally would count (the Start screen shows it before anything is created)
+exports.previewTally = async (req, res) => {
+    try {
+        const items = await Item.find({ status: { $in: SHOP_STATUSES } }).select('metalType netWeight containerId').lean();
+        const metals = {};
+        for (const it of items) {
+            const m = String(it.metalType || 'other').toLowerCase();
+            metals[m] = metals[m] || { metalType: m, items: 0, weight: 0 };
+            metals[m].items += 1;
+            metals[m].weight = Help.r3(metals[m].weight + (it.netWeight || 0));
+        }
+        const running = await TallySession.findOne({ status: 'active' }).select('description').lean();
+        res.json({ success: true, data: { items: items.length, containers: new Set(items.map((i) => String(i.containerId || '')).filter(Boolean)).size, metals: Object.values(metals), running: running ? { id: running._id, description: running.description } : null } });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not read the stock' });
+    }
+};
+
+// GET /api/tally/:id/summary : box-by-box progress and the list of pieces still to find (with box and slot)
+exports.tallySummary = async (req, res) => {
+    try {
+        const session = await TallySession.findById(req.params.id);
+        if (!session) return res.status(404).json({ success: false, message: 'Tally session not found' });
+        if (session.status !== 'active' && (session.missingAtLock || []).length + (session.soldSinceLock || []).length > 0) {
+            // a locked tally shows what was recorded at the moment it was locked
+            return res.json({ success: true, data: { frozen: true, expected: session.expectedItems, scanned: session.scannedItemsCount, boxes: [], missing: session.missingAtLock, soldSince: session.soldSinceLock } });
+        }
+        const pieces = await loadPieces(session);
+        const rec = Help.reconcile(pieces);
+        res.json({ success: true, data: {
+            frozen: false,
+            expected: rec.expectedItems, scanned: rec.scanned.length, left: rec.missing.length, soldSince: rec.soldSince.map(findRow),
+            expectedWeight: rec.expectedWeight, soldWeight: rec.soldWeight,
+            boxes: Help.boxProgress(pieces),
+            missing: rec.missing.slice(0, 300).map(findRow),
+        } });
+    } catch (e) {
+        console.error('Tally summary error:', e);
+        res.status(500).json({ success: false, message: 'Could not work out the tally progress' });
     }
 };
 
@@ -268,6 +250,16 @@ exports.scanItem = async (req, res) => {
             }
         } else {
             console.log(`[SCAN] WARNING: No expectedItemIds list - accepting any item`);
+        }
+
+        // **CHECK 2b**: the tally is a photograph taken when it started; a piece that is not in it is not counted
+        if ((tallySession.items || []).length > 0 && !tallySession.items.some((i) => i.itemId.toString() === item._id.toString())) {
+            return res.status(400).json({
+                success: false,
+                notInTally: true,
+                message: `${item.name || item.barcode} was not in stock when this tally started, so it is not counted. Add it with "Add missing item" if it belongs here.`,
+                data: { item }
+            });
         }
 
         // **CHECK 3**: Ensure item not already scanned
@@ -627,8 +619,10 @@ exports.lockTally = async (req, res) => {
             });
         }
 
-        // Check if all items are scanned
-        const itemsLeft = tallySession.expectedItems - tallySession.scannedItemsCount;
+        // What is left is worked out from the pieces: a piece sold while the tally ran does not count as missing
+        const pieces = await loadPieces(tallySession);
+        const rec = Help.reconcile(pieces);
+        const itemsLeft = rec.missing.length;
         const isForceLock = itemsLeft > 0;
 
         if (isForceLock && !remarks) {
@@ -638,9 +632,16 @@ exports.lockTally = async (req, res) => {
                 data: { itemsLeft }
             });
         }
+        tallySession.missingAtLock = rec.missing.map(findRow);
+        tallySession.soldSinceLock = rec.soldSince.map(findRow);
 
         // Calculate mismatch
         const mismatchInfo = tallySession.calculateMismatch();
+        // pieces sold since the start are not expected on the shelf: take their weight off what was expected
+        const goldDiff = Math.abs(tallySession.scannedGoldWeight - (tallySession.expectedGoldWeight - (rec.soldWeight.gold || 0)));
+        const silverDiff = Math.abs(tallySession.scannedSilverWeight - (tallySession.expectedSilverWeight - (rec.soldWeight.silver || 0)));
+        Object.assign(mismatchInfo, { goldDifference: Help.r3(goldDiff), silverDifference: Help.r3(silverDiff), totalDifference: Help.r3(goldDiff + silverDiff), mismatchDetected: goldDiff + silverDiff > 0.01 });
+        tallySession.mismatchDetected = mismatchInfo.mismatchDetected;
 
         // Lock the session
         tallySession.status = isForceLock ? 'force_locked' : 'locked';
@@ -658,6 +659,8 @@ exports.lockTally = async (req, res) => {
                 tallySession,
                 mismatchInfo,
                 itemsLeft,
+                missing: tallySession.missingAtLock,
+                soldSince: tallySession.soldSinceLock,
                 isForceLocked: isForceLock
             }
         });

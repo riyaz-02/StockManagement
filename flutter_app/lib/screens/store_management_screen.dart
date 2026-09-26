@@ -61,37 +61,36 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
               SliverAppBar(
                 pinned: true,
                 floating: false,
-                expandedHeight: 110,
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFF1A1A1A),
                 elevation: 0,
                 shadowColor: Colors.black12,
                 surfaceTintColor: Colors.white,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 58),
-                  title: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Store Management',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                          color: Color(0xFF1A1A1A),
-                          letterSpacing: -0.3,
-                        ),
+                titleSpacing: 0,
+                centerTitle: false,
+                toolbarHeight: 70,
+                title: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Store Management',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        color: Color(0xFF1A1A1A),
+                        letterSpacing: -0.3,
                       ),
-                      Text(
-                        _tabs[_currentTab].subtitle,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.grey[500],
-                        ),
+                    ),
+                    Text(
+                      _tabs[_currentTab].subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey[500],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(48),

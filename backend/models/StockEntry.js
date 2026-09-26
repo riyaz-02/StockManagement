@@ -78,4 +78,5 @@ stockEntrySchema.index({ metalType: 1, entryType: 1, status: 1 });
 stockEntrySchema.index({ referenceId: 1, referenceType: 1 });
 stockEntrySchema.index({ status: 1, entryDate: -1 });
 
+stockEntrySchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = (connection) => connection.model('StockEntry', stockEntrySchema);

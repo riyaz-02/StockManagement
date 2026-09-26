@@ -4,6 +4,7 @@ import '../providers/tally_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/tally_model.dart';
 import '../services/api_service.dart';
+import '../widgets/tally_progress_card.dart';
 import 'live_scanner_screen.dart';
 import 'barcode_scanner_for_assignment.dart';
 import 'quick_add_item_screen.dart';
@@ -142,7 +143,13 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
   Future<void> _lockTally() async {
     if (_tally == null) return;
 
-    final itemsLeft = _tally!.itemsLeft;
+    // what is really left comes from the server: pieces sold while the tally ran do not count as missing
+    int itemsLeft = _tally!.itemsLeft;
+    try {
+      final sm = await ApiService().tallySummary(widget.tallyId);
+      itemsLeft = ((sm['data'] as Map)['left'] as num?)?.toInt() ?? itemsLeft;
+    } catch (_) {/* fall back to the count on screen */}
+    if (!mounted) return;
     String? remarks;
 
     if (itemsLeft > 0) {
@@ -603,6 +610,7 @@ class _TallyDetailsScreenState extends State<TallyDetailsScreen> {
                   // METAL SUMMARY CARDS (DYNAMIC)
                   _buildMetalCards(),
                   const SizedBox(height: 8),
+                  TallyProgressCard(tallyId: widget.tallyId, refreshKey: _tally!.scannedItemsCount, locked: isLocked),
 
                   // COLLAPSIBLE ITEM CONTAINER
                   Container(

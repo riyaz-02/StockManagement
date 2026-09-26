@@ -13,7 +13,9 @@ const {
     removeUnscannedItem,
     removeAllUnscannedItems,
     addItemToTally,
-    updateInventory
+    updateInventory,
+    previewTally,
+    tallySummary
 } = require('../controllers/tallyController');
 const { protect, requirePermission } = require('../middleware/auth');
 
@@ -21,7 +23,9 @@ const { protect, requirePermission } = require('../middleware/auth');
 router.use(protect);
 
 router.get('/', requirePermission('tally.view'), getTallySessions);
+router.get('/preview', requirePermission('tally.create'), previewTally);
 router.get('/:id', requirePermission('tally.view'), getTallySession);
+router.get('/:id/summary', requirePermission('tally.view'), tallySummary);
 router.get('/:id/report', requirePermission('tally.view'), getTallyReport);
 router.get('/:id/items', requirePermission('tally.view'), getTallyItems);
 

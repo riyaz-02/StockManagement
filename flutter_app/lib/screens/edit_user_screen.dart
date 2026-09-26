@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../widgets/branch_dropdown.dart';
 import '../utils/app_toast.dart';
 
 /// Admin-only screen to edit another user's name, mobile, role, and photo.
@@ -26,6 +27,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   late String _selectedRole;
+  late String _branchId;
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   bool _isSaving = false;
@@ -47,6 +49,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
     _mobileController =
         TextEditingController(text: widget.user['mobile'] ?? '');
     _selectedRole = widget.user['role'] ?? 'staff';
+    _branchId = (widget.user['branchId'] ?? 'main').toString();
     _uploadedImageUrl = widget.user['profileImage'];
 
     final existingOverrides =
@@ -274,6 +277,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
         'name': _nameController.text.trim(),
         'mobile': _mobileController.text.trim(),
         'role': _selectedRole,
+        'branchId': _branchId,
         if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl,
       });
 
@@ -546,6 +550,11 @@ class _EditUserScreenState extends State<EditUserScreen> {
               onChanged: (value) {
                 if (value != null) setState(() => _selectedRole = value);
               },
+            ),
+            const SizedBox(height: 16),
+            BranchDropdown(
+              value: _branchId,
+              onChanged: (v) => setState(() => _branchId = v),
             ),
             const SizedBox(height: 16),
             if (_isConfigurableRole) _buildCustomPermissionsSection(),

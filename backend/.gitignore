@@ -45,3 +45,7 @@ tmp/
 add-admin.js
 deploy/DEPLOYMENT_GUIDE.md
 config/firebase-service-account.json
+
+# Local dev database
+.localdb/
+.env.prod-backup

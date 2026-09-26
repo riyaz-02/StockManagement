@@ -30,7 +30,7 @@ class _ItemSettingsScreenState extends State<ItemSettingsScreen> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1A1A),
         title: const Text(
-          'Item Settings',
+          'Stock Types & Purity',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 20,

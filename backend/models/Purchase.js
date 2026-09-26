@@ -43,6 +43,8 @@ const purchaseSchema = new mongoose.Schema(
             required: [true, 'Rate per gram is required'],
             min: [0, 'Rate cannot be negative'],
         },
+        // How the amount was worked out (weights, purity, wastage, labour, rate) when the Purchase valuation was used
+        valuation: { type: Object, default: null },
         // Gross amount before taxes (quantity * rate)
         totalAmount: {
             type: Number,
@@ -131,4 +133,5 @@ purchaseSchema.virtual('invoiceDateFormatted').get(function () {
         : null;
 });
 
+purchaseSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = (connection) => connection.model('Purchase', purchaseSchema);

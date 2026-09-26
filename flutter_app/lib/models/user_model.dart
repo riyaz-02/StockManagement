@@ -7,6 +7,10 @@ class User {
   final String? profileImage;
   final DateTime createdAt;
 
+  /// Shop / branch this user works at (server-assigned; 'main' = default).
+  final String branchId;
+  final String branchName;
+
   User({
     required this.id,
     required this.name,
@@ -15,6 +19,8 @@ class User {
     required this.mobile,
     this.profileImage,
     required this.createdAt,
+    this.branchId = 'main',
+    this.branchName = 'Main branch',
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -25,6 +31,8 @@ class User {
       language: json['language'] ?? 'en',
       mobile: json['mobile'] ?? '',
       profileImage: json['profileImage'],
+      branchId: json['branchId'] ?? 'main',
+      branchName: json['branchName'] ?? 'Main branch',
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -38,6 +46,8 @@ class User {
       'role': role,
       'language': language,
       'mobile': mobile,
+      'branchId': branchId,
+      'branchName': branchName,
       if (profileImage != null) 'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
     };

@@ -142,7 +142,7 @@ class _ItemListScreenState extends State<ItemListScreen>
           ),
           IconButton(
             icon: const Icon(Icons.output),
-            tooltip: 'Moved Out Items',
+            tooltip: 'Moved Out Stock',
             onPressed: () {
               Navigator.push(
                 context,
@@ -1091,7 +1091,7 @@ class _ItemListScreenState extends State<ItemListScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Filter Items',
+                          'Filter Stock',
                           style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.bold),
                         ),

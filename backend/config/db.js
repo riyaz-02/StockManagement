@@ -67,6 +67,50 @@ const connectShopmanage = async () => {
     return shopmanageConnection;
 };
 
+// ─── Third connection (LGP admin cluster → shopmanage db) ──────────────────
+// Holds the legacy web-admin data: customers, staff login users, GST data.
+// The app treats this DB as PRODUCTION: routes built on it are read + insert
+// only (see controllers/directoryController.js). Never add update/delete
+// paths against the pre-existing collections here.
+let lgpAdminConnection = null;
+
+const connectLgpAdmin = async () => {
+    const uri = process.env.LGP_ADMIN_DB_URI;
+    if (!uri) {
+        logger.warn('⚠️  [DB] LGP_ADMIN_DB_URI not set — User Directory will be unavailable.');
+        return null;
+    }
+
+    logger.info('[DB] Connecting to LGP admin cluster...');
+
+    lgpAdminConnection = mongoose.createConnection(uri, {
+        ...mongoOptions,
+        // Never let Mongoose create indexes/collections on this production DB.
+        autoIndex: false,
+        autoCreate: false,
+    });
+
+    lgpAdminConnection.on('connected', () => {
+        logger.info(`✅ [DB] LGP admin connected (db: ${lgpAdminConnection.name})`);
+    });
+    lgpAdminConnection.on('error', (err) => {
+        logger.error('[DB] LGP admin connection error:', err.message);
+    });
+    lgpAdminConnection.on('disconnected', () => {
+        logger.warn('[DB] LGP admin disconnected');
+    });
+
+    await lgpAdminConnection.asPromise();
+    return lgpAdminConnection;
+};
+
+const getLgpAdminConnection = () => {
+    if (!lgpAdminConnection) {
+        throw new Error('LGP admin connection is not initialized (LGP_ADMIN_DB_URI missing?).');
+    }
+    return lgpAdminConnection;
+};
+
 // ─── Getters ────────────────────────────────────────────────────────────────
 const getShopmanageConnection = () => {
     if (!shopmanageConnection) {
@@ -81,7 +125,17 @@ const closeAll = async () => {
     if (shopmanageConnection) {
         await shopmanageConnection.close();
     }
+    if (lgpAdminConnection) {
+        await lgpAdminConnection.close();
+    }
     logger.info('[DB] All connections closed.');
 };
 
-module.exports = { connectPrimary, connectShopmanage, getShopmanageConnection, closeAll };
+module.exports = {
+    connectPrimary,
+    connectShopmanage,
+    getShopmanageConnection,
+    connectLgpAdmin,
+    getLgpAdminConnection,
+    closeAll,
+};

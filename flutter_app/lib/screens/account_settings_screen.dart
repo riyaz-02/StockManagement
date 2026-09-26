@@ -21,6 +21,96 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final ApiService _apiService = ApiService();
   final ImagePicker _imagePicker = ImagePicker();
   bool _isUploadingImage = false;
+  bool _biometricSupported = false;
+  bool _biometricEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricState();
+  }
+
+  Future<void> _loadBiometricState() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final supported = await authProvider.isBiometricAvailable();
+    final enabled = await authProvider.hasSavedBiometricCredentials();
+    if (mounted) {
+      setState(() {
+        _biometricSupported = supported;
+        _biometricEnabled = enabled;
+      });
+    }
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (!value) {
+      await authProvider.forgetBiometricCredentials();
+      setState(() => _biometricEnabled = false);
+      return;
+    }
+
+    final password = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Confirm your password'),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Password'),
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('Enable'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (password == null || password.isEmpty || !mounted) return;
+
+    final mobile = authProvider.user!.mobile;
+    // Verify the password is actually correct before storing it — a wrong
+    // entry here would otherwise sit silently until the next failed
+    // fingerprint attempt.
+    final verified = await authProvider.login(mobile, password);
+
+    if (!mounted) return;
+
+    if (!verified) {
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(authProvider.error ?? 'Incorrect password'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await authProvider.saveBiometricCredentials(mobile, password);
+    setState(() => _biometricEnabled = true);
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        const SnackBar(
+          content: Text('Fingerprint login enabled'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
 
   Future<void> _uploadProfileImage() async {
     try {
@@ -243,6 +333,45 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ],
             ),
             const SizedBox(height: 16),
+
+            if (_biometricSupported) ...[
+              _buildInfoCard(
+                languageProvider: languageProvider,
+                title: 'Security',
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.fingerprint,
+                            size: 20, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Fingerprint Login',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: _biometricEnabled,
+                        activeColor: AppColors.primary,
+                        onChanged: _toggleBiometric,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Actions Card
             _buildInfoCard(

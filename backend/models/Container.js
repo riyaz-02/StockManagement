@@ -134,4 +134,5 @@ containerSchema.index({ isActive: 1, isDeleted: 1 });
 // Index for container listing
 containerSchema.index({ isDeleted: 1, createdAt: -1 });
 
+containerSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('Container', containerSchema);

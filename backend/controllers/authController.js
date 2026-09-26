@@ -57,7 +57,9 @@ exports.login = async (req, res) => {
                     name: user.name,
                     mobile: user.mobile,
                     role: user.role,
-                    language: user.language
+                    language: user.language,
+                    branchId: user.branchId || 'main',
+                    branchName: user.branchName || 'Main branch'
                 }
             }
         });
@@ -113,7 +115,9 @@ exports.register = async (req, res) => {
                     name: user.name,
                     mobile: user.mobile,
                     role: user.role,
-                    language: user.language
+                    language: user.language,
+                    branchId: user.branchId || 'main',
+                    branchName: user.branchName || 'Main branch'
                 }
             }
         });

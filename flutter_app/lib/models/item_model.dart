@@ -27,6 +27,18 @@ class Item {
   final String? lastPrintedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
+  // optional detail used by billing (null = not set)
+  final double? grossWeight;
+  final double? lessWeight;
+  final double? stoneValue;
+  final String stoneNote;
+  final double? makingCharge;
+  final String supplier;
+  final String size;
+  final double? wastage;
+  final double? custWastage;
+  final double? labourRate;
+  final double? makingRate;
 
   Item({
     required this.id,
@@ -57,6 +69,17 @@ class Item {
     this.lastPrintedBy,
     required this.createdAt,
     required this.updatedAt,
+    this.grossWeight,
+    this.lessWeight,
+    this.stoneValue,
+    this.stoneNote = '',
+    this.makingCharge,
+    this.supplier = '',
+    this.size = '',
+    this.wastage,
+    this.custWastage,
+    this.labourRate,
+    this.makingRate,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -106,6 +129,17 @@ class Item {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
+      grossWeight: (json['grossWeight'] as num?)?.toDouble(),
+      lessWeight: (json['lessWeight'] as num?)?.toDouble(),
+      stoneValue: (json['stoneValue'] as num?)?.toDouble(),
+      stoneNote: (json['stoneNote'] ?? '').toString(),
+      makingCharge: (json['makingCharge'] as num?)?.toDouble(),
+      supplier: (json['supplier'] ?? '').toString(),
+      size: (json['size'] ?? '').toString(),
+      wastage: (json['wastage'] as num?)?.toDouble(),
+      custWastage: (json['custWastage'] as num?)?.toDouble(),
+      labourRate: (json['labourRate'] as num?)?.toDouble(),
+      makingRate: (json['makingRate'] as num?)?.toDouble(),
     );
   }
 
@@ -137,6 +171,17 @@ class Item {
       'lastPrintedBy': lastPrintedBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'grossWeight': grossWeight,
+      'lessWeight': lessWeight,
+      'stoneValue': stoneValue,
+      'stoneNote': stoneNote,
+      'makingCharge': makingCharge,
+      'supplier': supplier,
+      'size': size,
+      'wastage': wastage,
+      'custWastage': custWastage,
+      'labourRate': labourRate,
+      'makingRate': makingRate,
     };
   }
 

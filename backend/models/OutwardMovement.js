@@ -143,4 +143,5 @@ outwardMovementSchema.index({ itemId: 1, status: 1 });
 outwardMovementSchema.index({ movementType: 1, status: 1 });
 outwardMovementSchema.index({ createdAt: -1 });
 
+outwardMovementSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('OutwardMovement', outwardMovementSchema);

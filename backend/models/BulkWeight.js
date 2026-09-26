@@ -65,4 +65,5 @@ const bulkWeightSchema = new mongoose.Schema(
 bulkWeightSchema.index({ metalType: 1, isActive: 1 });
 bulkWeightSchema.index({ date: -1 });
 
+bulkWeightSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = (connection) => connection.model('BulkWeight', bulkWeightSchema);

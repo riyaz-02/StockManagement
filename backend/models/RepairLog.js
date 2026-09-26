@@ -73,4 +73,5 @@ repairLogSchema.pre('save', function (next) {
 repairLogSchema.index({ itemId: 1, status: 1 });
 repairLogSchema.index({ status: 1, expectedReturnDate: 1 });
 
+repairLogSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('RepairLog', repairLogSchema);

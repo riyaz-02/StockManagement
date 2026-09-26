@@ -1,3 +1,4 @@
+const { resolveBranch } = require('../utils/branches');
 const User = require('../models/User');
 const cloudinaryHelper = require('../utils/cloudinaryHelper');
 const { hasPermission } = require('../middleware/auth');
@@ -57,7 +58,7 @@ exports.getUser = async (req, res) => {
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
     try {
-        const { name, mobile, password, role, profileImage } = req.body;
+        const { name, mobile, password, role, profileImage, branchId } = req.body;
 
         // Validate required fields
         if (!name || !mobile || !password) {
@@ -76,13 +77,17 @@ exports.createUser = async (req, res) => {
             });
         }
 
+        // Branch: explicit choice, else the creating admin's own branch
+        const branch = await resolveBranch(branchId || req.user.branchId);
+
         // Create user
         const user = await User.create({
             name,
             mobile,
             password,
             role: role || 'staff',
-            profileImage
+            profileImage,
+            ...branch
         });
 
         // Remove password from response
@@ -95,6 +100,9 @@ exports.createUser = async (req, res) => {
         });
     } catch (error) {
         console.error('Create user error:', error);
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Server error while creating user'
@@ -107,7 +115,7 @@ exports.createUser = async (req, res) => {
 // @access  Private
 exports.updateUser = async (req, res) => {
     try {
-        const { name, mobile, profileImage, language, role, isActive } = req.body;
+        const { name, mobile, profileImage, language, role, isActive, branchId } = req.body;
 
         const user = await User.findById(req.params.id);
 
@@ -128,6 +136,12 @@ exports.updateUser = async (req, res) => {
 
         // Update fields
         if (name) user.name = name;
+        // Branch assignment is an admin action (users.manage), never self-service
+        if (branchId !== undefined && (await hasPermission(req.user, 'users.manage'))) {
+            const branch = await resolveBranch(branchId);
+            user.branchId = branch.branchId;
+            user.branchName = branch.branchName;
+        }
         if (mobile) {
             // Check if mobile is already taken by another user
             const existingUser = await User.findOne({ mobile, _id: { $ne: req.params.id } });
@@ -176,6 +190,9 @@ exports.updateUser = async (req, res) => {
         });
     } catch (error) {
         console.error('Update user error:', error);
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Server error while updating user'

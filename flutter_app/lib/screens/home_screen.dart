@@ -1,3 +1,5 @@
+import '../services/api_service.dart';
+import 'old_metal_screen.dart';
 import 'dart:ui';
 import 'dart:ui';
 import 'dart:async';
@@ -15,7 +17,15 @@ import 'reports_screen.dart';
 import 'settings_menu_screen.dart';
 import 'login_screen.dart';
 import 'store_management_screen.dart';
-import 'invoice_screen.dart';
+import 'user_directory_screen.dart';
+import 'billing_screen.dart';
+import 'gst_summary_screen.dart';
+import 'day_book_screen.dart';
+import 'expenses_screen.dart';
+import 'dues_screen.dart';
+import 'estimates_screen.dart';
+import 'orders_screen.dart';
+import '../widgets/rate_strip.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,12 +37,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _timer;
   DateTime _currentTime = DateTime.now();
+  bool _multiBranch = false; // the branch switcher only appears once the firm really has more than one shop
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _startTimer();
+    _checkBranches();
+  }
+
+  Future<void> _checkBranches() async {
+    try {
+      final r = await ApiService().getDirectoryBranches();
+      final n = (r['data'] as List? ?? const []).length;
+      if (mounted) setState(() => _multiBranch = n > 1);
+    } catch (_) {/* stay hidden */}
   }
 
   @override
@@ -279,6 +299,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             actions: [
+              if (authProvider.canSwitchBranch && _multiBranch) _BranchSwitcher(auth: authProvider),
               IconButton(
                 icon: const Icon(Icons.logout,
                     color: Color(0xFFE94560), size: 24),
@@ -303,6 +324,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const RateStrip(),
                   // Feature Cards Grid (removed section header)
                   const SizedBox(height: 0),
                   const Text(
@@ -440,22 +462,130 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      // ── GST Invoice card ───────────────────────────────
-                      SizedBox(
-                        width: (MediaQuery.of(context).size.width - 56) / 2,
-                        child: _ElegantCard(
-                          icon: Icons.receipt_outlined,
-                          title: 'GST Invoice',
-                          description: 'Sales billing',
-                          primaryColor: const Color(0xFFD97706),
-                          secondaryColor: const Color(0xFFF59E0B),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const InvoiceScreen()),
+                      // ── GST Billing card (new billing module) ──────────
+                      if (authProvider.can('billing.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.request_quote_rounded,
+                            title: 'GST Billing',
+                            description: 'Invoices & dues',
+                            primaryColor: const Color(0xFFB45309),
+                            secondaryColor: const Color(0xFFFBBF24),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const BillingScreen()),
+                            ),
                           ),
                         ),
-                      ),
+                      // ── GST Summary card ───────────────────────────────
+                      if (authProvider.can('gst.viewReports'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.insights_rounded,
+                            title: 'GST Summary',
+                            description: 'Returns, ITC & due dates',
+                            primaryColor: const Color(0xFF4F46E5),
+                            secondaryColor: const Color(0xFF818CF8),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const GstSummaryScreen()),
+                            ),
+                          ),
+                        ),
+                      // ── Old Metal card ─────────────────────────────────
+                      if (authProvider.can('oldMetal.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.recycling_rounded,
+                            title: 'Old Metal',
+                            description: 'Old gold, silver & raw metal',
+                            primaryColor: const Color(0xFFB45309),
+                            secondaryColor: const Color(0xFFF59E0B),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OldMetalScreen())),
+                          ),
+                        ),
+                      // ── Pending dues / Day Book / Expenses ─────────────
+                      if (authProvider.can('billing.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.hourglass_bottom_rounded,
+                            title: 'Pending dues',
+                            description: 'Who owes you money',
+                            primaryColor: const Color(0xFFDC2626),
+                            secondaryColor: const Color(0xFFF87171),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PendingDuesScreen())),
+                          ),
+                        ),
+                      if (authProvider.can('orders.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.handyman_rounded,
+                            title: 'Orders',
+                            description: 'Made-to-order pieces',
+                            primaryColor: const Color(0xFF0E7490),
+                            secondaryColor: const Color(0xFF67E8F9),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen())),
+                          ),
+                        ),
+                      if (authProvider.can('estimates.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.request_page_rounded,
+                            title: 'Estimates',
+                            description: 'Quote a price',
+                            primaryColor: const Color(0xFF7C3AED),
+                            secondaryColor: const Color(0xFFC4B5FD),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EstimatesScreen())),
+                          ),
+                        ),
+                      if (authProvider.can('daybook.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.menu_book_rounded,
+                            title: 'Day Book',
+                            description: 'Money in and out',
+                            primaryColor: const Color(0xFF0F766E),
+                            secondaryColor: const Color(0xFF2DD4BF),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DayBookScreen())),
+                          ),
+                        ),
+                      if (authProvider.can('expenses.view'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.payments_rounded,
+                            title: 'Expenses',
+                            description: 'Tea, salary, rent...',
+                            primaryColor: const Color(0xFF7C3AED),
+                            secondaryColor: const Color(0xFFA78BFA),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen())),
+                          ),
+                        ),
+                      // ── User Directory card ────────────────────────────
+                      if (authProvider.can('directory.view') ||
+                          authProvider.can('directory.viewStaff'))
+                        SizedBox(
+                          width: (MediaQuery.of(context).size.width - 56) / 2,
+                          child: _ElegantCard(
+                            icon: Icons.contacts_rounded,
+                            title: 'Users',
+                            description: 'Customers, staff & suppliers',
+                            primaryColor: const Color(0xFF2563EB),
+                            secondaryColor: const Color(0xFF60A5FA),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const UserDirectoryScreen()),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -584,14 +714,14 @@ class _ElegantCardState extends State<_ElegantCard>
                     final isSmallScreen = cardWidth < 170;
 
                     // Responsive sizes - more aggressive reduction for small screens
-                    final padding = isSmallScreen ? 8.0 : 14.0;
-                    final iconSize = isSmallScreen ? 36.0 : 46.0;
-                    final iconRadius = isSmallScreen ? 9.0 : 12.0;
-                    final iconInnerSize = isSmallScreen ? 18.0 : 24.0;
-                    final spacingAfterIcon = isSmallScreen ? 6.0 : 10.0;
-                    final titleFontSize = isSmallScreen ? 13.0 : 15.5;
+                    final padding = isSmallScreen ? 7.0 : 10.0;
+                    final iconSize = isSmallScreen ? 32.0 : 38.0;
+                    final iconRadius = isSmallScreen ? 8.0 : 10.0;
+                    final iconInnerSize = isSmallScreen ? 16.0 : 20.0;
+                    final spacingAfterIcon = isSmallScreen ? 5.0 : 7.0;
+                    final titleFontSize = isSmallScreen ? 12.5 : 14.0;
                     final spacingAfterTitle = isSmallScreen ? 2.0 : 3.0;
-                    final descriptionFontSize = isSmallScreen ? 9.5 : 11.0;
+                    final descriptionFontSize = isSmallScreen ? 9.5 : 10.5;
 
                     return Padding(
                       padding: EdgeInsets.fromLTRB(
@@ -679,6 +809,71 @@ class _ElegantCardState extends State<_ElegantCard>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// For admins / every-branch users: work as one branch (its stock, its invoices, its numbering) or see the whole firm.
+class _BranchSwitcher extends StatelessWidget {
+  const _BranchSwitcher({required this.auth});
+  final AuthProvider auth;
+
+  Future<void> _open(BuildContext context) async {
+    List<Map<String, dynamic>> branches = [];
+    try {
+      final r = await ApiService().getDirectoryBranches();
+      branches = (r['data'] as List? ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {}
+    if (!context.mounted) return;
+    final current = ApiService.activeBranch;
+    final pick = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 6), child: Align(alignment: Alignment.centerLeft, child: Text('Work as which branch?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)))),
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 8), child: Align(alignment: Alignment.centerLeft, child: Text('New items and invoices are filed under this branch, and lists show only its records.', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+          RadioListTile<String>(value: '', groupValue: current, title: const Text('Whole firm (all branches)'), onChanged: (_) => Navigator.pop(context, {'id': '', 'name': ''})),
+          for (final b in branches)
+            RadioListTile<String>(
+              value: '${b['_id'] ?? b['id'] ?? ''}',
+              groupValue: current,
+              title: Text('${b['name'] ?? 'Branch'}'),
+              subtitle: (b['gstin'] ?? '').toString().isEmpty ? null : Text('GSTIN ${b['gstin']}', style: const TextStyle(fontSize: 11.5)),
+              onChanged: (v) => Navigator.pop(context, {'id': v ?? '', 'name': '${b['name'] ?? ''}'}),
+            ),
+        ]),
+      ),
+    );
+    if (pick == null) return;
+    await auth.setActiveBranch(pick['id'] ?? '', pick['name'] ?? '');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pick['id']!.isEmpty ? 'Showing the whole firm' : 'Working as ${pick['name']}')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = auth.activeBranchName;
+    return Tooltip(
+      message: 'Switch branch',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _open(context),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          constraints: const BoxConstraints(maxWidth: 150),
+          decoration: BoxDecoration(color: const Color(0xFFE94560).withOpacity(0.10), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE94560).withOpacity(0.45))),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.storefront_outlined, size: 16, color: Color(0xFFE94560)),
+            const SizedBox(width: 5),
+            Flexible(child: Text(name.isEmpty ? 'All branches' : name, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFE94560), fontSize: 12, fontWeight: FontWeight.w700))),
+            const Icon(Icons.arrow_drop_down, size: 18, color: Color(0xFFE94560)),
+          ]),
         ),
       ),
     );

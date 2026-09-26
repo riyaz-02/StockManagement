@@ -9,6 +9,8 @@ import '../models/store_models.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_toast.dart';
+import '../utils/stock_valuation.dart';
+import '../widgets/bill_ui.dart';
 
 class AddPurchaseScreen extends StatefulWidget {
   /// Pass a [purchase] to open screen in edit mode.
@@ -32,6 +34,21 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
   final _taxableCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+
+  // ── Purchase valuation (Stock Setting > Purchase rules) ──
+  bool _useValuation = false;
+  final _vGross = TextEditingController();
+  final _vLess = TextEditingController();
+  final _vNet = TextEditingController();
+  final _vWastage = TextEditingController();
+  final _vLabour = TextEditingController();
+  final _vPieces = TextEditingController(text: '1');
+  String _vPurity = '22K';
+  String _vCert = 'none'; // none | hallmarked | huid: the hallmark fee is added on top with its own GST
+  Map<String, dynamic> _rules = {};
+
+  static const _goldPurities = ['24K', '22K', '18K', '14K'];
+  static const _silverPurities = ['999', '925', '800'];
 
   DateTime _invoiceDate = DateTime.now();
   String _metalType = 'gold';
@@ -57,9 +74,51 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
 
   bool get _isEdit => widget.purchase != null;
 
+  Future<void> _loadRules() async {
+    try {
+      final r = await ApiService().stockSettings();
+      if (mounted) setState(() => _rules = Map<String, dynamic>.from((r['data'] as Map)['settings'] as Map));
+    } catch (_) {/* the engine defaults apply */}
+  }
+
+  Map<String, double> get _val => computePurchase({
+        'gross': _vGross.text,
+        'less': _vLess.text,
+        'net': _vNet.text.trim(),
+        'purity': _vPurity,
+        'wastage': _vWastage.text,
+        'rate': _rateCtrl.text,
+        'labourRate': _vLabour.text,
+        'pieces': _vPieces.text,
+        'certification': _vCert,
+        'interstate': _transactionType == 'inter-state',
+      }, _rules);
+
+  /// Gross - less = net (typing the net directly still works), then the amount follows the Purchase rules.
+  void _onValuationChanged({bool fromNet = false}) {
+    final g = double.tryParse(_vGross.text) ?? 0, l = double.tryParse(_vLess.text) ?? 0;
+    if (!fromNet && g > 0) {
+      final n = g - l;
+      _vNet.text = n > 0 ? n.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '') : '';
+    }
+    _applyValuation();
+  }
+
+  void _applyValuation() {
+    if (!_useValuation) return;
+    final v = _val;
+    if (v['net']! > 0) _quantityCtrl.text = v['net']!.toStringAsFixed(3);
+    if (v['goodsTaxable']! > 0) {
+      _taxableOverride = true;
+      _taxableCtrl.text = v['goodsTaxable']!.toStringAsFixed(2);
+    }
+    _debounceGst();
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadRules();
     _dateCtrl = TextEditingController(text: _fmtDate(_invoiceDate));
     // Pre-fill fields in edit mode
     if (_isEdit) {
@@ -77,6 +136,19 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       _metalType = p.metalType;
       _transactionType = p.transactionType;
       _taxableOverride = true; // don't auto-overwrite on init
+      final vi = p.valuation?['input'];
+      if (vi is Map) {
+        _useValuation = true;
+        String t(dynamic x) => x == null ? '' : '$x';
+        _vGross.text = t(vi['gross']);
+        _vLess.text = t(vi['less']);
+        _vNet.text = t(vi['net']);
+        _vWastage.text = t(vi['wastage']);
+        _vLabour.text = t(vi['labourRate']);
+        _vPieces.text = t(vi['pieces']).isEmpty ? '1' : t(vi['pieces']);
+        _vPurity = t(vi['purity']).isEmpty ? _vPurity : t(vi['purity']);
+        _vCert = t(vi['certification']).isEmpty ? 'none' : t(vi['certification']);
+      }
       // Keep existing attachments
       _attachmentMeta.addAll(p.attachmentMeta);
     }
@@ -114,6 +186,11 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       _quantityCtrl,
       _rateCtrl,
       _taxableCtrl,
+      _vGross,
+      _vLess,
+      _vNet,
+      _vWastage,
+      _vLabour,
       _descCtrl,
       _remarksCtrl,
     ]) {
@@ -124,6 +201,10 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
 
   // ── Amount / GST compute ─────────────────────────────────────────────────────
   void _onQtyRateChanged() {
+    if (_useValuation) {
+      _applyValuation();
+      return;
+    }
     if (!_taxableOverride) {
       final q = double.tryParse(_quantityCtrl.text) ?? 0;
       final r = double.tryParse(_rateCtrl.text) ?? 0;
@@ -174,10 +255,14 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       });
   }
 
+  // The hallmark fee of the valuation and the GST on it: added on top of the 3% goods amount (also by the server on save).
+  double get _hallFee => _useValuation ? (_val['hallmarkCharge'] ?? 0) : 0;
+  double get _hallGst => _useValuation ? (_val['hallmarkGst'] ?? 0) : 0;
+
   // ── Invoice total (rounded) ───────────────────────────────────────────────
   double get _invoiceTotal {
     final taxable = double.tryParse(_taxableCtrl.text) ?? 0;
-    if (_gst != null) return (_gst!.totalPayable).roundToDouble();
+    if (_gst != null) return _hallFee > 0 ? _gst!.totalPayable + _hallFee + _hallGst : (_gst!.totalPayable).roundToDouble();
     // Estimated before GST loads (3%)
     return (taxable * 1.03).roundToDouble();
   }
@@ -257,6 +342,8 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       'description': _descCtrl.text.trim(),
       'remarks': _remarksCtrl.text.trim(),
       'attachmentMeta': _attachmentMeta,
+      if (_useValuation)
+        'valuation': {'gross': _vGross.text, 'less': _vLess.text, 'net': _vNet.text.trim(), 'purity': _vPurity, 'wastage': _vWastage.text, 'rate': _rateCtrl.text, 'labourRate': _vLabour.text, 'pieces': int.tryParse(_vPieces.text) ?? 1, 'certification': _vCert},
     };
     final err = _isEdit
         ? await store.updatePurchase(widget.purchase!.id, payload)
@@ -289,6 +376,82 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       ));
 
   // ─────────────────────────────────────────────────────────────────────────
+  Widget _valuationCard() {
+    const amber = Color(0xFFD97706);
+    final v = _val;
+    final pr = Map<String, dynamic>.from((_rules['purchase'] as Map?) ?? const {});
+    const bn = {'finalFine': 'final fine wt', 'fine': 'fine wt', 'net': 'net wt', 'gross': 'gross wt'};
+    Widget f(TextEditingController c, String label, {bool net = false}) => TextFormField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}'))],
+          onChanged: (_) => setState(() => _onValuationChanged(fromNet: net)),
+          style: const TextStyle(fontSize: 13.5),
+          decoration: billDec(label, amber),
+        );
+    Widget two(Widget a, Widget b) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: a), const SizedBox(width: 8), Expanded(child: b)]);
+    final purities = _metalType == 'silver' ? _silverPurities : _goldPurities;
+    if (!purities.contains(_vPurity)) _vPurity = purities.contains('22K') ? '22K' : purities.first;
+    return BillCard(
+      title: 'Valuation',
+      icon: Icons.calculate_outlined,
+      color: amber,
+      trailing: Switch(value: _useValuation, activeColor: amber, onChanged: (x) => setState(() {
+            _useValuation = x;
+            if (x) _applyValuation();
+          })),
+      child: !_useValuation
+          ? const Text('Switch on to work the amount out from gross / net weight, purity, wastage and labour with your Purchase rules.', style: TextStyle(fontSize: 12, color: Colors.black54))
+          : Column(children: [
+              two(f(_vGross, 'Gross wt (g)'), f(_vLess, 'Less (g)')),
+              const SizedBox(height: 10),
+              two(f(_vNet, 'Net wt (g) *', net: true), DropdownButtonFormField<String>(value: _vPurity, isExpanded: true, style: const TextStyle(fontSize: 13.5, color: Colors.black87), decoration: billDec('Purity', amber), items: [for (final p in purities) DropdownMenuItem(value: p, child: Text(p))], onChanged: (x) => setState(() {
+                    _vPurity = x ?? _vPurity;
+                    _applyValuation();
+                  }))),
+              const SizedBox(height: 10),
+              two(f(_vWastage, 'Wastage %'), f(_vLabour, 'Labour ₹ / g')),
+              const SizedBox(height: 10),
+              two(
+                DropdownButtonFormField<String>(
+                  value: _vCert,
+                  isExpanded: true,
+                  style: const TextStyle(fontSize: 13.5, color: Colors.black87),
+                  decoration: billDec('Hallmark', amber),
+                  items: const [DropdownMenuItem(value: 'none', child: Text('None')), DropdownMenuItem(value: 'hallmarked', child: Text('Hallmarked')), DropdownMenuItem(value: 'huid', child: Text('HUID'))],
+                  onChanged: (x) => setState(() {
+                    _vCert = x ?? 'none';
+                    _applyValuation();
+                  }),
+                ),
+                _vCert == 'none' ? const SizedBox.shrink() : f(_vPieces, 'Pieces'),
+              ),
+              const SizedBox(height: 4),
+              const Align(alignment: Alignment.centerLeft, child: Text('Enter the rate per gram below (Metal & amount).', style: TextStyle(fontSize: 11, color: Colors.black45))),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(10), border: Border.all(color: amber.withValues(alpha: 0.35))),
+                child: Column(children: [
+                  for (final r in [
+                    ('Purity', '${v['purityPct']!.toStringAsFixed(2)} %'),
+                    ('Fine wt', '${v['fine']!.toStringAsFixed(3)} g'),
+                    ('Wastage wt (on ${bn[pr['wastage'] ?? 'net']})', '${v['wastageWt']!.toStringAsFixed(3)} g'),
+                    ('Final fine wt', '${v['finalFine']!.toStringAsFixed(3)} g'),
+                    ('Metal (${bn[pr['finalValuation'] ?? 'net']} ${v['valuationWt']!.toStringAsFixed(3)} g)', '₹${v['metalValuation']!.toStringAsFixed(2)}'),
+                    if (v['labourTotal']! > 0) ('Labour (on ${bn[pr['labourCharges'] ?? 'fine']})', '₹${v['labourTotal']!.toStringAsFixed(2)}'),
+                    if (v['hallmarkCharge']! > 0) ('Hallmark fee (not in the 3% amount)', '₹${v['hallmarkCharge']!.toStringAsFixed(2)}'),
+                    if (v['hallmarkGst']! > 0) ('GST on the hallmark fee', '₹${v['hallmarkGst']!.toStringAsFixed(2)}'),
+                  ])
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 1.5), child: Row(children: [Expanded(child: Text(r.$1, style: const TextStyle(fontSize: 12, color: Colors.black54))), Text(r.$2, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))])),
+                  const Divider(height: 12),
+                  Row(children: [const Expanded(child: Text('Taxable amount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: amber))), Text('₹${v['goodsTaxable']!.toStringAsFixed(2)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: amber))]),
+                ]),
+              ),
+            ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -387,6 +550,9 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                 decoration: _dec('Supplier GSTIN', Icons.verified_outlined),
               ),
             ]),
+            const SizedBox(height: 10),
+
+            _valuationCard(),
             const SizedBox(height: 10),
 
             // ── 2. Metal & Amount ───────────────────────────────────────────
@@ -621,8 +787,8 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
   // ── Invoice Total (taxable + GST, rounded) — stacked to avoid overflow ──
   Widget _invoiceTotalRow() {
     final taxable = double.tryParse(_taxableCtrl.text) ?? 0;
-    final gstAmt = _gst?.totalGst ?? (taxable * 0.03);
-    final total = (taxable + gstAmt).roundToDouble();
+    final gstAmt = (_gst?.totalGst ?? (taxable * 0.03)) + _hallGst;
+    final total = _hallFee > 0 ? taxable + gstAmt + _hallFee : (taxable + gstAmt).roundToDouble();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
@@ -634,10 +800,10 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Taxable + GST',
+            Text(_hallFee > 0 ? 'Taxable + GST + hallmark fee' : 'Taxable + GST',
                 style: TextStyle(fontSize: 10, color: Colors.grey[600])),
             const SizedBox(height: 1),
-            Text('₹${_fmtN(taxable)} + ₹${_fmtN(gstAmt)}',
+            Text('₹${_fmtN(taxable)} + ₹${_fmtN(gstAmt)}${_hallFee > 0 ? ' + ₹${_fmtN(_hallFee)}' : ''}',
                 style: TextStyle(fontSize: 11, color: Colors.grey[700])),
           ]),
         ),
@@ -703,6 +869,12 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
             ] else
               _r2('IGST ${g.igstRate?.toStringAsFixed(1)}%',
                   '+₹${_fmtN(g.igstAmount ?? 0)}', Colors.purple),
+            if (_hallFee > 0) ...[
+              const SizedBox(height: 2),
+              _r2('Hallmark fee', '+₹${_fmtN(_hallFee)}', Colors.grey[800]!),
+              const SizedBox(height: 2),
+              _r2('GST on hallmark fee', '+₹${_fmtN(_hallGst)}', Colors.indigo),
+            ],
             const Divider(height: 14),
 
             // Invoice Total
@@ -711,7 +883,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const Spacer(),
               Text(
-                '₹${_fmtN(g.totalPayable.roundToDouble())}',
+                '₹${_fmtN(_hallFee > 0 ? g.totalPayable + _hallFee + _hallGst : g.totalPayable.roundToDouble())}',
                 style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -722,7 +894,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
               const SizedBox(height: 4),
               _r2('TDS ${g.tdsRate.toStringAsFixed(0)}% (194Q)',
                   '−₹${_fmtN(g.tdsAmount)}', Colors.orange),
-              _r2('Net Payable', '₹${_fmtN(g.netPayable)}', Colors.grey[900]!,
+              _r2('Net Payable', '₹${_fmtN(g.netPayable + _hallFee + _hallGst)}', Colors.grey[900]!,
                   bold: true),
             ],
             const Divider(height: 14),
@@ -744,7 +916,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                         color: Colors.grey[700],
                         fontWeight: FontWeight.w600)),
                 const Spacer(),
-                Text('₹${_fmtN(g.totalItc)}',
+                Text('₹${_fmtN(g.totalItc + _hallGst)}',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -758,7 +930,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
               Icon(Icons.check_circle_outline,
                   size: 12, color: Colors.green.shade600),
               const SizedBox(width: 5),
-              Text('Effective inventory cost: ₹${_fmtN(g.effectiveCost)}',
+              Text('Effective inventory cost: ₹${_fmtN(g.effectiveCost + _hallFee)}',
                   style: TextStyle(fontSize: 10, color: Colors.green.shade700)),
             ]),
           ]),

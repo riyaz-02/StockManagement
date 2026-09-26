@@ -42,6 +42,18 @@ class StorageService {
     await prefs.remove(_keyUser);
   }
 
+  // Branch an admin switched to (see ApiService.activeBranch)
+  Future<void> saveBranch(String id, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('active_branch', id);
+    await prefs.setString('active_branch_name', name);
+  }
+
+  Future<(String, String)> getBranch() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getString('active_branch') ?? '', prefs.getString('active_branch_name') ?? '');
+  }
+
   // Language preference
   Future<void> saveLanguage(String language) async {
     final prefs = await SharedPreferences.getInstance();

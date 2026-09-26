@@ -41,4 +41,5 @@ saleSchema.index({ itemId: 1 });
 saleSchema.index({ mobile: 1 });
 saleSchema.index({ saleDate: -1 });
 
+saleSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('Sale', saleSchema);

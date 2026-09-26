@@ -25,6 +25,30 @@ const generateBarcode = async () => {
 // @desc    Create new item
 // @route   POST /api/items
 // @access  Private
+// Optional billing detail sent with an item (only what was sent is changed)
+const NUM_EXTRAS = ['grossWeight', 'lessWeight', 'stoneValue', 'makingCharge', 'wastage', 'custWastage', 'labourRate', 'makingRate'];
+const TXT_EXTRAS = ['stoneNote', 'supplier', 'size'];
+function pickExtras(body) {
+    const out = {};
+    for (const k of NUM_EXTRAS) {
+        if (body[k] === undefined) continue;
+        if (body[k] === null || body[k] === '' || body[k] === 'null') { out[k] = null; continue; }
+        const n = Number(body[k]);
+        if (Number.isFinite(n) && n >= 0) out[k] = n;
+    }
+    for (const k of TXT_EXTRAS) if (body[k] !== undefined) out[k] = String(body[k] || '').trim().slice(0, 120);
+    return out;
+}
+
+// Free the box slot an item occupies (used when it moves)
+async function freeItemSlot(item) {
+    if (!item.containerId || !item.slotNumber) return;
+    const c = await Container.findById(item.containerId);
+    if (!c) return;
+    const slot = c.slots.find((s) => s.slotNumber === item.slotNumber);
+    if (slot && String(slot.itemId) === String(item._id)) { slot.itemId = null; slot.reserved = false; await c.save(); }
+}
+
 exports.createItem = async (req, res) => {
     try {
         const {
@@ -45,6 +69,7 @@ exports.createItem = async (req, res) => {
             slotNumber,
             status
         } = req.body;
+        const extra = pickExtras(req.body);
 
         // Helper to extract images
         let imagePaths = [];
@@ -94,11 +119,13 @@ exports.createItem = async (req, res) => {
         // Try to auto-assign a container only when one hasn't been explicitly provided
         // This is best-effort: if no container is available the item is saved without one
         if (!containerId || !slotNumber) {
+            // boxes of the branch the item is being filed under only (an admin sees every branch)
+            const branchNow = (require('../utils/branchScope').current() || {}).branchId || 'main';
             const containers = await Container.find({
                 isActive: true,
-                $or: [
-                    { allowedItemTypes: itemType },
-                    { allowedItemTypes: { $size: 0 } }
+                $and: [
+                    require('../utils/branchScope').matchFor([branchNow]),
+                    { $or: [{ allowedItemTypes: itemType }, { allowedItemTypes: { $size: 0 } }] }
                 ]
             });
 
@@ -151,7 +178,8 @@ exports.createItem = async (req, res) => {
             images: imagePaths,
             containerId: assignedContainerId,
             slotNumber: assignedSlotNumber,
-            status: status || 'active'
+            status: status || 'active',
+            ...extra
         });
 
         // Update container slot
@@ -378,8 +406,11 @@ exports.updateItem = async (req, res) => {
             images,
             status,
             barcode,
-            keptImages
+            keptImages,
+            containerId: newContainerId,
+            slotNumber: newSlotNumber
         } = req.body;
+        const extra = pickExtras(req.body);
 
 
 
@@ -477,6 +508,40 @@ exports.updateItem = async (req, res) => {
         if (certificationType !== undefined) item.certificationType = certificationType;
         if (huidNumber !== undefined) item.huidNumber = huidNumber;
         if (status) item.status = status;
+        Object.assign(item, extra);
+
+        // Move to another box / slot (or take out of a box) only when the app asked for it
+        if (newContainerId !== undefined) {
+            const wantId = newContainerId ? String(newContainerId) : null;
+            const wantSlot = newSlotNumber ? Number(newSlotNumber) : null;
+            const sameBox = (item.containerId ? String(item.containerId) : null) === wantId;
+            if (!sameBox || (wantId && wantSlot && wantSlot !== item.slotNumber)) {
+                if (wantId) {
+                    const target = await Container.findById(wantId);
+                    if (!target || target.isActive === false || target.isDeleted) {
+                        return res.status(400).json({ success: false, message: 'That box is not available' });
+                    }
+                    if (target.isLocked) {
+                        return res.status(400).json({ success: false, message: 'That box is locked' });
+                    }
+                    const slot = wantSlot
+                        ? target.slots.find((s) => s.slotNumber === wantSlot)
+                        : target.slots.find((s) => !s.itemId && !s.reserved);
+                    if (!slot || (slot.itemId && String(slot.itemId) !== String(item._id)) || slot.reserved) {
+                        return res.status(400).json({ success: false, message: 'No free slot in that box' });
+                    }
+                    await freeItemSlot(item);
+                    slot.itemId = item._id;
+                    await target.save();
+                    item.containerId = target._id;
+                    item.slotNumber = slot.slotNumber;
+                } else {
+                    await freeItemSlot(item);
+                    item.containerId = null;
+                    item.slotNumber = null;
+                }
+            }
+        }
 
         await item.save();
 

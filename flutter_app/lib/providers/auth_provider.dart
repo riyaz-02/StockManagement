@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import '../services/secure_credential_storage.dart';
+import '../services/biometric_auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final StorageService _storage = StorageService();
+  final SecureCredentialStorage _credentialStorage = SecureCredentialStorage();
 
   User? _user;
   String? _token;
@@ -25,6 +28,34 @@ class AuthProvider with ChangeNotifier {
   bool can(String key) {
     if (_user?.hasFullAccess == true) return true;
     return _permissions[key] ?? false;
+  }
+
+  /// May switch between branches (sees the whole firm by default).
+  bool get canSwitchBranch => can('branches.viewAll') || can('billing.viewAllBranches');
+
+  String _branchName = '';
+
+  /// Name of the branch switched to, or '' for the whole firm.
+  String get activeBranchName => _branchName;
+
+  /// Work as one branch ('' = whole firm). Screens opened afterwards load that branch's stock and invoices; new records
+  /// (invoices, items) are filed under it.
+  Future<void> setActiveBranch(String id, String name) async {
+    ApiService.activeBranch = id;
+    _branchName = id.isEmpty ? '' : name;
+    await _storage.saveBranch(id, _branchName);
+    notifyListeners();
+  }
+
+  Future<void> _restoreBranch() async {
+    if (!canSwitchBranch) {
+      ApiService.activeBranch = '';
+      _branchName = '';
+      return;
+    }
+    final (id, name) = await _storage.getBranch();
+    ApiService.activeBranch = id;
+    _branchName = id.isEmpty ? '' : name;
   }
 
   Future<void> _fetchPermissions() async {
@@ -57,6 +88,7 @@ class AuthProvider with ChangeNotifier {
         if (userData != null) {
           _user = User.fromJson(userData);
           await _fetchPermissions();
+          await _restoreBranch();
         }
       }
     } catch (e) {
@@ -107,8 +139,75 @@ class AuthProvider with ChangeNotifier {
     _user = null;
     _token = null;
     _permissions = {};
+    ApiService.activeBranch = '';
+    ApiService.activeGstin = '';
+    _branchName = '';
     await _storage.clearAll();
+    // Forget saved fingerprint-login credentials — this device may be
+    // shared by other staff, so a logout shouldn't leave a shortcut that
+    // logs the next person straight back into this account.
+    await _credentialStorage.clearCredentials();
     notifyListeners();
+  }
+
+  // ── Biometric login ──────────────────────────────────────────────────
+  Future<bool> isBiometricAvailable() => BiometricAuthService().isDeviceSupported();
+
+  Future<bool> hasSavedBiometricCredentials() => _credentialStorage.hasCredentials();
+
+  Future<void> saveBiometricCredentials(String mobile, String password) =>
+      _credentialStorage.saveCredentials(mobile, password);
+
+  Future<bool> biometricPromptWasDismissed() => _credentialStorage.wasPromptDismissed();
+
+  Future<void> setBiometricPromptDismissed() =>
+      _credentialStorage.setPromptDismissed(true);
+
+  Future<void> forgetBiometricCredentials() => _credentialStorage.clearCredentials();
+
+  /// Prompts the fingerprint/face sensor, then logs in with the stored
+  /// credentials. Returns 'success', 'biometric_failed', 'no_credentials',
+  /// 'invalid_credentials' (stored password no longer works — cleared), or
+  /// 'network_error' (kept, since that's not the stored password's fault).
+  Future<String> loginWithBiometrics() async {
+    final creds = await _credentialStorage.getCredentials();
+    if (creds == null) return 'no_credentials';
+
+    final authenticated = await BiometricAuthService().authenticate();
+    if (!authenticated) return 'biometric_failed';
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.login(creds['mobile']!, creds['password']!);
+
+      if (response['success'] == true) {
+        _token = response['data']['token'];
+        _user = User.fromJson(response['data']['user']);
+        await _storage.saveToken(_token!);
+        await _storage.saveUser(response['data']['user']);
+        await _fetchPermissions();
+        _isLoading = false;
+        notifyListeners();
+        return 'success';
+      } else {
+        // Server rejected the stored credentials (password changed, account
+        // deactivated, etc.) — forget them so we stop offering a fingerprint
+        // shortcut that can no longer work.
+        await _credentialStorage.clearCredentials();
+        _error = response['message'] ?? 'Login failed';
+        _isLoading = false;
+        notifyListeners();
+        return 'invalid_credentials';
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return 'network_error';
+    }
   }
 
   // Update language

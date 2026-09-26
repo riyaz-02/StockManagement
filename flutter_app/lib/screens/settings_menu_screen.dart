@@ -1,10 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import '../utils/app_colors.dart';
 import 'item_settings_screen.dart';
+import 'stock_setting_screen.dart';
 import 'container_settings_screen.dart';
 import 'tag_printing_screen.dart';
 import 'recycle_bin_screen.dart';
@@ -15,7 +14,6 @@ import 'gst_config_screen.dart';
 import 'app_update_settings_screen.dart';
 import 'send_notification_screen.dart';
 import 'role_permission_manager_screen.dart';
-import '../utils/app_toast.dart';
 
 class SettingsMenuScreen extends StatelessWidget {
   const SettingsMenuScreen({super.key});
@@ -24,9 +22,9 @@ class SettingsMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
+    final isFullAccess = authProvider.user?.hasFullAccess == true;
 
-    // Check if user is admin
-    if (authProvider.user?.hasFullAccess != true) {
+    if (!isFullAccess) {
       return Scaffold(
         appBar: AppBar(title: Text(languageProvider.t('settings'))),
         body: const Center(
@@ -51,10 +49,10 @@ class SettingsMenuScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7F7FA),
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF7F7FA),
         foregroundColor: const Color(0xFF1A1A1A),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -75,218 +73,157 @@ class SettingsMenuScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          // Account Settings (All Users)
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('account_settings'),
-            icon: Icons.account_circle_outlined,
-            color: Colors.teal,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AccountSettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-
-          // Manage Users (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: languageProvider.t('manage_users'),
-              icon: Icons.people_outline,
-              color: Colors.indigo,
-              onTap: () {
-                Navigator.push(
+          _SettingsSection(
+            label: 'Account',
+            accentColor: const Color(0xFF0D9488),
+            rows: [
+              _SettingsRow(
+                title: languageProvider.t('account_settings'),
+                subtitle: 'Profile, password, fingerprint login',
+                icon: Icons.account_circle_outlined,
+                onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
+                  MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+                ),
+              ),
+            ],
+          ),
 
-          // Roles & Permissions (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: 'Roles & Permissions',
-              subtitle: 'Configure what each role can do',
-              icon: Icons.admin_panel_settings_outlined,
-              color: Colors.deepPurple,
-              onTap: () {
-                Navigator.push(
+          _SettingsSection(
+            label: 'Inventory',
+            accentColor: const Color(0xFF2563EB),
+            rows: [
+              _SettingsRow(
+                title: languageProvider.t('item_settings'),
+                subtitle: 'Stock types, metals, and purity options',
+                icon: Icons.inventory_2_outlined,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ItemSettingsScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: 'Stock Setting',
+                subtitle: 'Valuation, wastage, labour, sell, purchase and old metal rules',
+                icon: Icons.tune_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StockSettingScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: languageProvider.t('container_settings'),
+                subtitle: 'Container types, weight categories, layouts',
+                icon: Icons.inventory_outlined,
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const RolePermissionManagerScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
-
-          // Action Needed Items (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: 'Action Needed Items',
-              subtitle: 'Review items added via quick-scan',
-              icon: Icons.pending_actions_rounded,
-              color: const Color(0xFFFF6B35),
-              onTap: () {
-                Navigator.push(
+                      builder: (_) => const ContainerSettingsScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: languageProvider.t('tag_printing'),
+                subtitle: 'Print barcode tags and view print history',
+                icon: Icons.print_outlined,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TagPrintingScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: 'Action Needed Stock',
+                subtitle: 'Review stock added via quick-scan',
+                icon: Icons.pending_actions_outlined,
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ActionNeededItemsScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
+                ),
+              ),
+              _SettingsRow(
+                title: languageProvider.t('recycle_bin'),
+                subtitle: 'View and restore deleted stock',
+                icon: Icons.delete_outline,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
+                ),
+              ),
+            ],
+          ),
 
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('item_settings'),
-            subtitle: 'Manage item types, metals, and purity options',
-            icon: Icons.inventory,
-            color: Colors.blue,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ItemSettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12), // Reduced from 16
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('container_settings'),
-            subtitle: 'Manage container types, weight categories, and layouts',
-            icon: Icons.inventory_2,
-            color: Colors.green,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const ContainerSettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12), // Reduced from 16
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('tag_printing'),
-            subtitle: 'Print barcode tags and view print history',
-            icon: Icons.print,
-            color: Colors.pink,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TagPrintingScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12), // Reduced from 16
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('recycle_bin'),
-            subtitle: 'View and restore deleted items', // Modified subtitle
-            icon: Icons.delete_outline,
-            color: Colors.orange, // Modified color
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          // GST Configuration (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: 'GST Configuration',
-              subtitle: 'GSTIN, PAN, HSN code and tax rates',
-              icon: Icons.percent_rounded,
-              color: const Color(0xFF059669),
-              onTap: () {
-                Navigator.push(
+          _SettingsSection(
+            label: 'Store & Billing',
+            accentColor: const Color(0xFF059669),
+            rows: [
+              _SettingsRow(
+                title: 'GST Configuration',
+                subtitle: 'GSTIN, PAN, HSN code and tax rates',
+                icon: Icons.percent_rounded,
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const GstConfigScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
+                ),
+              ),
+            ],
+          ),
 
-          // Send Notification (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: 'Send Notification',
-              subtitle: 'Push a message to all users or a specific role',
-              icon: Icons.campaign_outlined,
-              color: const Color(0xFF2563EB),
-              onTap: () {
-                Navigator.push(
+          _SettingsSection(
+            label: 'Administration',
+            accentColor: const Color(0xFF4F46E5),
+            rows: [
+              _SettingsRow(
+                title: languageProvider.t('manage_users'),
+                subtitle: 'Add, edit, and manage staff accounts',
+                icon: Icons.people_outline,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: 'Roles & Permissions',
+                subtitle: 'Configure what each role can do',
+                icon: Icons.admin_panel_settings_outlined,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RolePermissionManagerScreen()),
+                ),
+              ),
+            ],
+          ),
+
+          _SettingsSection(
+            label: 'Notifications & Updates',
+            accentColor: const Color(0xFF7C3AED),
+            rows: [
+              _SettingsRow(
+                title: 'Send Notification',
+                subtitle: 'Push a message to all users or a specific role',
+                icon: Icons.campaign_outlined,
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const SendNotificationScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
-
-          // App Update Settings (Admin Only)
-          if (authProvider.user?.hasFullAccess == true)
-            _buildSettingCard(
-              context,
-              languageProvider: languageProvider,
-              title: 'App Update Settings',
-              subtitle: 'Control the update-available popup users see',
-              icon: Icons.system_update_outlined,
-              color: const Color(0xFF7C3AED),
-              onTap: () {
-                Navigator.push(
+                ),
+              ),
+              _SettingsRow(
+                title: 'App Update Settings',
+                subtitle: 'Control the update-available popup users see',
+                icon: Icons.system_update_outlined,
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const AppUpdateSettingsScreen()),
-                );
-              },
-            ),
-          if (authProvider.user?.hasFullAccess == true)
-            const SizedBox(height: 12),
-          _buildSettingCard(
-            context,
-            languageProvider: languageProvider,
-            title: languageProvider.t('system_settings'),
-            subtitle: 'Configure system preferences and defaults',
-            icon: Icons.settings,
-            color: Colors.purple,
-            onTap: () {
-              showAppSnackBar(
-                context,
-                const SnackBar(content: Text('Coming soon!')),
-              );
-            },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          // Copyright footer
+
+          const SizedBox(height: 12),
           Text(
             '© Laltu Guinea Palace',
             textAlign: TextAlign.center,
@@ -294,85 +231,148 @@ class SettingsMenuScreen extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Version 1.2.0',
+            'Version 1.3.0',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11, color: Colors.grey[400]),
           ),
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSettingCard(
-    BuildContext context, {
-    required LanguageProvider languageProvider,
-    required String title,
-    String? subtitle, // Made optional but not used
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.7),
-                Colors.white.withOpacity(0.3),
+/// One labeled group of settings rows, rendered as a single flat card so
+/// related options read as one unit instead of N separately-styled cards.
+class _SettingsSection extends StatelessWidget {
+  final String label;
+  final Color accentColor;
+  final List<_SettingsRow> rows;
+
+  const _SettingsSection({
+    required this.label,
+    required this.accentColor,
+    required this.rows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: Colors.grey[500],
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.withOpacity(0.12)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
+            child: Column(
+              children: [
+                for (int i = 0; i < rows.length; i++) ...[
+                  _SettingsTile(row: rows[i], accentColor: accentColor),
+                  if (i != rows.length - 1)
+                    Divider(
+                      height: 1,
+                      indent: 60,
+                      color: Colors.grey.withOpacity(0.12),
+                    ),
+                ],
+              ],
+            ),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(10), // Reduced from 12
-                child: Row(
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsRow {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _SettingsRow({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+}
+
+class _SettingsTile extends StatelessWidget {
+  final _SettingsRow row;
+  final Color accentColor;
+
+  const _SettingsTile({required this.row, required this.accentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: row.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(row.icon, color: accentColor, size: 19),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40, // Reduced from 48
-                      height: 40, // Reduced from 48
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child:
-                          Icon(icon, color: color, size: 22), // Reduced from 24
-                    ),
-                    const SizedBox(width: 12), // Reduced from 16
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15, // Reduced from 16
-                          fontWeight: FontWeight.bold,
-                        ),
+                    Text(
+                      row.title,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
                       ),
                     ),
-                    Icon(Icons.chevron_right,
-                        color: Colors.grey[400], size: 20),
+                    const SizedBox(height: 2),
+                    Text(
+                      row.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
+              Icon(Icons.chevron_right, color: Colors.grey[350], size: 20),
+            ],
           ),
         ),
       ),

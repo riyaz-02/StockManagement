@@ -18,12 +18,34 @@ class _LoginScreenState extends State<LoginScreen> {
   final _mobileController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _showBiometricButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricAvailability();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final available = await authProvider.isBiometricAvailable();
+    final hasSaved = await authProvider.hasSavedBiometricCredentials();
+    if (mounted) {
+      setState(() => _showBiometricButton = available && hasSaved);
+    }
+  }
 
   @override
   void dispose() {
     _mobileController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _goToHome() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+    );
   }
 
   Future<void> _handleLogin() async {
@@ -36,9 +58,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
+        await _maybeOfferBiometricEnrollment(authProvider);
+        if (mounted) _goToHome();
       } else if (mounted) {
         showAppSnackBar(
           context,
@@ -51,6 +72,91 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _maybeOfferBiometricEnrollment(AuthProvider authProvider) async {
+    final alreadySaved = await authProvider.hasSavedBiometricCredentials();
+    if (alreadySaved) return;
+
+    final dismissedBefore = await authProvider.biometricPromptWasDismissed();
+    if (dismissedBefore) return;
+
+    final available = await authProvider.isBiometricAvailable();
+    if (!available || !mounted) return;
+
+    final enable = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enable fingerprint login?'),
+        content: const Text(
+          'Log in faster next time using your fingerprint or face instead of typing your password.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE94560),
+            ),
+            child: const Text('Enable', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (enable == true) {
+      await authProvider.saveBiometricCredentials(
+        _mobileController.text.trim(),
+        _passwordController.text,
+      );
+    } else {
+      await authProvider.setBiometricPromptDismissed();
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final result = await authProvider.loginWithBiometrics();
+
+    if (!mounted) return;
+
+    switch (result) {
+      case 'success':
+        _goToHome();
+        break;
+      case 'biometric_failed':
+      case 'no_credentials':
+        // Silent — user can just fall back to the password fields.
+        break;
+      case 'invalid_credentials':
+        setState(() => _showBiometricButton = false);
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(
+                authProvider.error ?? 'Please log in with your password again'),
+            backgroundColor: const Color(0xFFE94560),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        break;
+      default:
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(authProvider.error ?? 'Login failed'),
+            backgroundColor: const Color(0xFFE94560),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
     }
   }
 
@@ -401,6 +507,41 @@ class _LoginScreenState extends State<LoginScreen> {
                                       );
                                     },
                                   ),
+                                  if (_showBiometricButton) ...[
+                                    const SizedBox(height: 14),
+                                    Center(
+                                      child: InkWell(
+                                        onTap: _handleBiometricLogin,
+                                        borderRadius: BorderRadius.circular(30),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: const Color(0xFFE94560)
+                                                .withOpacity(0.1),
+                                            border: Border.all(
+                                              color: const Color(0xFFE94560)
+                                                  .withOpacity(0.3),
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.fingerprint,
+                                            color: Color(0xFFE94560),
+                                            size: 30,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Login with fingerprint',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 8),
                                 ],
                               ),

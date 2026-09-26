@@ -272,9 +272,13 @@ tallySessionSchema.methods.getMetalData = function (metalType) {
 };
 
 // Index for faster queries
+// frozen when the tally is locked: pieces that were not found (with their box and slot) and pieces sold while it ran
+tallySessionSchema.add({ missingAtLock: { type: [mongoose.Schema.Types.Mixed], default: [] }, soldSinceLock: { type: [mongoose.Schema.Types.Mixed], default: [] } });
+
 tallySessionSchema.index({ status: 1, createdAt: -1 });
 tallySessionSchema.index({ createdBy: 1, date: -1 });
 tallySessionSchema.index({ 'scannedItemIds': 1 });
 tallySessionSchema.index({ 'items.itemId': 1 });
 
+tallySessionSchema.plugin(require('../utils/branchScope').branchPlugin);
 module.exports = mongoose.model('TallySession', tallySessionSchema);

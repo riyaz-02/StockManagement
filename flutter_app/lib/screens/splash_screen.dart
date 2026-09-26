@@ -1,7 +1,7 @@
+import '../services/server_health.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:jewellery_stock_app/providers/auth_provider.dart';
@@ -12,7 +12,6 @@ import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
 import 'package:jewellery_stock_app/services/api_service.dart';
 import 'package:jewellery_stock_app/models/app_version_model.dart';
 import 'package:jewellery_stock_app/widgets/update_dialog.dart';
-import 'package:jewellery_stock_app/utils/app_constants.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -51,17 +50,8 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  /// Returns true if the server is reachable (any HTTP response code < 500).
-  Future<bool> _isServerOnline() async {
-    try {
-      final response = await http
-          .get(Uri.parse(AppConstants.healthCheckUrl))
-          .timeout(const Duration(seconds: 5));
-      return response.statusCode < 500;
-    } catch (_) {
-      return false;
-    }
-  }
+  /// Is the server ready? Retries a few times (a slow first connection must not read as "server off").
+  Future<bool> _isServerOnline() async => (await ServerHealth.check(attempts: 3)) == ServerState.online;
 
   Future<void> _loadAppVersionText() async {
     try {
@@ -101,6 +91,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Initialize language (local, fast) and check server in parallel with splash delay
     await languageProvider.initialize();
+    await ServerHealth.restore();
     unawaited(_loadAppVersionText());
 
     final results = await Future.wait([
