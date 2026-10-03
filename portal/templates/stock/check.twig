@@ -1,0 +1,29 @@
+{% set rec = d.reconciliation|default({}) %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Check the stock</h2>
+            <p class="muted">What came in (purchases and old / raw metal) against what is in the shop, was sold on bills and was wasted. A small difference is normal; a large one usually means bulk metal is not entered yet.</p>
+        </div>
+        {% if d.anyAlert %}<span class="pill pill-red">Check needed</span>{% elseif rec|length %}<span class="pill pill-green">Balanced</span>{% endif %}
+    </div>
+    {% if rec|length %}
+    <div class="panel-body check-grid">
+        {% for metal, m in rec %}
+        <div class="check-card">
+            <h3>{{ metal|capitalize }}</h3>
+            <div class="kv-row"><span>Bought (× {{ m.multiplierUsed|number_format(2) }})</span><strong>{{ m.adjustedPurchase|grams }}</strong></div>
+            <div class="kv-row"><span>Old and raw metal taken in</span><strong>{{ (m.oldMetalReceived|default(0) + m.rawMetalBought|default(0))|grams }}</strong></div>
+            <div class="kv-row"><span>In the shop: pieces</span><strong>{{ m.barcodedStock|default(0)|grams }}</strong></div>
+            <div class="kv-row"><span>In the shop: bulk stock</span><strong>{{ m.bulkStock|default(0)|grams }}</strong></div>
+            <div class="kv-row"><span>Sold on bills</span><strong>{{ m.totalSold|default(0)|grams }}</strong></div>
+            <div class="kv-row"><span>Wastage</span><strong>{{ m.totalWastage|default(0)|grams }}</strong></div>
+            <div class="kv-row"><span>Difference</span><strong class="{{ m.hasAlert ? 'neg' : 'pos' }}">{{ m.discrepancy|grams }}</strong></div>
+            {% if m.alertMessage %}<p class="muted">{{ m.alertMessage }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel-body"><p class="muted">The check is not available right now.</p></div>
+    {% endif %}
+</section>

@@ -1,0 +1,15 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.expenses') }}{% endblock %}
+{% block heading %}{{ t('nav.expenses') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ t('nav.expenses') }}</h1><p class="muted">Tea, salary, rent and the other running costs.</p></div>
+    <div class="actions">
+        {% if can('expenses.create') %}<button class="btn btn-primary" type="button" hx-get="/expenses/new" hx-target="#modal-body">{{ icon('plus', 17) }} Add expense</button>{% endif %}
+    </div>
+</div>
+<div class="live-block" hx-get="/expenses/list?quick={{ range.quick }}&from={{ range.from }}&to={{ range.to }}" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

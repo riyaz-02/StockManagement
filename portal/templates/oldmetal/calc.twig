@@ -1,0 +1,11 @@
+{% if calc %}
+<div class="kv calc">
+    <div class="kv-row"><span>Purity</span><strong>{{ calc.purityPct|number_format(2) }} %</strong></div>
+    <div class="kv-row"><span>Fine weight</span><strong>{{ calc.fine|grams }}</strong></div>
+    <div class="kv-row"><span>Final fine (after deduction)</span><strong>{{ calc.finalFine|grams }}</strong></div>
+    <div class="kv-row"><span>Valued on {{ calc.basis }} weight ({{ calc.valuationWt|grams }})</span><strong></strong></div>
+    <div class="kv-row total"><span>Value of the metal</span><strong class="pos">{{ calc.amount|inr }}</strong></div>
+</div>
+{% else %}
+<div class="muted small">Enter the weight and the rate to see the value.</div>
+{% endif %}

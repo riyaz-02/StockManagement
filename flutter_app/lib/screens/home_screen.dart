@@ -354,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
+                                    settings: const RouteSettings(name: 'Scan'),
                                     builder: (_) => const GeneralScanScreen()),
                               );
                             },
@@ -373,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'Stock'),
                                   builder: (_) => const ItemListScreen()),
                             ),
                           ),
@@ -391,6 +393,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'Boxes'),
                                   builder: (_) => const ContainerListScreen()),
                             ),
                           ),
@@ -409,6 +412,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'Stock Tally'),
                                   builder: (_) => const TallyListScreen()),
                             ),
                           ),
@@ -427,6 +431,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'Bookings'),
                                   builder: (_) => const BookingListScreen()),
                             ),
                           ),
@@ -443,6 +448,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
+                                settings: const RouteSettings(name: 'Reports'),
                                 builder: (_) => const ReportsScreen()),
                           ),
                         ),
@@ -458,6 +464,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
+                                settings: const RouteSettings(name: 'Store'),
                                 builder: (_) => const StoreManagementScreen()),
                           ),
                         ),
@@ -474,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFFFBBF24),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const BillingScreen()),
+                              MaterialPageRoute(settings: const RouteSettings(name: 'GST Billing'), builder: (_) => const BillingScreen()),
                             ),
                           ),
                         ),
@@ -490,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             secondaryColor: const Color(0xFF818CF8),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const GstSummaryScreen()),
+                              MaterialPageRoute(settings: const RouteSettings(name: 'GST Summary'), builder: (_) => const GstSummaryScreen()),
                             ),
                           ),
                         ),
@@ -504,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Old gold, silver & raw metal',
                             primaryColor: const Color(0xFFB45309),
                             secondaryColor: const Color(0xFFF59E0B),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OldMetalScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Old Metal'), builder: (_) => const OldMetalScreen())),
                           ),
                         ),
                       // ── Pending dues / Day Book / Expenses ─────────────
@@ -517,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Who owes you money',
                             primaryColor: const Color(0xFFDC2626),
                             secondaryColor: const Color(0xFFF87171),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PendingDuesScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Pending dues'), builder: (_) => const PendingDuesScreen())),
                           ),
                         ),
                       if (authProvider.can('orders.view'))
@@ -529,7 +536,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Made-to-order pieces',
                             primaryColor: const Color(0xFF0E7490),
                             secondaryColor: const Color(0xFF67E8F9),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Orders'), builder: (_) => const OrdersScreen())),
                           ),
                         ),
                       if (authProvider.can('estimates.view'))
@@ -541,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Quote a price',
                             primaryColor: const Color(0xFF7C3AED),
                             secondaryColor: const Color(0xFFC4B5FD),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EstimatesScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Estimates'), builder: (_) => const EstimatesScreen())),
                           ),
                         ),
                       if (authProvider.can('daybook.view'))
@@ -553,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Money in and out',
                             primaryColor: const Color(0xFF0F766E),
                             secondaryColor: const Color(0xFF2DD4BF),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DayBookScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Day Book'), builder: (_) => const DayBookScreen())),
                           ),
                         ),
                       if (authProvider.can('expenses.view'))
@@ -565,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             description: 'Tea, salary, rent...',
                             primaryColor: const Color(0xFF7C3AED),
                             secondaryColor: const Color(0xFFA78BFA),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'Expenses'), builder: (_) => const ExpensesScreen())),
                           ),
                         ),
                       // ── User Directory card ────────────────────────────
@@ -582,6 +589,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'Customers & suppliers'),
                                   builder: (_) => const UserDirectoryScreen()),
                             ),
                           ),

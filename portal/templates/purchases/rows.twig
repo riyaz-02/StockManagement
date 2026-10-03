@@ -1,0 +1,15 @@
+{% for p in rows %}
+    <tr class="is-link" data-href="/purchases/{{ p._id }}">
+        <td><a class="row-link" href="/purchases/{{ p._id }}">{{ p.invoiceNumber }}</a><small>{{ p.invoiceDate|dmy }}</small></td>
+        <td class="strong">{{ p.biller }}<small>{{ p.billerGstin }}</small></td>
+        <td>{{ p.metalType|capitalize }}{% if p.description|default('') %}<small>{{ p.description }}</small>{% endif %}</td>
+        <td class="num">{{ p.quantity|grams }}</td>
+        <td class="num">{{ p.totalAmount|inr }}</td>
+        <td class="num hide-sm">{% if p.gstRecorded|default(true) %}{{ p.totalGst|inr }}{% else %}<span class="muted" title="Made on the old website: its GST was not recorded, so no GST or input credit is counted">not recorded</span>{% endif %}</td>
+        <td class="num strong">{{ p.totalPayable|inr }}{% if p.tdsApplicable|default(false) %}<small>TDS {{ p.tdsAmount|default(0)|inr }} · net {{ p.netPayable|default(0)|inr }}</small>{% endif %}</td>
+    </tr>
+{% endfor %}
+{% if pg.hasMore|default(false) %}
+    <tr id="pur-more"><td colspan="7" class="more-cell"><button class="btn" type="button"
+        hx-get="/purchases/list?{{ {metal: metal, q: q, from: from, to: to, page: page + 1}|filter(v => v != '')|url_encode }}" hx-target="#pur-more" hx-swap="outerHTML">Show more</button></td></tr>
+{% endif %}

@@ -1,0 +1,42 @@
+{% extends 'app.twig' %}
+{% block title %}Reports{% endblock %}
+{% block heading %}Reports{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Reports</h1><p class="muted">How the shop stands today: stock, sales this month and what customers owe.</p></div>
+    <div class="actions">{% if can('gst.viewReports') %}<a class="btn" href="/gst">Full GST Summary</a>{% endif %}</div></div>
+
+{% if sales.totals is defined %}
+<h2 class="section-title" style="margin-top: 4px">Sales this month ({{ from|dmy }} to {{ to|dmy }})</h2>
+<div class="stats">
+    <div class="stat"><span>Bills</span><strong>{{ sales.totals.invoices }}</strong></div>
+    <div class="stat"><span>Sales (with GST)</span><strong>{{ sales.totals.invoiceValue|inr(0) }}</strong></div>
+    <div class="stat"><span>GST collected</span><strong>{{ sales.totals.tax|inr(0) }}</strong></div>
+    <div class="stat"><span>Making charges</span><strong>{{ sales.totals.making|inr(0) }}</strong></div>
+</div>
+<section class="panel"><div class="panel-head"><h2>By metal</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Metal</th><th class="num">Weight sold</th><th class="num">Metal value</th><th class="num">Making</th><th class="num">Total</th></tr></thead>
+        <tbody>{% for m in sales.byMetal %}<tr><td class="strong">{{ m.metal }}</td><td class="num">{{ m.weight|grams }}</td><td class="num">{{ m.metalValue|inr(0) }}</td><td class="num">{{ m.making|inr(0) }}</td><td class="num strong">{{ m.total|inr(0) }}</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+{% endif %}
+
+<h2 class="section-title">Stock today</h2>
+<div class="stats">
+    {% for m in stock.currentStockMetalBreakdown|default([]) %}
+        <div class="stat"><span>{{ m.metal|capitalize }} in stock</span><strong>{{ m.weight|grams }}</strong><small>{{ m.count }} pieces</small></div>
+    {% endfor %}
+    <div class="stat"><span>Pieces sold today</span><strong>{{ today.today.sold|default(0) }}</strong><small>{{ today.today.bookings|default(0) }} booked · {{ today.today.sentToRepair|default(0) }} to repair</small></div>
+    <div class="stat"><span>Boxes</span><strong>{{ stock.totalContainers|default(0) }}</strong><small>{{ stock.totalTallies|default(0) }} tallies done{% if stock.activeTallies|default(0) > 0 %} · {{ stock.activeTallies }} running{% endif %}</small></div>
+</div>
+<section class="panel"><div class="panel-head"><h2>Every piece by state</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>State</th><th>Metal</th><th class="num">Pieces</th><th class="num">Weight</th></tr></thead>
+        <tbody>{% for d in stock.detailedBreakdown|default([]) %}<tr><td class="strong">{{ {active: 'In stock', sold: 'Sold', deleted: 'Removed', booked: 'Booked'}[d.status]|default(d.status|pretty) }}</td><td>{{ d.metal|capitalize }}</td><td class="num">{{ d.count }}</td><td class="num">{{ d.weight|grams }}</td></tr>{% else %}<tr><td colspan="4" class="t-empty">No stock yet.</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+
+{% if dues.total is defined %}
+<h2 class="section-title">Owed by customers</h2>
+<div class="stats"><div class="stat"><span>Total due</span><strong class="neg">{{ dues.total|inr(0) }}</strong><small><a href="/dues">See who owes</a></small></div></div>
+{% endif %}
+{% endblock %}

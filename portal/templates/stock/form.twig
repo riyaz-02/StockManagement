@@ -1,0 +1,56 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% set editing = id is not null %}
+{% block title %}{{ editing ? 'Edit stock' : 'Add stock' }}{% endblock %}
+{% block heading %}{{ editing ? 'Edit stock' : 'Add stock' }}{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>{{ editing ? 'Edit ' ~ v.name|default('stock') : 'Add stock' }}</h1><p class="muted">{{ editing ? v.barcode|default('') : 'A barcode and the box are given automatically.' }}</p></div></div>
+<form method="post" action="{{ editing ? '/stock/' ~ id : '/stock' }}" class="bill-layout" data-no-enter novalidate
+      hx-post="/stock/calc" hx-target="#price" hx-swap="innerHTML" hx-trigger="input delay:400ms, change delay:200ms" hx-sync="this:replace">
+    {{ csrf_field() }}
+    <div class="bill-main">
+        {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+        <section class="panel"><div class="panel-head"><h2>Piece</h2></div><div class="panel-body"><div class="form-grid">
+            {{ ui.field('Name', 'name', v.name|default(''), {required: true, span: true, placeholder: 'e.g. Gold ring 22K'}) }}
+            {{ ui.field('Type', 'itemType', v.itemType|default('ring'), {type: 'select', options: opts.itemTypes|default(['ring'])}) }}
+            {{ ui.field('Metal', 'metalType', v.metalType|default('gold'), {type: 'select', options: opts.metalTypes|default(['gold', 'silver'])}) }}
+            {{ ui.field('Purity', 'purity', v.purity|default('22k'), {type: 'select', options: opts.purityOptions|default(['22k'])}) }}
+            {{ ui.field('Pieces', 'numberOfPieces', v.numberOfPieces|default(1), {type: 'number', step: '1', min: '1', inputmode: 'numeric'}) }}
+        </div></div></section>
+
+        <section class="panel"><div class="panel-head"><h2>Weight</h2></div><div class="panel-body"><div class="form-grid" data-net-calc>
+            {{ ui.field('Gross weight (g)', 'grossWeight', v.grossWeight|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+            {{ ui.field('Less: stone etc. (g)', 'lessWeight', v.lessWeight|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+            {{ ui.field('Net weight (g)', 'netWeight', v.netWeight|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal', required: true, hint: 'Filled from gross minus less. Type it if you only know the net.'}) }}
+        </div></div></section>
+
+        <section class="panel"><div class="panel-head"><h2>Hallmark</h2></div><div class="panel-body"><div class="form-grid">
+            <label class="field"><span>Hallmark</span>
+                <select name="certificationType">{% for k, label in certs %}<option value="{{ k }}"{{ k == v.certificationType|default('none') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
+            </label>
+            {{ ui.field('HUID (6 letters/digits)', 'huidNumber', v.huidNumber|default(''), {}) }}
+        </div></div></section>
+
+        <section class="panel"><div class="panel-head"><h2>Price rules</h2></div><div class="panel-body"><div class="form-grid">
+            {{ ui.field('Wastage %', 'wastage', v.wastage|default(''), {type: 'number', step: '0.01', min: '0', inputmode: 'decimal'}) }}
+            {{ ui.field('Customer wastage %', 'custWastage', v.custWastage|default(''), {type: 'number', step: '0.01', min: '0', inputmode: 'decimal'}) }}
+            {{ ui.field('Labour per gram', 'labourRate', v.labourRate|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+            {{ ui.field('Making per gram', 'makingRate', v.makingRate|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+            {{ ui.field('Fixed making charge', 'fixedMaking', v.fixedMaking|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal', hint: 'Added on top of labour and making. Billing starts from this making charge.'}) }}
+            {{ ui.field('Stone value', 'stoneValue', v.stoneValue|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+            {{ ui.field('Stone note', 'stoneNote', v.stoneNote|default(''), {}) }}
+            {{ ui.field('Supplier', 'supplier', v.supplier|default(''), {}) }}
+            {{ ui.field('Size', 'size', v.size|default(''), {}) }}
+            {{ ui.field('Note', 'description', v.description|default(''), {span: true}) }}
+        </div></div></section>
+    </div>
+    <aside class="bill-side">
+        <section class="panel sticky-panel">
+            <div class="panel-head"><h2>Price</h2></div>
+            <div class="panel-body" id="price"><p class="muted">Enter the weight and purity to see the price.</p></div>
+            <div class="panel-foot"><a class="btn" href="{{ editing ? '/stock/' ~ id : '/stock' }}">{{ t('common.cancel') }}</a><button class="btn btn-primary" type="submit">Save</button></div>
+        </section>
+    </aside>
+</form>
+{% endblock %}

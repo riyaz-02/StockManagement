@@ -1,0 +1,25 @@
+{% extends 'app.twig' %}
+{% set title = (x.firmName ?: (x.firstName ~ ' ' ~ x.lastName))|trim %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ kind == 'karigars' ? 'Karigar' : 'Supplier' }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ title }}</h1><p class="muted">{{ kind == 'karigars' ? 'Karigar' : 'Supplier' }}{% if x.mobile %} · {{ x.mobile }}{% endif %}</p></div>
+    <div class="actions"><a class="btn" href="/directory">All people</a></div>
+</div>
+<section class="panel">
+    <div class="panel-head"><h2>Details</h2></div>
+    <div class="panel-body kv">
+        {% if x.firmName %}<div class="kv-row"><span>Firm</span><strong>{{ x.firmName }}</strong></div>{% endif %}
+        {% if x.firstName %}<div class="kv-row"><span>Contact person</span><strong>{{ (x.firstName ~ ' ' ~ x.lastName)|trim }}</strong></div>{% endif %}
+        {% if x.mobile %}<div class="kv-row"><span>Mobile</span><strong>{{ x.mobile }}</strong></div>{% endif %}
+        {% if x.phone %}<div class="kv-row"><span>Phone</span><strong>{{ x.phone }}</strong></div>{% endif %}
+        {% if x.email %}<div class="kv-row"><span>Email</span><strong>{{ x.email }}</strong></div>{% endif %}
+        {% if x.address or x.city %}<div class="kv-row"><span>Address</span><strong>{{ [x.address, x.city, x.state, x.pincode]|filter(v => v)|join(', ') }}</strong></div>{% endif %}
+        {% if x.gstNo %}<div class="kv-row"><span>GSTIN</span><strong>{{ x.gstNo }}</strong></div>{% endif %}
+        {% if x.panNo %}<div class="kv-row"><span>PAN</span><strong>{{ x.panNo }}</strong></div>{% endif %}
+        {% if x.bank.name|default('') %}<div class="kv-row"><span>Bank</span><strong>{{ x.bank.name }}{% if x.bank.accountNo %} · {{ x.bank.accountNo }}{% endif %}{% if x.bank.ifsc %} · {{ x.bank.ifsc }}{% endif %}</strong></div>{% endif %}
+    </div>
+</section>
+{% endblock %}

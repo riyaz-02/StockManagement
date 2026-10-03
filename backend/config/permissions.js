@@ -19,7 +19,6 @@ const GROUPS = [
             { key: 'items.view', label: 'View items', viewerDefault: true },
             { key: 'items.create', label: 'Create items' },
             { key: 'items.edit', label: 'Edit items' },
-            { key: 'items.sell', label: 'Mark items sold' },
             { key: 'items.delete', label: 'Delete items (recycle bin)' },
             { key: 'items.restore', label: 'Restore items from recycle bin' },
             { key: 'items.permanentDelete', label: 'Permanently delete items' },
@@ -97,19 +96,14 @@ const GROUPS = [
         ],
     },
     {
-        group: 'Invoices',
-        keys: [
-            { key: 'invoices.view', label: 'View invoices', viewerDefault: true },
-            { key: 'invoices.create', label: 'Create invoices' },
-            { key: 'invoices.edit', label: 'Edit invoices' },
-            { key: 'invoices.delete', label: 'Delete invoices' },
-        ],
-    },
-    {
         group: 'Stock (Store Management)',
         keys: [
             { key: 'stock.view', label: 'View stock dashboard/reconciliation', viewerDefault: true },
             { key: 'stock.manageBulkWeights', label: 'Manage bulk weight entries' },
+            { key: 'stock.snapshot', label: 'Save the daily stock snapshot' },
+            { key: 'wastage.view', label: 'See wastage reports', viewerDefault: true },
+            { key: 'wastage.report', label: 'Report metal wastage' },
+            { key: 'wastage.approve', label: 'Approve or reject wastage reports' },
         ],
     },
     {
@@ -229,6 +223,7 @@ const ADMIN_ONLY_KEYS = [
     'expenses.delete',
     'orders.cancel',
     'daybook.view',
+    'wastage.approve',
 ];
 
 function buildDefaultGrid(role) {

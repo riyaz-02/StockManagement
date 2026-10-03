@@ -30,6 +30,22 @@ const view = (d) => {
     };
 };
 
+// what's on the quote, without sending every item's full detail (used by the list only)
+const summarizeItems = (items) => {
+    const list = Array.isArray(items) ? items : [];
+    const weight = {};
+    for (const it of list) { const m = it.metalType || 'Other'; weight[m] = Math.round(((weight[m] || 0) + (Number(it.netWt) || 0)) * 1000) / 1000; }
+    return { count: list.length, first: list[0] ? list[0].particulars : '', weight };
+};
+
+const viewList = (d) => {
+    const v = view(d);
+    v.itemsSummary = summarizeItems(d.items);
+    delete v.items;
+    delete v.inputItems;
+    return v;
+};
+
 // POST / { requestId, customerId?, customerName, customerMobile, items, goldRate, silverRate, additionalCharges, discount, validDays, note }
 exports.create = async (req, res, next) => {
     try {
@@ -58,6 +74,8 @@ exports.create = async (req, res, next) => {
             totals: { taxable: calc.gstSummary.total_taxable_amount, cgst: calc.gstSummary.total_cgst || 0, sgst: calc.gstSummary.total_sgst || 0, igst: calc.gstSummary.total_igst || 0, gst: calc.gstSummary.total_gst, total: calc.totalAmount, payable: calc.totalPayableAmount, roundOff: calc.roundOff, discount: calc.discountGiven },
             note: str(b.note).slice(0, 300), createdBy: String(req.user._id), createdByName: req.user.name || '',
         });
+        require('../services/events').changed('estimates', doc.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'estimate', doc._id, `${number} · ${name}`, 'created', [{ field: 'total', to: String(calc.totalPayableAmount) }]);
         res.status(201).json({ success: true, data: view(doc.toObject()) });
     } catch (e) { next(e); }
 };
@@ -73,8 +91,8 @@ exports.list = async (req, res, next) => {
         else if (['converted', 'cancelled'].includes(st)) f.status = st;
         const q = str(req.query.q);
         if (q.length >= 2) { const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); f.$or = [{ customerName: rx }, { customerMobile: rx }, { number: rx }]; }
-        const rows = await Estimate.find(f).sort({ createdAt: -1 }).limit(200).select('-inputItems -items').lean();
-        res.json({ success: true, data: rows.map(view) });
+        const rows = await Estimate.find(f).sort({ createdAt: -1 }).limit(200).select('-inputItems').lean();
+        res.json({ success: true, data: rows.map(viewList) });
     } catch (e) { next(e); }
 };
 
@@ -91,6 +109,7 @@ exports.converted = async (req, res, next) => {
     try {
         const d = isId(req.params.id) ? await Estimate.findOneAndUpdate({ _id: req.params.id, status: 'open' }, { $set: { status: 'converted', convertedInvoice: str(req.body && req.body.invoiceNumber) } }, { new: true }).lean() : null;
         if (!d) return fail(res, 404, 'Estimate not found or already used');
+        require('../services/audit').record(req, 'estimate', d._id, `${d.number} · ${d.customerName}`, 'billed', [{ field: 'invoice', to: d.convertedInvoice }]);
         res.json({ success: true, data: view(d) });
     } catch (e) { next(e); }
 };
@@ -99,6 +118,7 @@ exports.cancel = async (req, res, next) => {
     try {
         const d = isId(req.params.id) ? await Estimate.findOneAndUpdate({ _id: req.params.id, status: 'open' }, { $set: { status: 'cancelled' } }, { new: true }).lean() : null;
         if (!d) return fail(res, 404, 'Estimate not found or already used');
+        require('../services/audit').record(req, 'estimate', d._id, `${d.number} · ${d.customerName}`, 'cancelled', []);
         res.json({ success: true });
     } catch (e) { next(e); }
 };

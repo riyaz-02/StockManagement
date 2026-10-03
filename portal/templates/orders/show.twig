@@ -1,0 +1,56 @@
+{% extends 'app.twig' %}
+{% block title %}{{ o.number }}{% endblock %}
+{% block heading %}{{ o.number }}{% endblock %}
+
+{% block content %}
+{% set active_order = o.status in ['new', 'making', 'ready'] %}
+{% set tone = o.overdue ? 'red' : {new: 'blue', making: 'amber', ready: 'green', delivered: 'grey', cancelled: 'grey'}[o.status]|default('grey') %}
+<div class="page-head">
+    <div>
+        <h1>{{ o.customerName }} <span class="pill pill-{{ tone }}">{{ o.overdue ? 'Overdue' : {new: 'New', making: 'Being made', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled'}[o.status]|default(o.status) }}</span></h1>
+        <p class="muted">{{ o.number }} · ordered {{ o.date|dmy }} · {{ o.customerMobile }}</p>
+    </div>
+    <div class="actions">
+        {% if o.customerMobile|length >= 10 %}<a class="btn" href="tel:{{ o.customerMobile }}">Call</a>{% endif %}
+        <a class="btn" href="/orders">All orders</a>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>What to make</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Item</span><strong>{{ o.description }}</strong></div>
+            <div class="kv-row"><span>Metal</span><strong>{{ o.metalType|capitalize }} {{ o.purity }}{% if o.approxWeight > 0 %} · about {{ o.approxWeight|grams }}{% endif %}</strong></div>
+            {% if o.karigar %}<div class="kv-row"><span>Karigar</span><strong>{{ o.karigar }}</strong></div>{% endif %}
+            {% if o.note %}<div class="kv-row"><span>Note</span><strong>{{ o.note }}</strong></div>{% endif %}
+            <div class="kv-row"><span>Delivery</span><strong class="{{ o.overdue ? 'neg' : '' }}">{{ o.deliveryDate|dmy }}{% if active_order %} ({{ o.overdue ? (-o.daysLeft) ~ ' days late' : o.daysLeft ~ ' days left' }}){% endif %}</strong></div>
+            {% if o.invoiceNumber %}<div class="kv-row"><span>Billed as</span><strong>{{ o.invoiceNumber }}</strong></div>{% endif %}
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>Money</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Price told</span><strong>{{ o.estimatedPrice > 0 ? o.estimatedPrice|inr : 'not fixed' }}</strong></div>
+            <div class="kv-row"><span>Advance taken</span><strong class="pos">{{ o.advancePaid|inr }}</strong></div>
+            {% if active_order and o.estimatedPrice > 0 %}<div class="kv-row"><span>Balance (before final weight and GST)</span><strong>{{ o.balanceEstimate|inr }}</strong></div>{% endif %}
+            {% for a in o.advances %}<div class="kv-row"><span>{{ a.date|dmy }} advance ({{ a.mode }})</span><strong class="pos">{{ a.amount|inr }}</strong></div>{% endfor %}
+            {% for r in o.refunds %}<div class="kv-row"><span>{{ r.date|dmy }} returned ({{ r.mode }})</span><strong class="neg">− {{ r.amount|inr }}</strong></div>{% endfor %}
+        </div>
+    </section>
+</div>
+
+{% if active_order %}
+<section class="panel">
+    <div class="panel-body row-gap wrap">
+        {% if can('orders.create') %}
+            {% if o.status == 'new' %}<button class="btn" type="button" hx-post="/orders/{{ o.id }}/status" hx-vals='{"status":"making"}' hx-swap="none">Given to karigar / being made</button>{% endif %}
+            {% if o.status != 'ready' %}<button class="btn btn-ok" type="button" hx-post="/orders/{{ o.id }}/status" hx-vals='{"status":"ready"}' hx-swap="none">Piece is ready</button>{% endif %}
+            <button class="btn" type="button" hx-get="/orders/{{ o.id }}/advance" hx-target="#modal-body">Take more advance</button>
+        {% endif %}
+        {% if can('billing.create') %}<a class="btn btn-primary" href="/billing/new?order={{ o.id }}">Deliver and make the bill</a>{% endif %}
+        {% if can('orders.cancel') %}<button class="btn btn-danger" type="button" hx-get="/orders/{{ o.id }}/cancel" hx-target="#modal-body">Cancel order</button>{% endif %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

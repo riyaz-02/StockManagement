@@ -1,0 +1,12 @@
+{% extends 'app.twig' %}
+{% block title %}Stock Tally{% endblock %}
+{% block heading %}Stock Tally{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Stock tally</h1><p class="muted">Count what is really in the shop against what the system says, piece by piece.</p></div>
+</div>
+<div class="live-block" hx-get="/tally/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

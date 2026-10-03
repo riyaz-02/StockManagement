@@ -1,0 +1,16 @@
+{
+    "name": "laltu/portal",
+    "description": "Laltu Guinea Palace web portal (PHP front end of the Node API)",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "slim/slim": "^4.12",
+        "slim/psr7": "^1.6",
+        "slim/twig-view": "^3.3"
+    },
+    "autoload": { "psr-4": { "Portal\\": "src/" } },
+    "config": { "optimize-autoloader": true, "sort-packages": true }
+}

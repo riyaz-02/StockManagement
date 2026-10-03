@@ -80,6 +80,8 @@ exports.create = async (req, res, next) => {
             advances: adv.none ? [] : [{ date: today, amount: adv.amount, mode: adv.mode, byName: who(req), at: now }], advancePaid: adv.none ? 0 : adv.amount,
             history: [{ status: 'new', at: now, byName: who(req) }], createdBy: String(req.user._id), createdByName: who(req),
         });
+        require('../services/events').changed('orders', doc.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'order', doc._id, `${number} · ${name}`, 'created', [{ field: 'description', to: description }, { field: 'price told', to: String(est) }]);
         res.status(201).json({ success: true, data: view(doc.toObject()) });
     } catch (e) { next(e); }
 };
@@ -129,6 +131,8 @@ exports.addAdvance = async (req, res, next) => {
         const d = await Order.findOneAndUpdate({ _id: d0._id, status: { $in: ['new', 'making', 'ready'] } },
             { $push: { advances: { date: Calc.todayIST(), amount: adv.amount, mode: adv.mode, byName: who(req), at: new Date() } }, $inc: { advancePaid: adv.amount } }, { new: true }).lean();
         if (!d) return fail(res, 400, 'This order is closed');
+        require('../services/events').changed('orders', d.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'order', d._id, `${d.number} · ${d.customerName}`, 'advance received', [{ field: 'amount', to: String(adv.amount) }, { field: 'mode', to: adv.mode }]);
         res.json({ success: true, data: view(d) });
     } catch (e) { next(e); }
 };
@@ -144,6 +148,8 @@ exports.setStatus = async (req, res, next) => {
         if (b.karigar !== undefined) set.karigar = str(b.karigar).slice(0, 60);
         const d = isId(req.params.id) ? await Order.findOneAndUpdate({ _id: req.params.id, status: { $in: from } }, { $set: set, $push: { history: { status: to, at: new Date(), byName: who(req) } } }, { new: true }).lean() : null;
         if (!d) return fail(res, 400, 'This order cannot move to that step');
+        require('../services/events').changed('orders', d.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'order', d._id, `${d.number} · ${d.customerName}`, 'status changed', [{ field: 'status', to: to }]);
         res.json({ success: true, data: view(d) });
     } catch (e) { next(e); }
 };
@@ -165,6 +171,7 @@ exports.cancel = async (req, res, next) => {
         if (refund > 0) push.refunds = { date: Calc.todayIST(), amount: refund, mode, reason, byName: who(req), at: new Date() };
         const d = await Order.findOneAndUpdate({ _id: d0._id, status: { $in: ['new', 'making', 'ready'] } }, { $set: set, $push: push }, { new: true }).lean();
         if (!d) return fail(res, 400, 'This order is closed');
+        require('../services/audit').record(req, 'order', d._id, `${d.number} · ${d.customerName}`, 'cancelled', [{ field: 'refund', to: String(refund) }, { field: 'reason', to: reason }]);
         res.json({ success: true, data: view(d) });
     } catch (e) { next(e); }
 };

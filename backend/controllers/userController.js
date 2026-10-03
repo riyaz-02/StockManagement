@@ -58,7 +58,7 @@ exports.getUser = async (req, res) => {
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
     try {
-        const { name, mobile, password, role, profileImage, branchId } = req.body;
+        const { name, mobile, password, role, profileImage, branchId, username, email } = req.body;
 
         // Validate required fields
         if (!name || !mobile || !password) {
@@ -68,28 +68,22 @@ exports.createUser = async (req, res) => {
             });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ mobile });
-        if (existingUser) {
+        // Already used? Mobile, username and e-mail must each belong to one person (the website enforces the same)
+        const clash = await User.taken({ mobile, username: username || mobile, email });
+        if (clash) {
             return res.status(400).json({
                 success: false,
-                message: 'User with this mobile number already exists'
+                message: `Another person already has this ${clash}`
             });
         }
 
         // Branch: explicit choice, else the creating admin's own branch
         const branch = await resolveBranch(branchId || req.user.branchId);
 
-        // Create user
-        const user = await User.create({
-            name,
-            mobile,
-            password,
-            role: role || 'staff',
-            profileImage,
-            ...branch
-        });
+        // Create user (in the website's own format: they can sign in there too, with the same password)
+        const user = await User.create(User.forCreate({ name, mobile, password, role: role || 'staff', profileImage, username, email, ...branch }));
 
+        require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'created', [{ field: 'role', to: user.role }, { field: 'branch', to: user.branchName }]);
         // Remove password from response
         const userResponse = user.toJSON();
 
@@ -103,6 +97,10 @@ exports.createUser = async (req, res) => {
         if (error.statusCode) {
             return res.status(error.statusCode).json({ success: false, message: error.message });
         }
+        if (error.name === 'ValidationError') {
+            // say what is wrong (for example a password shorter than 6 characters), not a generic server error
+            return res.status(400).json({ success: false, message: Object.values(error.errors).map((e) => e.message).join('; ') });
+        }
         res.status(500).json({
             success: false,
             message: 'Server error while creating user'
@@ -115,7 +113,7 @@ exports.createUser = async (req, res) => {
 // @access  Private
 exports.updateUser = async (req, res) => {
     try {
-        const { name, mobile, profileImage, language, role, isActive, branchId } = req.body;
+        const { name, mobile, profileImage, language, role, isActive, branchId, username, email } = req.body;
 
         const user = await User.findById(req.params.id);
 
@@ -134,6 +132,7 @@ exports.updateUser = async (req, res) => {
             });
         }
 
+        const auditBefore = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName };
         // Update fields
         if (name) user.name = name;
         // Branch assignment is an admin action (users.manage), never self-service
@@ -151,7 +150,21 @@ exports.updateUser = async (req, res) => {
                     message: 'Mobile number already in use'
                 });
             }
+            // the website's own phone field follows (when it was empty or held the old number), so both sides show one number
+            const digits = (v) => String(v || '').replace(/\D/g, '').slice(-10);
+            if (!user.contact || digits(user.contact) === digits(user.mobile)) user.contact = mobile;
             user.mobile = mobile;
+        }
+        // The website signs in with a username or an e-mail: an admin can set them (each must belong to one person)
+        if ((username !== undefined || email !== undefined) && (await hasPermission(req.user, 'users.manage'))) {
+            const nextUser = username !== undefined && String(username).trim() ? String(username).trim() : undefined;
+            const nextMail = email !== undefined ? String(email).trim() : undefined;
+            const clash = await User.taken({ username: nextUser, email: nextMail || undefined }, req.params.id);
+            if (clash) {
+                return res.status(400).json({ success: false, message: `Another person already has this ${clash}` });
+            }
+            if (nextUser) user.username = nextUser;
+            if (nextMail !== undefined) user.email = nextMail;
         }
         if (profileImage !== undefined) {
             // Delete old profile image from Cloudinary if exists
@@ -181,6 +194,11 @@ exports.updateUser = async (req, res) => {
 
         await user.save();
 
+        {
+            const after = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName };
+            const changes = Object.keys(after).filter((k) => String(after[k]) !== String(auditBefore[k])).map((k) => ({ field: k, from: auditBefore[k], to: after[k] }));
+            if (changes.length) require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'updated', changes);
+        }
         const userResponse = user.toJSON();
 
         res.status(200).json({
@@ -226,6 +244,7 @@ exports.deleteUser = async (req, res) => {
         user.isActive = false;
         user.updatedAt = Date.now();
         await user.save();
+        require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'deactivated', [{ field: 'active', from: 'true', to: 'false' }]);
 
         res.status(200).json({
             success: true,
@@ -294,6 +313,7 @@ exports.changePassword = async (req, res) => {
         user.password = newPassword;
         user.updatedAt = Date.now();
         await user.save();
+        require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'password reset', []);
 
         res.status(200).json({
             success: true,

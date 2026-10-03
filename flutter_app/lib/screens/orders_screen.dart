@@ -10,6 +10,7 @@ import '../utils/app_toast.dart';
 import '../widgets/bill_ui.dart';
 import '../widgets/customer_field.dart';
 import 'create_invoice_screen.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -26,7 +27,13 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends State<OrdersScreen> with LiveRefresh<OrdersScreen> {
+  @override
+  List<String> get liveModules => ['orders'];
+
+  @override
+  void onLiveChange() => _load();
+
   final _api = ApiService();
   final _q = TextEditingController();
   String _tab = 'active';
@@ -38,12 +45,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _load();
   }
 
   @override
   void dispose() {
     _q.dispose();
+    disposeLive();
     super.dispose();
   }
 

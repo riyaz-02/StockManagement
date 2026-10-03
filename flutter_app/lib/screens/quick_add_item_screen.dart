@@ -330,7 +330,9 @@ class _QuickAddItemScreenState extends State<QuickAddItemScreen> {
 
   // ─── camera / images (Cloudinary, unchanged) ─────────────────────────────────
   Future<void> _camera() async {
-    final img = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    // maxWidth/maxHeight bound the decoded size so a high-megapixel photo cannot spike memory while the camera app is in
+    // the foreground (that spike is what makes Android kill this app in the background and "restart" it on return).
+    final img = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
     if (img == null) return;
     setState(() => _isUploadingImages = true);
     try {
@@ -713,9 +715,11 @@ class _QuickAddItemScreenState extends State<QuickAddItemScreen> {
         'Weight (g)',
         Icons.scale_outlined,
         Column(children: [
-          _two(_tf(_grossCtrl, 'Gross', number: true, onChanged: (_) => _onGrossOrLess()), _tf(_lessCtrl, 'Less (stone / other)', number: true, onChanged: (_) => _onGrossOrLess())),
+          // Gross and Net sit side by side (the two fields almost every piece needs) so a quick add needs no jumping
+          // between rows; Less and Accuracy — used less often — are the second row.
+          _two(_tf(_grossCtrl, 'Gross', number: true, onChanged: (_) => _onGrossOrLess()), _tf(_weightCtrl, 'Net *', number: true, bold: true, onChanged: (_) => _onNet())),
           const SizedBox(height: 10),
-          _two(_tf(_weightCtrl, 'Net *', number: true, bold: true, onChanged: (_) => _onNet()), _dd('Accuracy', _weightAccuracy, _accuracies, (v) => setState(() => _weightAccuracy = v ?? 'exact'), label: (v) => _fmt(v))),
+          _two(_tf(_lessCtrl, 'Less (stone / other)', number: true, onChanged: (_) => _onGrossOrLess()), _dd('Accuracy', _weightAccuracy, _accuracies, (v) => setState(() => _weightAccuracy = v ?? 'exact'), label: (v) => _fmt(v))),
           if (g > 0 && l > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(top: 5), child: Text('Net = gross ${_num(g)} − less ${_num(l)}', style: const TextStyle(fontSize: 11, color: _T.text3)))),
           const SizedBox(height: 10),
           _two(_dd('Weight class', _weightCategory, _weightCategories, (v) => setState(() {

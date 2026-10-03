@@ -3,11 +3,9 @@ const OldMetal = require('../models/OldMetal');
 const Rules = require('../services/stockRules');
 const Doc = require('../models/AppStockSettings');
 const { computeOldMetal } = require('../services/stockValuation');
-const { getShopmanageConnection } = require('../config/db');
 
 const fail = (res, code, message) => res.status(code).json({ success: false, message });
 const str = (v) => (v == null ? '' : String(v).trim());
-const StockEntry = () => require('../models/StockEntry')(getShopmanageConnection());
 
 exports.list = async (req, res, next) => {
     try {
@@ -46,11 +44,8 @@ exports.create = async (req, res, next) => {
             fine: v.fine, finalFine: v.finalFine, valuationWt: v.valuationWt, basis: v.basis, amount: v.amount, note: str(b.note).slice(0, 200),
             createdBy: String(req.user._id), createdByName: req.user.name || '',
         });
-        // the metal comes into the shop: a credit in the stock ledger (never blocks the entry)
-        await StockEntry().create({
-            entryDate: doc.date, metalType: metal, entryType: 'credit', weightGrams: v.net, referenceId: doc._id, referenceType: 'adjustment',
-            description: `${kind === 'old' ? 'Old metal from' : 'Raw metal'} ${doc.customerName || ''}`.trim(), status: 'active', createdBy: req.user._id,
-        }).catch(() => {});
+        require('../services/events').changed('oldmetal', doc.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'old_metal', doc._id, `${kind === 'old' ? 'Old metal from' : 'Raw metal'} ${doc.customerName || 'Walk-in'}`, 'received', [{ field: 'metal', to: `${metal} ${v.net}g` }, { field: 'value', to: String(v.amount) }]);
         res.status(201).json({ success: true, data: { entry: doc } });
     } catch (e) { next(e); }
 };
@@ -76,7 +71,7 @@ exports.cancel = async (req, res, next) => {
         if (doc.usedOnInvoice) return fail(res, 400, `Already adjusted on invoice ${doc.usedOnInvoice}`);
         doc.status = 'cancelled';
         await doc.save();
-        await StockEntry().updateMany({ referenceId: doc._id, referenceType: 'adjustment' }, { $set: { status: 'deleted' } }).catch(() => {});
+        require('../services/audit').record(req, 'old_metal', doc._id, `${doc.kind === 'old' ? 'Old metal from' : 'Raw metal'} ${doc.customerName || 'Walk-in'}`, 'cancelled', []);
         res.json({ success: true, data: { entry: doc } });
     } catch (e) { next(e); }
 };

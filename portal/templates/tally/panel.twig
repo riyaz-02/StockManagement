@@ -1,0 +1,43 @@
+{% set expected = sum.expected|default(s.expectedItems) %}
+{% set scanned = sum.scanned|default(s.scannedItemsCount) %}
+{% set pct = expected > 0 ? (scanned / expected * 100)|round : 0 %}
+<div class="stats">
+    <div class="stat"><span>Checked</span><strong>{{ scanned }} of {{ expected }}</strong><div class="bar"><span style="width: {{ pct }}%"></span></div></div>
+    {% if not sum.frozen|default(false) %}<div class="stat"><span>Still to find</span><strong>{{ sum.left|default(0) }}</strong><small>{% if sum.soldSince|length %}{{ sum.soldSince|length }} sold since it started{% endif %}</small></div>{% endif %}
+    <div class="stat"><span>Gold checked</span><strong>{{ s.scannedGoldWeight|default(0)|grams }}</strong><small>expected {{ s.expectedGoldWeight|default(0)|grams }}</small></div>
+    <div class="stat"><span>Silver checked</span><strong>{{ s.scannedSilverWeight|default(0)|grams }}</strong><small>expected {{ s.expectedSilverWeight|default(0)|grams }}</small></div>
+</div>
+
+{% if sum.boxes|default([])|length %}
+<section class="panel">
+    <div class="panel-head"><h2>Box by box</h2></div>
+    <div class="panel-body">
+        {% for b in sum.boxes %}
+            <div class="box-row{{ b.missing == 0 ? ' is-done' : '' }}"><span>{{ b.name }}</span><div class="bar"><span style="width: {{ b.total > 0 ? (b.scanned / b.total * 100)|round : 0 }}%"></span></div><b>{{ b.scanned }} / {{ b.total }}</b></div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if sum.missing|default([])|length %}
+<section class="panel">
+    <div class="panel-head"><h2>{{ locked ? 'Not found when locked' : 'Still to find' }}</h2><span class="muted small">{{ sum.missing|length }}</span></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Piece</th><th>Metal</th><th class="num">Weight</th><th>Where to look</th></tr></thead>
+        <tbody>{% for m in sum.missing %}
+            <tr><td class="strong">{{ m.name }}<small>{{ m.barcode }}</small></td><td>{{ m.metalType|capitalize }}</td><td class="num">{{ m.weight|grams }}</td><td>{{ m.box }}{% if m.slot %} · slot {{ m.slot }}{% endif %}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
+
+{% if sum.soldSince|default([])|length %}
+<section class="panel">
+    <div class="panel-head"><h2>Sold since the tally started</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Piece</th><th>Metal</th><th class="num">Weight</th></tr></thead>
+        <tbody>{% for m in sum.soldSince %}<tr><td class="strong">{{ m.name }}<small>{{ m.barcode }}</small></td><td>{{ m.metalType|capitalize }}</td><td class="num">{{ m.weight|grams }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
+{% if s.lockRemarks|default('') %}<section class="panel"><div class="panel-body"><strong>Remarks:</strong> {{ s.lockRemarks }}</div></section>{% endif %}

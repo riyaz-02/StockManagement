@@ -1,0 +1,30 @@
+{% set tabs = [['', 'All'], ['open', 'Open'], ['converted', 'Billed'], ['expired', 'Expired'], ['cancelled', 'Cancelled']] %}
+<form class="toolbar" hx-get="/estimates/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input, submit">
+    <div class="chips">
+        {% for tb in tabs %}
+            <button type="button" class="chip{{ status == tb[0] ? ' is-on' : '' }}" hx-get="/estimates/list?status={{ tb[0] }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ tb[1] }}</button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search name, mobile or number" autocomplete="off"></div>
+</form>
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Estimate</th><th>Customer</th><th>Items</th><th>Valid till</th><th>Status</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        {% for e in rows %}
+            {% set tone = {open: 'blue', converted: 'green', expired: 'amber', cancelled: 'grey'}[e.status]|default('grey') %}
+            <tr class="is-link" data-href="/estimates/{{ e.id }}">
+                <td><a class="row-link" href="/estimates/{{ e.id }}">{{ e.number }}</a><small>{{ e.date|dmy }}{% if e.createdByName %} · {{ e.createdByName }}{% endif %}</small></td>
+                <td class="strong">{{ e.customerName }}<small>{{ e.customerMobile }}</small></td>
+                <td>{{ e.itemsSummary.first|default('') }}{% if e.itemsSummary.count|default(0) > 1 %}<small>+{{ e.itemsSummary.count - 1 }} more item{{ e.itemsSummary.count > 2 ? 's' : '' }}</small>{% endif %}</td>
+                <td>{{ e.validTill|dmy }}</td>
+                <td><span class="pill pill-{{ tone }}">{{ {open: 'Open', converted: 'Billed', expired: 'Expired', cancelled: 'Cancelled'}[e.status]|default(e.status) }}</span>{% if e.convertedInvoice %}<small>{{ e.convertedInvoice }}</small>{% endif %}</td>
+                <td class="num strong">{{ e.totals.payable|default(0)|inr(0) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="t-empty">No estimates here.</div>{% endif %}
+</section>

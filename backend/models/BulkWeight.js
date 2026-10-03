@@ -35,6 +35,14 @@ const bulkWeightSchema = new mongoose.Schema(
             maxlength: [200, 'Description cannot exceed 200 characters'],
         },
         // Date this weight is applicable for (defaults to today IST)
+        // What kind of bulk metal this is (kept together, no barcode): dust, parts, sub-items, raw, in-process, reserved
+        category: {
+            type: String,
+            enum: ['dust', 'parts', 'sub_items', 'raw', 'in_process', 'reserved', 'other'],
+            default: 'other',
+        },
+        purity: { type: String, trim: true },
+        pieces: { type: Number, min: 0 },
         date: {
             type: Date,
             default: Date.now,

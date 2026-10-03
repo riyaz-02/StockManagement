@@ -1,0 +1,21 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/orders/{{ o.id }}/cancel" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>Cancel this order?</h2>
+    <p class="muted">{{ o.number }} · {{ o.customerName }}</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    {% if o.advancePaid|default(0) > 0 %}
+        <p>Advance taken: <strong>{{ o.advancePaid|inr }}</strong>. Pay it back:</p>
+        <div class="form-grid">
+            {{ ui.field('Amount to return', 'refundAmount', v.refundAmount|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+            {{ ui.field('Returned by', 'refundMode', v.refundMode|default('Cash'), {type: 'select', options: modes}) }}
+            {{ ui.field('Reason (needed if you keep some)', 'reason', v.reason|default(''), {span: true}) }}
+        </div>
+    {% else %}
+        <p>No advance was taken.</p>
+    {% endif %}
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>No, keep it</button>
+        <button type="submit" class="btn btn-danger">Cancel order</button>
+    </div>
+</form>

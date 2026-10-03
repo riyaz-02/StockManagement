@@ -1,0 +1,74 @@
+{% import 'ui.twig' as ui %}
+{{ ui.range_bar('/day-book/body', range) }}
+
+{% set t = d.totals|default({}) %}
+{% set s = d.summary|default({}) %}
+<div class="hero">
+    <div>
+        <small>Cash in hand (in − out)</small>
+        <strong>{{ cash|inr }}</strong>
+        <small>for this period, before your opening balance</small>
+    </div>
+    <div class="side">
+        <div>In {{ t.in|default(0)|inr }}</div>
+        <div>Out {{ t.out|default(0)|inr }}</div>
+        <div>Net {{ t.net|default(0)|inr }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Money by how it was paid</h2></div>
+        <div class="table-wrap">
+            <table class="t">
+                <thead><tr><th>Mode</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th></tr></thead>
+                <tbody>
+                {% for m in d.modes|default([]) %}
+                    <tr>
+                        <td class="strong">{{ m.mode }}</td>
+                        <td class="num pos">{{ m.in > 0 ? m.in|inr : '–' }}</td>
+                        <td class="num neg">{{ m.out > 0 ? m.out|inr : '–' }}</td>
+                        <td class="num strong">{{ m.net|inr }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2>What happened</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Sales ({{ s.sales.count|default(0) }} bills)</span><strong>{{ s.sales.amount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>&nbsp;&nbsp;received so far</span><strong>{{ s.sales.received|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Refunds / returns ({{ s.refunds.count|default(0) }})</span><strong class="neg">{{ s.refunds.amount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Expenses ({{ s.expenses.count|default(0) }})</span><strong class="neg">{{ s.expenses.amount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Purchases ({{ s.purchases.count|default(0) }} bills)</span><strong>{{ s.purchases.amount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Old metal taken ({{ s.oldMetal.count|default(0) }})</span><strong>{{ s.oldMetal.net|default(0)|grams }} · {{ s.oldMetal.amount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Raw metal bought ({{ s.rawMetal.count|default(0) }})</span><strong>{{ s.rawMetal.net|default(0)|grams }} · {{ s.rawMetal.amount|default(0)|inr }}</strong></div>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Every entry ({{ d.lines|default([])|length }})</h2></div>
+    {% if d.lines|default([])|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Time</th><th>What</th><th>Mode</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+            {% for l in d.lines %}
+                <tr>
+                    <td>{{ l.at|slice(5, 11) }}</td>
+                    <td class="strong">{{ l.title }}<small>{{ l.subtitle }}</small></td>
+                    <td>{{ l.mode }}</td>
+                    <td class="num strong {{ l.kind == 'receipt' ? 'pos' : 'neg' }}">{{ l.kind == 'receipt' ? '+' : '−' }} {{ l.amount|inr }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="t-empty">No money moved in this period.</div>
+    {% endif %}
+</section>

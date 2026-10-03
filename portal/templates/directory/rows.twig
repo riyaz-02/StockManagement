@@ -1,0 +1,19 @@
+{% for x in rows %}
+    {% if tab == 'customers' %}
+        <tr class="is-link" data-href="/directory/customers/{{ x._id }}">
+            <td><a class="row-link" href="/directory/customers/{{ x._id }}">{{ x.customer_name }}</a>{% if x.customer_name_bengali %}<small>{{ x.customer_name_bengali }}</small>{% endif %}</td>
+            <td>{{ x.whatsapp_no ?: x.mobile_no }}{% if x.mobile_no and x.whatsapp_no %}<small>{{ x.mobile_no }}</small>{% endif %}</td>
+            <td class="hide-sm">{{ x.address }}</td>
+        </tr>
+    {% else %}
+        <tr class="is-link" data-href="/directory/{{ tab }}/{{ x._id }}">
+            <td><a class="row-link" href="/directory/{{ tab }}/{{ x._id }}">{{ (x.firmName ?: (x.firstName ~ ' ' ~ x.lastName))|trim }}</a>{% if x.firmName and x.firstName %}<small>{{ (x.firstName ~ ' ' ~ x.lastName)|trim }}</small>{% endif %}</td>
+            <td>{{ x.mobile }}{% if x.phone %}<small>{{ x.phone }}</small>{% endif %}</td>
+            <td class="hide-sm">{{ x.city }}{% if x.gstNo %}<small>GSTIN {{ x.gstNo }}</small>{% endif %}</td>
+        </tr>
+    {% endif %}
+{% endfor %}
+{% if pg.hasMore|default(false) %}
+    <tr id="dir-more"><td colspan="3" class="more-cell"><button class="btn" type="button"
+        hx-get="/directory/list?{{ {tab: tab, q: q, page: page + 1}|filter(v => v != '')|url_encode }}" hx-target="#dir-more" hx-swap="outerHTML">Show more</button></td></tr>
+{% endif %}

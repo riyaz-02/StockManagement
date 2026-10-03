@@ -1,0 +1,58 @@
+{% extends 'app.twig' %}
+{% block title %}{{ p.invoiceNumber }}{% endblock %}
+{% block heading %}{{ p.invoiceNumber }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ p.biller }}</h1>
+        <p class="muted">Bill {{ p.invoiceNumber }} · {{ p.invoiceDate|dmy }} · {{ p.metalType|capitalize }}{% if p.billerGstin %} · GSTIN {{ p.billerGstin }}{% endif %}</p>
+    </div>
+    <div class="actions">
+        {% if can('purchases.delete') %}<button class="btn btn-danger" type="button" hx-post="/purchases/{{ p._id }}/remove" hx-confirm="Remove this purchase?" hx-swap="none">Remove</button>{% endif %}
+        <a class="btn" href="/purchases">All purchases</a>
+    </div>
+</div>
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Goods</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Weight</span><strong>{{ p.quantity|grams }}</strong></div>
+            <div class="kv-row"><span>Rate per gram</span><strong>{{ p.rate|inr }}</strong></div>
+            {% if p.gstRecorded|default(true) %}
+            <div class="kv-row"><span>Taxable value</span><strong>{{ p.totalAmount|inr }}</strong></div>
+            {% else %}
+            <div class="kv-row"><span>GST</span><strong class="muted">Not recorded (made on the old website: no GST or input credit is counted)</strong></div>
+            {% endif %}
+            {% if not p.gstRecorded|default(true) %}{% elseif p.transactionType == 'inter-state' %}<div class="kv-row"><span>IGST {{ p.gstRate }}%</span><strong>{{ p.igstAmount|inr }}</strong></div>
+            {% else %}<div class="kv-row"><span>CGST</span><strong>{{ p.cgstAmount|inr }}</strong></div><div class="kv-row"><span>SGST</span><strong>{{ p.sgstAmount|inr }}</strong></div>{% endif %}
+            <div class="kv-row total"><span>Total payable</span><strong>{{ p.totalPayable|inr }}</strong></div>
+            {% if p.description|default('') %}<div class="kv-row"><span>What</span><strong>{{ p.description }}</strong></div>{% endif %}
+            {% if p.remarks|default('') %}<div class="kv-row"><span>Note</span><strong>{{ p.remarks }}</strong></div>{% endif %}
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>Tax</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>GST you can claim back (input credit)</span><strong class="pos">{{ p.totalItc|inr }}</strong></div>
+            <div class="kv-row"><span>Real cost after credit</span><strong>{{ p.effectiveCost|inr }}</strong></div>
+            {% if p.tdsApplicable|default(false) %}<div class="kv-row"><span>TDS {{ p.tdsRate|default(0) }}% (194Q)</span><strong>{{ p.tdsAmount|default(0)|inr }}</strong></div>
+            <div class="kv-row"><span>Net to pay the supplier</span><strong>{{ p.netPayable|default(0)|inr }}</strong></div>{% endif %}
+            <div class="kv-row"><span>HSN</span><strong>{{ p.hsnCode }}</strong></div>
+            <div class="kv-row"><span>Entered by</span><strong>{{ p.createdByName }}</strong></div>
+        </div>
+    </section>
+</div>
+{% if p.valuation.result is defined %}
+<section class="panel">
+    <div class="panel-head"><h2>How the amount was worked out</h2></div>
+    <div class="panel-body kv">
+        {% set r = p.valuation.result %}
+        <div class="kv-row"><span>Net weight · fine weight</span><strong>{{ r.net|grams }} · {{ r.fine|grams }}</strong></div>
+        <div class="kv-row"><span>Final fine weight (with wastage)</span><strong>{{ r.finalFine|default(0)|grams }}</strong></div>
+        <div class="kv-row"><span>Metal · labour</span><strong>{{ r.metalValuation|default(0)|inr }} · {{ r.labourTotal|default(0)|inr }}</strong></div>
+        {% if r.hallmarkCharge|default(0) > 0 %}<div class="kv-row"><span>Hallmark fee</span><strong>{{ r.hallmarkCharge|inr }}</strong></div>{% endif %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

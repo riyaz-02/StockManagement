@@ -32,6 +32,7 @@ const schema = new mongoose.Schema(
         updated_at: { type: Date },
         sl_no: { type: Number },
         is_deleted: { type: Boolean },
+        source: { type: String },                // the website writes this too ('bulk_import'); the app writes 'app'
     },
     { collection: 'customers', versionKey: false, autoIndex: false, autoCreate: false }
 );

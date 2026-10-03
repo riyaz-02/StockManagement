@@ -1,0 +1,13 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.orders') }}{% endblock %}
+{% block heading %}{{ t('nav.orders') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Customer orders</h1><p class="muted">Made-to-order pieces: the advance, who is making it, and when it is due.</p></div>
+    <div class="actions">{% if can('orders.create') %}<a class="btn btn-primary" href="/orders/new">{{ icon('plus', 17) }} New order</a>{% endif %}</div>
+</div>
+<div class="live-block" hx-get="/orders/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

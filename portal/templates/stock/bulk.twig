@@ -1,0 +1,40 @@
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Bulk stock</h2>
+            <p class="muted">Metal kept together without a barcode: dust, parts, sub-items, raw or in-process metal. It counts as stock in the shop, with the pieces.</p>
+        </div>
+        {% if can('stock.manageBulkWeights') %}<button class="btn btn-primary" type="button" hx-get="/stock/bulk/new" hx-target="#modal-body">{{ icon('plus', 17) }} Add bulk stock</button>{% endif %}
+    </div>
+    {% if rows|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Kind</th><th>What</th><th>Metal</th><th class="num">Weight</th><th class="hide-sm">Purity</th><th class="hide-sm num">Pieces</th>{% if can('stock.manageBulkWeights') %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for r in rows %}
+                <tr>
+                    <td><span class="pill pill-grey">{{ kinds[r.category|default('other')]|default('Other') }}</span></td>
+                    <td class="strong">{{ r.description }}</td>
+                    <td>{{ r.metalType|capitalize }}</td>
+                    <td class="num strong">{{ r.weightGrams|grams }}</td>
+                    <td class="hide-sm">{{ r.purity|default('–') }}</td>
+                    <td class="hide-sm num">{{ r.pieces is defined and r.pieces is not null ? r.pieces : '–' }}</td>
+                    {% if can('stock.manageBulkWeights') %}
+                    <td class="num">
+                        <button class="btn btn-sm" type="button" hx-get="/stock/bulk/{{ r._id }}/edit" hx-target="#modal-body">Edit</button>
+                        <button class="btn btn-sm btn-danger" type="button" hx-post="/stock/bulk/{{ r._id }}/remove" hx-confirm="Remove this bulk entry from the stock?" hx-swap="none">Remove</button>
+                    </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr>
+                <td colspan="3" class="muted">In bulk</td>
+                <td class="num strong" colspan="{{ can('stock.manageBulkWeights') ? 4 : 3 }}">{% for m, w in totals %}{{ m|capitalize }} {{ w|grams }}{{ not loop.last ? ' · ' : '' }}{% endfor %}</td>
+            </tr></tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="panel-body"><p class="muted">Nothing entered yet. If the check above shows more metal missing than expected, enter the dust, parts and in-process metal here.</p></div>
+    {% endif %}
+</section>

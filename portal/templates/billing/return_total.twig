@@ -1,0 +1,10 @@
+{% if err %}<div class="notice notice-error">{{ err }}</div>
+{% elseif prev %}
+    <div class="kv">
+        <div class="kv-row"><span>Before tax</span><strong>{{ prev.taxable|inr }}</strong></div>
+        <div class="kv-row"><span>Tax taken back</span><strong>{{ (prev.cgst + prev.sgst + prev.igst)|inr }}</strong></div>
+        <div class="kv-row total"><span>Credit note total</span><strong>{{ prev.total|inr }}</strong></div>
+        <div class="kv-row"><span>Most that can be paid back</span><strong>{{ prev.maxRefund|inr }}</strong></div>
+        {% if not prev.reducesTax %}<div class="notice notice-info">Late for this bill's financial year: this note will not reduce the tax you pay.</div>{% endif %}
+    </div>
+{% endif %}

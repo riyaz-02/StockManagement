@@ -16,6 +16,8 @@ router.get('/customer/:id', requirePermission('billing.view'), ctrl.customerSumm
 
 router.get('/invoices', requirePermission('billing.view'), ctrl.listInvoices);
 router.get('/invoices/:id', requirePermission('billing.view'), ctrl.getInvoice);
+router.get('/stock-line', requirePermission('billing.create'), ctrl.stockLine);
+router.post('/calculate', requirePermission('billing.create'), ctrl.calculate);
 router.post('/invoices', requirePermission('billing.create'), ctrl.createInvoice);
 router.post('/invoices/:id/payments', requirePermission('billing.receivePayment'), ctrl.addPayment);
 router.get('/dues', requirePermission('billing.view'), ctrl.dues);

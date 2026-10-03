@@ -1,0 +1,32 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}New order{% endblock %}
+{% block heading %}New order{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>New order</h1><p class="muted">Take an order for a piece to be made, with the advance.</p></div></div>
+<form method="post" action="/orders" class="grid">
+    {{ csrf_field() }}
+    <input type="hidden" name="rid" value="{{ rid }}">
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <section class="panel"><div class="panel-head"><h2>Customer</h2></div><div class="panel-body"><div class="form-grid">
+        {{ ui.customer_picker(v.customerName|default(''), v.customerMobile|default(''), v.customerId|default('')) }}
+    </div></div></section>
+    <section class="panel"><div class="panel-head"><h2>What to make</h2></div><div class="panel-body"><div class="form-grid">
+        {{ ui.field('Describe it (type, size, pattern)', 'description', v.description|default(''), {type: 'textarea', rows: 2, required: true, span: true}) }}
+        {{ ui.field('Metal', 'metalType', v.metalType|default('gold'), {type: 'select', options: ['gold', 'silver']}) }}
+        {{ ui.field('Purity', 'purity', v.purity|default('22K'), {type: 'select', options: ['24K', '22K', '18K', '14K', '999', '925', '800']}) }}
+        {{ ui.field('About weight (g)', 'approxWeight', v.approxWeight|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+        {{ ui.field('Karigar (optional)', 'karigar', v.karigar|default(''), {}) }}
+    </div></div></section>
+    <section class="panel"><div class="panel-head"><h2>Price, date and advance</h2></div><div class="panel-body"><div class="form-grid">
+        {{ ui.field('Price told', 'estimatedPrice', v.estimatedPrice|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal', hint: 'What you told the customer. The final bill uses the real weight and the rate on the day.'}) }}
+        {{ ui.field('Delivery date', 'deliveryDate', v.deliveryDate|default(''), {type: 'date', required: true, min: 'now'|date('Y-m-d')}) }}
+        {{ ui.field('Advance', 'advanceAmount', v.advanceAmount|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Paid by', 'advanceMode', v.advanceMode|default('Cash'), {type: 'select', options: modes}) }}
+        {{ ui.field('Note (optional)', 'note', v.note|default(''), {span: true}) }}
+    </div>
+    <p class="muted small">No GST now: an advance carries none. GST comes on the bill when the piece is delivered, and the advance is taken off it.</p></div></section>
+    <div class="sticky-actions"><a class="btn" href="/orders">{{ t('common.cancel') }}</a><button class="btn btn-primary" type="submit">Save order</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="{{ id ? '/stock/bulk/' ~ id : '/stock/bulk' }}" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>{{ id ? 'Edit bulk stock' : 'Add bulk stock' }}</h2>
+    <p class="muted">Metal that is kept together without a barcode. It is added to the stock in the shop.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        <label class="field">
+            <span>Kind *</span>
+            <select name="category">
+                {% for k, label in kinds %}<option value="{{ k }}"{{ k == v.category|default('other') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="field">
+            <span>Metal *</span>
+            <select name="metalType"{{ id ? ' disabled' : '' }}>
+                {% for k, label in metals %}<option value="{{ k }}"{{ k == v.metalType|default('gold')|lower ? ' selected' : '' }}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        {{ ui.field('Weight (grams)', 'weightGrams', v.weightGrams|default(''), {type: 'number', step: '0.001', min: '0', required: true, autofocus: true, inputmode: 'decimal'}) }}
+        {{ ui.field('What is it', 'description', v.description|default(''), {required: true, placeholder: 'e.g. Bench dust, loose stone settings, raw silver bar'}) }}
+        {{ ui.field('Purity (optional)', 'purity', v.purity|default(''), {placeholder: 'e.g. 22K'}) }}
+        {{ ui.field('Pieces (optional)', 'pieces', v.pieces|default(''), {type: 'number', min: '0', inputmode: 'numeric'}) }}
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ id ? 'Save changes' : 'Add to stock' }}</button>
+    </div>
+</form>

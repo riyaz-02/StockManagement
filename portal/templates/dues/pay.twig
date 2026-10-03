@@ -1,0 +1,17 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/dues/pay/{{ inv._id|default(inv.id|default('')) }}" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <input type="hidden" name="rid" value="{{ rid }}">
+    <h2>Receive payment</h2>
+    <p class="muted">Bill {{ inv.invoiceNumber }} · {{ inv.customerName }}<br>Still due <strong class="neg">{{ inv.dueAmount|default(0)|inr }}</strong></p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        <div class="span-2">{{ ui.field('Amount received', 'amount', v.amount|default(''), {type: 'number', step: '0.01', min: '0', money: true, required: true, autofocus: true, inputmode: 'decimal'}) }}</div>
+        {{ ui.field('Paid by', 'mode', v.mode|default('Cash'), {type: 'select', options: modes}) }}
+        {{ ui.field('Reference (optional)', 'reference', v.reference|default(''), {placeholder: 'UPI / cheque no.'}) }}
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-ok">Receive</button>
+    </div>
+</form>

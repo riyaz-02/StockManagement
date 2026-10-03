@@ -1,0 +1,26 @@
+{% extends 'app.twig' %}
+{% block title %}Stock{% endblock %}
+{% block heading %}Stock{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Stock</h1><p class="muted">Every piece you hold, with its weight, box and price.</p></div>
+    <div class="actions">{% if can('items.create') %}<a class="btn btn-primary" href="/stock/new">{{ icon('plus', 17) }} Add stock</a>{% endif %}</div>
+</div>
+{% set g = dash.barcodedStock.gold|default({}) %}{% set s = dash.barcodedStock.silver|default({}) %}
+<div class="stats">
+    <div class="stat"><span>Gold in stock</span><strong>{{ dash.totalStock.gold|default(0)|grams }}</strong><small>{{ g.count|default(0) }} pieces ({{ g.weightGrams|default(0)|grams }}) + bulk</small></div>
+    <div class="stat"><span>Silver in stock</span><strong>{{ dash.totalStock.silver|default(0)|grams }}</strong><small>{{ s.count|default(0) }} pieces ({{ s.weightGrams|default(0)|grams }}) + bulk</small></div>
+</div>
+{% if can('stock.view') %}
+<div class="live-block" hx-get="/stock/check" hx-trigger="load, data-changed from:body" hx-swap="innerHTML" hx-target="this">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+<div class="live-block" hx-get="/stock/bulk" hx-trigger="load, data-changed from:body" hx-swap="innerHTML" hx-target="this">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endif %}
+<div class="live-block" hx-get="/stock/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

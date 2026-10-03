@@ -8,7 +8,6 @@ const {
     getItemByBarcode,
     updateItem,
     deleteItem,
-    sellItem,
     removeTemporarily,
     restoreItem,
     permanentDeleteItem,
@@ -29,7 +28,6 @@ router.get('/:id', requirePermission('items.view'), getItem);
 
 router.post('/', requirePermission('items.create'), cloudinaryUpload.array('images', 5), createItem);
 router.put('/:id', requirePermission('items.edit'), cloudinaryUpload.array('images', 5), updateItem);
-router.put('/:id/sell', requirePermission('items.sell'), sellItem);
 router.put('/:id/remove-temporarily', requirePermission('items.edit'), removeTemporarily);
 router.put('/:id/mark-no-sell', requirePermission('items.edit'), markAsNoSell);
 router.put('/:id/mark-active', requirePermission('items.edit'), markAsActive);

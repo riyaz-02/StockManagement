@@ -57,7 +57,7 @@ class StockDashboardTab extends StatelessWidget {
 
               if (store.bulkWeights.isEmpty)
                 _buildEmptyCard(
-                    'No bulk weight entries yet.\nTap Add to enter raw/reserved gold.'),
+                    'No bulk stock entered yet.\nTap Add to enter dust, parts or raw metal kept together.'),
 
               ...store.bulkWeights
                   .map((bw) => _buildBulkWeightCard(context, bw, store)),
@@ -213,7 +213,7 @@ class StockDashboardTab extends StatelessWidget {
         title: Text(bw.description,
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         subtitle: Text(
-          '${bw.metalType[0].toUpperCase()}${bw.metalType.substring(1)} • ${bw.weightGrams.toStringAsFixed(3)} g',
+          '${bw.categoryLabel} • ${bw.metalType[0].toUpperCase()}${bw.metalType.substring(1)} • ${bw.weightGrams.toStringAsFixed(3)} g${bw.purity.isNotEmpty ? ' • ${bw.purity}' : ''}${bw.pieces != null ? ' • ${bw.pieces} pcs' : ''}',
           style: TextStyle(color: Colors.grey[600], fontSize: 12),
         ),
         trailing: Row(
@@ -253,6 +253,10 @@ class StockDashboardTab extends StatelessWidget {
         TextEditingController(text: existing?.weightGrams.toString() ?? '');
     final descController =
         TextEditingController(text: existing?.description ?? '');
+    String selectedCategory = existing?.category ?? 'other';
+    final purityController = TextEditingController(text: existing?.purity ?? '');
+    final piecesController =
+        TextEditingController(text: existing?.pieces?.toString() ?? '');
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -289,6 +293,16 @@ class StockDashboardTab extends StatelessWidget {
                 onChanged: (v) => setSheetState(() => selectedMetal = v!),
               ),
               const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                decoration: const InputDecoration(labelText: 'Kind of bulk stock'),
+                items: BulkWeight.categoryLabels.entries
+                    .map((e) =>
+                        DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => setSheetState(() => selectedCategory = v!),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: weightController,
                 keyboardType:
@@ -303,8 +317,29 @@ class StockDashboardTab extends StatelessWidget {
                 controller: descController,
                 decoration: const InputDecoration(
                   labelText: 'Description',
-                  hintText: 'e.g. Reserved Gold, Raw Silver Bar',
+                  hintText: 'e.g. Bench dust, loose stone settings, raw silver bar',
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: purityController,
+                      decoration: const InputDecoration(
+                          labelText: 'Purity (optional)', hintText: 'e.g. 22K'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: piecesController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: 'Pieces (optional)'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -333,12 +368,18 @@ class StockDashboardTab extends StatelessWidget {
                             metalType: selectedMetal,
                             weightGrams: w,
                             description: descController.text.trim(),
+                            category: selectedCategory,
+                            purity: purityController.text.trim(),
+                            pieces: int.tryParse(piecesController.text.trim()),
                           );
                         } else {
                           ok = await store.updateBulkWeight(
                             existing.id,
                             w,
                             descController.text.trim(),
+                            category: selectedCategory,
+                            purity: purityController.text.trim(),
+                            pieces: int.tryParse(piecesController.text.trim()),
                           );
                         }
                         if (ctx.mounted) Navigator.pop(ctx);

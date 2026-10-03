@@ -99,7 +99,7 @@ To find your IP address:
 The backend is configured to use MongoDB Atlas. Connection string is in `backend/.env`:
 
 ```env
-MONGODB_URI=mongodb+srv://riyazjisce:sg4Ua6VfYEztDCVC@companyresearchassistan.rfodcjr.mongodb.net/jewellery_stock?retryWrites=true&w=majority&appName=CompanyResearchAssistant
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/shopmanage?retryWrites=true&w=majority
 ```
 
 ## 📋 Testing the App

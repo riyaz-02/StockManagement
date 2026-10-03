@@ -49,6 +49,9 @@ class Purchase {
   final String createdByName;
   final DateTime createdAt;
 
+  /// false for a purchase made on the old website: its GST was never recorded, so no GST / input credit is counted.
+  final bool gstRecorded;
+
   const Purchase({
     required this.id,
     required this.invoiceDate,
@@ -85,6 +88,7 @@ class Purchase {
     this.createdByName = '',
     required this.createdAt,
     this.valuation,
+    this.gstRecorded = true,
   });
 
   factory Purchase.fromJson(Map<String, dynamic> json) {
@@ -131,6 +135,7 @@ class Purchase {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
+      gstRecorded: json['gstRecorded'] != false,
     );
   }
 

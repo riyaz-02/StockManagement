@@ -108,7 +108,7 @@ const section = (t) => console.log(`\n${t}`);
     r = await call('PUT', `/api/items/${itemId}/restore`, { token: admin });
     check('restore item', r.status === 200, `(${r.status})`);
     r = await call('PUT', `/api/items/${item2}/sell`, { token: admin, body: { soldTo: 'SMOKE Buyer', sellingPrice: 30000 } });
-    check('mark item sold', r.status === 200, `(${r.status} ${r.json.message || ''})`);
+    check('there is no separate quick-sale any more (a piece is sold on a GST bill)', r.status === 404, `(${r.status} ${r.json.message || ''})`);
 
     // ── Users & roles ───────────────────────────────────────────────────────
     section('Users & permissions');
@@ -398,6 +398,16 @@ const section = (t) => console.log(`\n${t}`);
     check('meta: prints the live terms (Chandannagar jurisdiction)', r.data?.terms?.some((t) => /Chandannagar/.test(t)) && r.data?.terms?.length === 6);
     r = await call('GET', '/api/billing/meta', { token: viewer });
     check('viewer can read billing meta', r.status === 200);
+    r = await bill({ invoiceDate: '2099-01-01', paymentMode: 'Online', paidAmount: 100000 });
+    check('a bill dated in the future is refused (400)', r.status === 400 && /future/i.test(r.json?.message || ''), `(${r.status}) ${r.json?.message}`);
+    r = await call('POST', '/api/billing/calculate', { token: admin, body: { items: [ring()], goldRate: 9190, silverRate: 110, paidAmount: 1000 } });
+    check('calculate: totals for a typed bill, nothing saved', r.status === 200 && r.data?.totalPayableAmount > 60000 && r.data?.dueAmount === r.data.totalPayableAmount - 1000 && r.data?.gstType === 'CGST_SGST', JSON.stringify(r.json).slice(0, 100));
+    r = await call('POST', '/api/billing/calculate', { token: admin, body: { items: [ring()], goldRate: 9190, placeOfSupply: '27-Maharashtra' } });
+    check('calculate: another state gives IGST', r.status === 200 && r.data?.gstType === 'IGST' && r.data?.interstate === true, JSON.stringify(r.json).slice(0, 100));
+    r = await call('POST', '/api/billing/calculate', { token: admin, body: { items: [], goldRate: 9190 } });
+    check('calculate: no items is a clear 400', r.status === 400);
+    r = await call('POST', '/api/billing/calculate', { token: viewer, body: { items: [ring()], goldRate: 9190 } });
+    check('calculate: viewer cannot (403)', r.status === 403, `(${r.status})`);
     r = await bill({}, viewer);
     check('viewer cannot create an invoice (403)', r.status === 403, `(${r.status})`);
 
@@ -697,7 +707,7 @@ const section = (t) => console.log(`\n${t}`);
         const Calc2 = require('../services/billingCalc');
         const c2 = await MongoClient.connect('mongodb://127.0.0.1:27018');
         const lgp2 = c2.db('lgp_dev');
-        const shop2db = c2.db('shopmanage_dev');
+        const shop2db = c2.db('lgp_dev');
         await lgp2.collection('invoices').deleteMany({ source: 'gst-test' });
         await shop2db.collection('purchases').deleteMany({ biller: 'GST-TEST SUPPLIER' });
         const mk = (number, date, items, o = {}) => {
@@ -712,7 +722,7 @@ const section = (t) => console.log(`\n${t}`);
         const sv = (x = {}) => ({ particulars: 'Silver Chain', metalType: 'Silver', netWt: 100, rate: 100, makingCharge: 500, ...x });
         const inv = [mk('GT-A', '2024-06-03', [g(), sv()], { additional: 500 }), mk('GT-B', '2024-06-10', [g({ netWt: 20 })], { interstate: true }), mk('GT-C', '2024-06-20', [sv()], { status: 'cancelled' }), mk('GT-D', '2024-07-02', [g()])];
         await lgp2.collection('invoices').insertMany(inv);
-        const P = (date, cg, sg, ig, gstin) => ({ invoiceDate: new Date(date + 'T05:00:00Z'), invoiceNumber: `GT-P-${date}-${cg}`, metalType: 'gold', biller: 'GST-TEST SUPPLIER', quantity: 1, rate: 1, totalAmount: 10000, itcCgst: cg, itcSgst: sg, itcIgst: ig, totalItc: cg + sg + ig, billerGstin: gstin, isDeleted: false, createdBy: 'x', createdAt: new Date(), updatedAt: new Date() });
+        const P = (date, cg, sg, ig, gstin) => ({ invoice_date: date, invoice_number: `GT-P-${date}-${cg}`, metal_type: 'Gold', biller: 'GST-TEST SUPPLIER', description: '', quantity: 1, rate: 1, total_amount: 10000 + cg + sg + ig, created_at: new Date(), created_by: 'x', totalAmount: 10000, totalPayable: 10000 + cg + sg + ig, totalGst: cg + sg + ig, itcCgst: cg, itcSgst: sg, itcIgst: ig, totalItc: cg + sg + ig, billerGstin: gstin, source: 'app' });
         await shop2db.collection('purchases').insertMany([P('2024-06-05', 200, 200, 0, '19ABCDE1234F1Z5'), P('2024-06-06', 0, 0, 90, '27ABCDE1234F1Z5'), P('2024-06-07', 50, 50, 0, ''), P('2024-05-15', 100, 100, 0, '19ABCDE1234F1Z5')]);
 
         r = await call('GET', '/api/gst-reports/summary?from=2024-06-01&to=2024-06-30', { token: staff });
@@ -785,7 +795,7 @@ const section = (t) => console.log(`\n${t}`);
         check('a filing date in the future is refused (400)', r.status === 400);
         r = await call('POST', '/api/gst-reports/filings', { token: admin, body: { returnType: 'GSTR-1', period: '2024-Q9', filedOn: '2024-07-09' } });
         check('a period that does not fit is refused (400)', r.status === 400);
-        await c2.db('jewellery_stock_dev').collection('app_gst_filings').deleteMany({ arn: 'AA0607240000123' });
+        await c2.db('lgp_dev').collection('gst_data').deleteMany({ 'filings.arn': 'AA0607240000123' });
         r = await call('POST', '/api/gst-reports/filings', { token: admin, body: { returnType: 'GSTR-3B', period: '2024-06', filedOn: '2024-07-19', arn: 'aa0607240000123', taxLiability: 5000, itcUsed: 3000, cashPaid: 2000 } });
         const fid = r.data?._id;
         check('record a filed GSTR-3B: ARN upper-cased, amounts saved', r.status === 201 && r.data?.arn === 'AA0607240000123' && r.data?.cashPaid === 2000, `(${r.status} ${r.json.message || ''})`);
@@ -832,15 +842,15 @@ const section = (t) => console.log(`\n${t}`);
         check('monthly record: totals are exactly the two valid invoices own figures', mr?.totals?.taxable === sumTaxable && mr?.totals?.count === 2 && mr?.totals?.igst === inv[1].gst_summary.total_igst && mr?.totals?.goldWeight === 30 && mr?.totals?.silverWeight === 100);
         check('monthly record: header data (GSTIN, firm), document id and IST timestamp', mr?.seller?.gstin === '19AKFPN3465R1ZB' && /^GST-[0-9A-F]{6}$/.test(mr?.documentId || '') && / IST$/.test(mr?.generatedAt || '') && mr?.period?.monthName === 'June');
         check('monthly record: each invoice carries what the layout prints (customer, place of supply, items with HSN, GST, amount in words field)', mr?.invoices?.[0]?.customer?.name === 'GT GT-A' && mr?.invoices?.[0]?.placeOfSupply === '19-West Bengal' && mr?.invoices?.[0]?.items?.[0]?.hsn === '7113' && 'amountInWords' in mr.invoices[0] && mr?.invoices?.[1]?.gstType === 'IGST');
-        const auditDoc = await c2.db('jewellery_stock_dev').collection('app_gst_documents').findOne({ documentId: mr?.documentId });
-        check('monthly record: an audit row is kept (who, when, totals) like the website outputDoc', !!auditDoc && auditDoc.totalInvoices === 3 && auditDoc.validInvoices === 2 && auditDoc.generatedByName === 'Admin' && auditDoc.year === 2024);
-        await c2.db('jewellery_stock_dev').collection('app_gst_documents').deleteMany({ year: 2024, month: 6 });
+        const auditDoc = await c2.db('lgp_dev').collection('outputDoc').findOne({ document_id: mr?.documentId });
+        check('monthly record: one log row in the website outputDoc (its own field names: who, when, totals)', !!auditDoc && auditDoc.total_invoices === 3 && auditDoc.valid_invoices_count === 2 && auditDoc.user_name === 'Admin' && auditDoc.year === 2024 && auditDoc.document_type === 'GST_MONTHLY_REPORT' && auditDoc.month_name === 'June' && auditDoc.date_range?.start_date === '2024-06-01' && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(auditDoc.generation_timestamp) && / IST$/.test(auditDoc.generation_timestamp_ist));
+        await c2.db('lgp_dev').collection('outputDoc').deleteMany({ year: 2024, month: 6, source: 'app' });
 
         // put things back for the next run
         await call('PUT', '/api/gst-reports/settings', { token: admin, body: { frequency: 'monthly', remindersFrom: pmKey, trackFrom: `${new Date().getFullYear()}-04`, openingItc: { igst: 0, cgst: 0, sgst: 0 } } });
         await lgp2.collection('invoices').deleteMany({ source: 'gst-test' });
         await shop2db.collection('purchases').deleteMany({ biller: 'GST-TEST SUPPLIER' });
-        await c2.db('jewellery_stock_dev').collection('app_gst_filings').deleteMany({ arn: 'AA0607240000123' });
+        await c2.db('lgp_dev').collection('gst_data').deleteMany({ 'filings.arn': 'AA0607240000123' });
         await c2.close();
     }
 
@@ -941,13 +951,13 @@ const section = (t) => console.log(`\n${t}`);
             check('staff without GST access still get 403', r.status === 403);
         } finally {
             await cmb.db('lgp_dev').collection('invoices').deleteMany({ source: 'mb-test' });
-            await cmb.db('jewellery_stock_dev').collection('app_gst_filings').deleteMany({ arn: /^MBARN/ });
-            await cmb.db('jewellery_stock_dev').collection('app_gst_settings').deleteMany({ key: `gstin:${G_B}` });
+            await cmb.db('lgp_dev').collection('gst_data').deleteMany({ 'filings.arn': /^MBARN/ });
+            await cmb.db('lgp_dev').collection('app_gst_settings').deleteMany({ key: `gstin:${G_B}` });
             await cmb.db('lgp_dev').collection('invoices').deleteMany({ customer_name: 'Pune Walk-in' });
-            await cmb.db('jewellery_stock_dev').collection('app_branches').deleteMany({ name: `SMOKE Pune ${tag}` });
-            await cmb.db('jewellery_stock_dev').collection('users').deleteMany({ name: `SMOKE Pune Staff ${tag}` });
-            await cmb.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: `SMOKE-PI-${tag}` });
-            await cmb.db('jewellery_stock_dev').collection('containers').deleteMany({ qrCode: `SMOKE-PC-${tag}` });
+            await cmb.db('lgp_dev').collection('app_branches').deleteMany({ name: `SMOKE Pune ${tag}` });
+            await cmb.db('lgp_dev').collection('users').deleteMany({ full_name: `SMOKE Pune Staff ${tag}` });
+            await cmb.db('lgp_dev').collection('items').deleteMany({ barcode: `SMOKE-PI-${tag}` });
+            await cmb.db('lgp_dev').collection('containers').deleteMany({ qrCode: `SMOKE-PC-${tag}` });
             await cmb.close();
         }
     }
@@ -979,8 +989,8 @@ const section = (t) => console.log(`\n${t}`);
         r = await call('PUT', `/api/items/${xi?._id}`, { token: admin, body: { containerId: null } });
         check('containerId null takes the item out of its box', r.status === 200 && !unwrap(r.data)?.containerId, JSON.stringify(r.json).slice(0, 100));
         const cx = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cx.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: { $in: [bc, bc + 'b'] } });
-        await cx.db('jewellery_stock_dev').collection('containers').deleteMany({ qrCode: { $in: [`SMOKE-MA-${tag}`, `SMOKE-MB-${tag}`] } });
+        await cx.db('lgp_dev').collection('items').deleteMany({ barcode: { $in: [bc, bc + 'b'] } });
+        await cx.db('lgp_dev').collection('containers').deleteMany({ qrCode: { $in: [`SMOKE-MA-${tag}`, `SMOKE-MB-${tag}`] } });
         await cx.close();
     }
 
@@ -1004,8 +1014,8 @@ const section = (t) => console.log(`\n${t}`);
         r = await call('POST', '/api/billing/invoices', { token: admin, body: body(12772) });
         check('the same piece cannot be sold twice (400)', r.status === 400 && /already sold/.test(r.json.message || ''), `(${r.status} ${r.json.message || ''})`);
         const cs = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cs.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: bc });
-        await cs.db('jewellery_stock_dev').collection('containers').deleteMany({ qrCode: `SMOKE-SB-${tag}` });
+        await cs.db('lgp_dev').collection('items').deleteMany({ barcode: bc });
+        await cs.db('lgp_dev').collection('containers').deleteMany({ qrCode: `SMOKE-SB-${tag}` });
         await cs.db('lgp_dev').collection('invoices').deleteMany({ customer_name: 'Sell Walk-in' });
         await cs.close();
     }
@@ -1033,14 +1043,13 @@ const section = (t) => console.log(`\n${t}`);
         check('editing the valuation recomputes quantity, taxable amount, GST and ITC', r.status === 200 && pe?.quantity === 20 && pe?.totalAmount === 20000 && Math.abs(pe.totalGst - 616.2) < 0.01 && Math.abs(pe.totalItc - 616.2) < 0.01, JSON.stringify(r.json).slice(0, 200));
         // once the GSTR-3B of that period is filed the purchase is locked
         const cf = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cf.db('jewellery_stock_dev').collection('app_gst_filings').insertOne({ gstin: '', returnType: 'GSTR-3B', period: '2019-05', filedOn: '2019-06-20', taxLiability: 0, itcUsed: 0, cashPaid: 0, lateFee: 0, interest: 0, nil: false, note: 'SMOKE lock' });
+        await cf.db('lgp_dev').collection('gst_data').insertOne({ financial_year: 2019, quarter: 1, gstr1_filed: false, gstr3b_filed: false, created_at: new Date(), filings: [{ id: 'smoke-lock-0001', gstin: '', returnType: 'GSTR-3B', period: '2019-05', filedOn: '2019-06-20', taxLiability: 0, itcUsed: 0, cashPaid: 0, lateFee: 0, interest: 0, nil: false, note: 'SMOKE lock' }] });
         r = await call('PUT', `/api/purchases/${ph?._id}`, { token: admin, body: { valuation: { net: 30, purity: '24K', rate: 1000 } } });
         check('a purchase in a period whose GSTR-3B is filed cannot be revalued (409)', r.status === 409 && /already filed/.test(r.json.message || ''), `(${r.status} ${r.json.message || ''})`);
-        await cf.db('jewellery_stock_dev').collection('app_gst_filings').deleteMany({ note: 'SMOKE lock' });
+        await cf.db('lgp_dev').collection('gst_data').deleteMany({ 'filings.note': 'SMOKE lock' });
         await cf.close();
         const cp = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cp.db('shopmanage_dev').collection('purchases').deleteMany({ invoiceNumber: { $in: [inv, inv + 'x', inv2] } });
-        await cp.db('shopmanage_dev').collection('stock_entries').deleteMany({ description: /SMOKE Supplier/ });
+        await cp.db('lgp_dev').collection('purchases').deleteMany({ invoice_number: { $in: [inv, inv + 'x', inv2].map((x) => String(x).toUpperCase()) } });
         await cp.close();
     }
 
@@ -1066,8 +1075,7 @@ const section = (t) => console.log(`\n${t}`);
         r = await call('POST', `/api/old-metal/${om?._id}/cancel`, { token: admin });
         check('cancelling twice is refused (400)', r.status === 400);
         const co = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await co.db('jewellery_stock_dev').collection('app_old_metal').deleteMany({ $or: [{ customerName: /^SMOKE OM/ }, { note: 'SMOKE raw' }] });
-        await co.db('shopmanage_dev').collection('stock_entries').deleteMany({ description: /Old metal from SMOKE OM|Raw metal/ });
+        await co.db('lgp_dev').collection('app_old_metal').deleteMany({ $or: [{ customerName: /^SMOKE OM/ }, { note: 'SMOKE raw' }] });
         await co.close();
     }
 
@@ -1100,8 +1108,7 @@ const section = (t) => console.log(`\n${t}`);
         r = await call('GET', '/api/old-metal/available?mobile=9000000088', { token: staff });
         check('used entries no longer appear as available', (r.data || []).length === 0);
         const cb = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cb.db('jewellery_stock_dev').collection('app_old_metal').deleteMany({ customerName: /^SMOKE OMB/ });
-        await cb.db('shopmanage_dev').collection('stock_entries').deleteMany({ description: /SMOKE OMB/ });
+        await cb.db('lgp_dev').collection('app_old_metal').deleteMany({ customerName: /^SMOKE OMB/ });
         await cb.db('lgp_dev').collection('invoices').deleteMany({ customer_name: 'SMOKE OMB Cust' });
         await cb.close();
     }
@@ -1134,11 +1141,10 @@ const section = (t) => console.log(`\n${t}`);
         check('running it again does nothing (each cancelled bill is handled once)', r.data?.pieces === 0 && r.data?.oldMetal === 0);
         r = await call('POST', '/api/billing/reconcile', { token: staff });
         check('only people who see every branch can run it (403)', r.status === 403);
-        await cr.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: bc });
-        await cr.db('jewellery_stock_dev').collection('containers').deleteMany({ qrCode: `SMOKE-RB-${tag}` });
-        await cr.db('jewellery_stock_dev').collection('app_old_metal').deleteMany({ customerName: /^SMOKE REL/ });
-        await cr.db('jewellery_stock_dev').collection('app_stock_release').deleteMany({ invoice: invNo });
-        await cr.db('shopmanage_dev').collection('stock_entries').deleteMany({ description: /SMOKE REL/ });
+        await cr.db('lgp_dev').collection('items').deleteMany({ barcode: bc });
+        await cr.db('lgp_dev').collection('containers').deleteMany({ qrCode: `SMOKE-RB-${tag}` });
+        await cr.db('lgp_dev').collection('app_old_metal').deleteMany({ customerName: /^SMOKE REL/ });
+        await cr.db('lgp_dev').collection('app_stock_release').deleteMany({ invoice: invNo });
         await cr.db('lgp_dev').collection('invoices').deleteMany({ customer_name: 'SMOKE REL Cust' });
         await cr.close();
     }
@@ -1192,11 +1198,10 @@ const section = (t) => console.log(`\n${t}`);
         await cc.db('lgp_dev').collection('invoices').updateOne({ invoice_number: inv?.invoiceNumber }, { $set: { status: 'cancelled' } });
         r = await call('POST', '/api/credit-notes/preview', { token: admin, body: { invoiceId: inv?._id, lines: [{ index: 1 }] } });
         check('a cancelled invoice cannot get a credit note (400)', r.status === 400);
-        await cc.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: bc });
-        await cc.db('jewellery_stock_dev').collection('containers').deleteMany({ qrCode: `SMOKE-CB-${tag}` });
-        await cc.db('jewellery_stock_dev').collection('app_credit_notes').deleteMany({ customerName: 'SMOKE CN Cust' });
-        await cc.db('jewellery_stock_dev').collection('app_stock_release').deleteMany({ invoice: inv?.invoiceNumber });
-        await cc.db('shopmanage_dev').collection('stock_entries').deleteMany({ description: /SMOKE CN/ });
+        await cc.db('lgp_dev').collection('items').deleteMany({ barcode: bc });
+        await cc.db('lgp_dev').collection('containers').deleteMany({ qrCode: `SMOKE-CB-${tag}` });
+        await cc.db('lgp_dev').collection('app_credit_notes').deleteMany({ customerName: 'SMOKE CN Cust' });
+        await cc.db('lgp_dev').collection('app_stock_release').deleteMany({ invoice: inv?.invoiceNumber });
         await cc.db('lgp_dev').collection('invoices').deleteMany({ customer_name: 'SMOKE CN Cust' });
         await cc.close();
     }
@@ -1223,7 +1228,7 @@ const section = (t) => console.log(`\n${t}`);
     section('Rates, expenses, Day Book, dues');
     {
         const cr = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cr.db('jewellery_stock_dev').collection('app_rates').deleteMany({});
+        await cr.db('lgp_dev').collection('app_rates').deleteMany({});
         r = await call('PUT', '/api/rates', { token: viewer, body: { gold: 9200 } });
         check('a viewer cannot change the rate (403)', r.status === 403);
         r = await call('PUT', '/api/rates', { token: staff, body: { gold: 92 } });
@@ -1276,9 +1281,9 @@ const section = (t) => console.log(`\n${t}`);
         r = await call('DELETE', `/api/expenses/${ex?.id}`, { token: admin });
         const gone = await call('GET', '/api/expenses', { token: staff });
         check('the owner cancels an expense; it leaves the list', r.status === 200 && !gone.data.rows.some((x) => x.id === ex?.id));
-        await cr.db('jewellery_stock_dev').collection('app_rates').deleteMany({});
-        await cr.db('jewellery_stock_dev').collection('app_expenses').deleteMany({ note: 'SMOKE tea' });
-        await cr.db('jewellery_stock_dev').collection('app_credit_notes').deleteMany({ invoiceNumber: inv?.invoiceNumber });
+        await cr.db('lgp_dev').collection('app_rates').deleteMany({});
+        await cr.db('lgp_dev').collection('app_expenses').deleteMany({ note: 'SMOKE tea' });
+        await cr.db('lgp_dev').collection('app_credit_notes').deleteMany({ invoiceNumber: inv?.invoiceNumber });
         await cr.db('lgp_dev').collection('invoices').deleteMany({ invoice_number: inv?.invoiceNumber });
         await cr.close();
     }
@@ -1287,7 +1292,7 @@ const section = (t) => console.log(`\n${t}`);
     section('Stock tally');
     {
         const ct = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        const tdb = ct.db('jewellery_stock_dev');
+        const tdb = ct.db('lgp_dev');
         await tdb.collection('tallysessions').deleteMany({});
         r = await call('GET', '/api/tally/preview', { token: viewer });
         check('the Start screen preview is for people who may start a tally (viewer refused, 403)', r.status === 403);
@@ -1334,7 +1339,7 @@ const section = (t) => console.log(`\n${t}`);
     section('Estimates');
     {
         const ce = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await ce.db('jewellery_stock_dev').collection('app_estimates').deleteMany({});
+        await ce.db('lgp_dev').collection('app_estimates').deleteMany({});
         const line = { particulars: 'Gold Ring', metalType: 'Gold', purity: '22K', netWt: 2, rate: 0, makingCharge: 500, hsnCode: '7113' };
         const body = (over = {}) => ({ requestId: uid(), customerName: 'SMOKE Est Cust', customerMobile: '9000000044', items: [line], goldRate: 9000, silverRate: 100, validDays: 7, ...over });
         r = await call('POST', '/api/estimates', { token: viewer, body: body() });
@@ -1359,13 +1364,13 @@ const section = (t) => console.log(`\n${t}`);
         check('marking it as billed keeps the invoice number and closes it', r.status === 200 && r.data.status === 'converted' && r.data.convertedInvoice === 'X-1');
         r = await call('POST', `/api/estimates/${es.id}/converted`, { token: staff, body: { invoiceNumber: 'X-2' } });
         check('a billed estimate cannot be billed twice (404)', r.status === 404);
-        await ce.db('jewellery_stock_dev').collection('app_estimates').updateOne({ number: (await call('GET', '/api/estimates?q=SMOKE Est', { token: staff })).data.find((x) => x.status === 'open').number }, { $set: { validTill: '2001-01-01' } });
+        await ce.db('lgp_dev').collection('app_estimates').updateOne({ number: (await call('GET', '/api/estimates?q=SMOKE Est', { token: staff })).data.find((x) => x.status === 'open').number }, { $set: { validTill: '2001-01-01' } });
         r = await call('GET', '/api/estimates?status=expired', { token: staff });
         check('an estimate past its date shows as expired', r.data.length === 1 && r.data[0].status === 'expired');
         const openOne = (await call('GET', '/api/estimates?status=expired', { token: staff })).data[0];
         r = await call('DELETE', `/api/estimates/${openOne.id}`, { token: staff });
         check('an open estimate can be cancelled', r.status === 200);
-        await ce.db('jewellery_stock_dev').collection('app_estimates').deleteMany({});
+        await ce.db('lgp_dev').collection('app_estimates').deleteMany({});
         await ce.close();
     }
 
@@ -1373,7 +1378,7 @@ const section = (t) => console.log(`\n${t}`);
     section('Custom orders');
     {
         const co = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await co.db('jewellery_stock_dev').collection('app_orders').deleteMany({});
+        await co.db('lgp_dev').collection('app_orders').deleteMany({});
         const inDays = (n) => new Date(Date.now() + 5.5 * 3600000 + n * 86400000).toISOString().slice(0, 10);
         const ob = (over = {}) => ({ requestId: uid(), customerName: 'SMOKE Ord Cust', customerMobile: '9000000033', description: 'Gold chain 22K about 20 g, rope pattern', metalType: 'gold', purity: '22K', approxWeight: 20, estimatedPrice: 20000, deliveryDate: inDays(10), advanceAmount: 5000, advanceMode: 'Cash', ...over });
         r = await call('POST', '/api/orders', { token: viewer, body: ob() });
@@ -1434,10 +1439,111 @@ const section = (t) => console.log(`\n${t}`);
         check('cancelling returns the advance: the order closes and the Day Book shows it as money out', r.status === 200 && r.data.status === 'cancelled' && Math.abs(mode(a3, 'Cash').out - mode(b3, 'Cash').out - 1000) < 0.01);
         r = await call('POST', `/api/orders/${o2.id}/advance`, { token: staff, body: { amount: 10, mode: 'Cash' } });
         check('a cancelled order takes no more advance (400)', r.status === 400);
-        await co.db('jewellery_stock_dev').collection('app_orders').deleteMany({});
-        await co.db('jewellery_stock_dev').collection('app_credit_notes').deleteMany({ invoiceNumber: inv?.invoiceNumber });
+        await co.db('lgp_dev').collection('app_orders').deleteMany({});
+        await co.db('lgp_dev').collection('app_credit_notes').deleteMany({ invoiceNumber: inv?.invoiceNumber });
         await co.db('lgp_dev').collection('invoices').deleteMany({ invoice_number: inv?.invoiceNumber });
         await co.close();
+    }
+
+    // ── Realtime: events, live stream, catch-up, tickets ────────────────────────
+    section('Realtime');
+    {
+        const sleepMs = (ms) => new Promise((res) => setTimeout(res, ms));
+        // opens the live stream and collects what arrives
+        const openStream = async (query, token, useTicket) => {
+            const ctl = new AbortController();
+            const url = `${BASE}/api/live${query}`;
+            const resp = await fetch(url, { signal: ctl.signal, headers: useTicket ? {} : { Authorization: `Bearer ${token}` } });
+            const got = { status: resp.status, ctype: resp.headers.get('content-type') || '', events: [], raw: '', close: () => ctl.abort() };
+            if (resp.status !== 200) { got.body = await resp.text().catch(() => ''); return got; }
+            (async () => {
+                try {
+                    const dec = new TextDecoder();
+                    let buf = '';
+                    for await (const chunk of resp.body) {
+                        buf += dec.decode(chunk, { stream: true });
+                        got.raw += dec.decode(chunk, { stream: true });
+                        let i;
+                        while ((i = buf.indexOf('\n\n')) >= 0) {
+                            const block = buf.slice(0, i); buf = buf.slice(i + 2);
+                            const ev = { type: 'message', data: null };
+                            for (const line of block.split('\n')) {
+                                if (line.startsWith('event:')) ev.type = line.slice(6).trim();
+                                else if (line.startsWith('data:')) { try { ev.data = JSON.parse(line.slice(5).trim()); } catch (_) { ev.data = line.slice(5).trim(); } }
+                            }
+                            if (block.trim() && !block.startsWith(':') && !block.startsWith('retry')) got.events.push(ev);
+                        }
+                    }
+                } catch (_) { /* closed */ }
+            })();
+            return got;
+        };
+        const waitFor = async (st, type, pred, ms = 3000) => { for (let i = 0; i < ms / 50; i++) { const f = st.events.find((e) => e.type === type && (!pred || pred(e.data))); if (f) return f; await sleepMs(50); } return null; };
+
+        r = await call('GET', '/api/live/events?since=0', { token: null });
+        check('the live endpoints need a login (401)', r.status === 401);
+        const sAdmin = await openStream('', admin);
+        check('the stream opens as text/event-stream and says hello with the latest event number', sAdmin.status === 200 && /text\/event-stream/.test(sAdmin.ctype) && !!(await waitFor(sAdmin, 'hello')), sAdmin.ctype);
+        const helloSeq = (sAdmin.events.find((e) => e.type === 'hello') || {}).data?.latest || 0;
+        const sStaff = await openStream('', staff);
+        const sViewer = await openStream('', viewer);
+        await sleepMs(300);
+
+        // a change on one side reaches every open screen at once
+        const t0 = Date.now();
+        r = await call('PUT', '/api/rates', { token: admin, body: { gold: 9310, silver: 111 } });
+        const evAdmin = await waitFor(sAdmin, 'rate.changed', (d) => d.data?.gold === 9310);
+        const evStaff = await waitFor(sStaff, 'rate.changed', (d) => d.data?.gold === 9310);
+        check('changing the rate reaches the open screens within a second or two (admin and staff)', !!evAdmin && !!evStaff && Date.now() - t0 < 2500, `(${Date.now() - t0} ms)`);
+        check('the event says who changed it and carries the new numbers', evAdmin?.data?.by === 'Admin' && evAdmin.data.data.silver === 111 && evAdmin.data.seq > helloSeq);
+
+        // a change of one person's permissions goes to that person only
+        r = await call('PUT', `/api/users/${staffId}/permission-overrides`, { token: admin, body: { overrides: { 'rates.edit': false } } });
+        const pStaff = await waitFor(sStaff, 'permissions.changed');
+        await sleepMs(500);
+        check('a permission change reaches the person it is about', r.status === 200 && !!pStaff && pStaff.data.data.userId === String(staffId), `(${r.status})`);
+        check('...and nobody else (the admin and the viewer do not receive it)', !sAdmin.events.some((e) => e.type === 'permissions.changed') && !sViewer.events.some((e) => e.type === 'permissions.changed'));
+        await call('PUT', `/api/users/${staffId}/permission-overrides`, { token: admin, body: { overrides: { 'rates.edit': null } } });
+
+        // module changes
+        r = await call('POST', '/api/expenses', { token: staff, body: { amount: 12, mode: 'Cash', category: 'Other', note: 'SMOKE live' } });
+        const dc = await waitFor(sAdmin, 'data.changed', (d) => d.module === 'expenses');
+        check('adding an expense tells the other screens that the expenses changed (data.changed)', r.status === 201 && !!dc);
+        if (r.data?.id) await call('DELETE', `/api/expenses/${r.data.id}`, { token: admin });
+
+        // app update and settings
+        r = await call('PUT', '/api/app-version', { token: admin, body: { latestVersion: '9.9.9', latestVersionCode: 999, forceUpdate: false, updateMessage: 'SMOKE' } });
+        const au = await waitFor(sStaff, 'app.update', (d) => d.data?.latestVersionCode === 999);
+        check('publishing an app update reaches every open app (app.update)', r.status === 200 && !!au, `(${r.status})`);
+        await call('PUT', '/api/app-version', { token: admin, body: { latestVersion: '1.4.0', latestVersionCode: 4, forceUpdate: false, updateMessage: '' } });
+
+        // catch-up for a client that was away
+        r = await call('GET', `/api/live/events?since=${helloSeq}`, { token: staff });
+        check('a client that was away asks "what did I miss?" and gets it, oldest first, with the latest number', r.status === 200 && r.data.events.length >= 3 && r.data.events.every((e, i, a) => !i || a[i - 1].seq < e.seq) && r.data.latest >= r.data.events[r.data.events.length - 1].seq && r.data.reset === false, JSON.stringify(r.json).slice(0, 160));
+        check('the person-only permission event is NOT in another person\'s catch-up', !(await call('GET', `/api/live/events?since=${helloSeq}`, { token: viewer })).data.events.some((e) => e.type === 'permissions.changed'));
+        r = await call('GET', `/api/live/events?since=${r.data.latest}`, { token: staff });
+        check('nothing missed = an empty answer', r.status === 200 && r.data.events.length === 0);
+        // reconnect with a number: the missed ones are replayed on the stream itself
+        const sBack = await openStream(`?since=${helloSeq}`, staff);
+        check('reconnecting with the last number replays what was missed on the stream', !!(await waitFor(sBack, 'rate.changed', (d) => d.data?.gold === 9310)));
+
+        // tickets for browsers
+        r = await call('POST', '/api/live/ticket', { token: admin });
+        const tk = r.data?.ticket;
+        check('a one-time ticket is issued for the browser (60 seconds)', r.status === 200 && /^[a-f0-9]{48}$/.test(tk || '') && r.data.expiresInSeconds === 60);
+        const sTk = await openStream(`?ticket=${tk}`, null, true);
+        check('the browser opens the stream with the ticket and no login token', sTk.status === 200 && !!(await waitFor(sTk, 'hello')));
+        const sTk2 = await openStream(`?ticket=${tk}`, null, true);
+        check('the same ticket cannot be used twice (401)', sTk2.status === 401);
+        const sBad = await openStream('?ticket=deadbeef', null, true);
+        check('a made-up ticket is refused (401)', sBad.status === 401);
+
+        for (const st of [sAdmin, sStaff, sViewer, sBack, sTk]) st.close();
+        await call('PUT', '/api/rates', { token: admin, body: { gold: 9200, silver: 110 } });
+        const cl = await MongoClient.connect('mongodb://127.0.0.1:27018');
+        await cl.db('lgp_dev').collection('app_rates').deleteMany({});
+        await cl.db('lgp_dev').collection('app_expenses').deleteMany({ note: 'SMOKE live' });
+        await cl.close();
     }
 
     // ── Stock Setting (valuation / wastage / labour rules) ──────────────────────
@@ -1468,11 +1574,52 @@ const section = (t) => console.log(`\n${t}`);
     check('an item keeps wastage / customer wastage / labour / making rates', r.status === 201 && unwrap(r.data)?.wastage === 8.4 && unwrap(r.data)?.custWastage === 1.5 && unwrap(r.data)?.labourRate === 120 && unwrap(r.data)?.makingRate === 60, JSON.stringify(r.json).slice(0, 100));
     {
         const cw = await MongoClient.connect('mongodb://127.0.0.1:27018');
-        await cw.db('jewellery_stock_dev').collection('items').deleteMany({ barcode: `SMOKE-W-${tag}` });
+        await cw.db('lgp_dev').collection('items').deleteMany({ barcode: `SMOKE-W-${tag}` });
         await cw.close();
     }
     r = await call('POST', '/api/stock-settings/reset', { token: admin });
     check('reset brings every rule back to its default', r.status === 200 && r.data?.settings?.sellStock?.custWastage === 'addStock' && r.data.settings.hallmark.charge === 45);
+
+    // ── Helpers added for the website ───────────────────────────────────────────
+    section('Website helpers');
+    r = await call('GET', '/api/items?limit=2&page=1&status=active', { token: admin });
+    check('items can be paged: one page, the total and the weight of the whole filter', r.status === 200 && r.json?.data?.items?.length <= 2 && r.json?.pagination?.total > 0 && typeof r.json?.totals?.netWeight === 'number', JSON.stringify(r.json?.pagination));
+    r = await call('POST', '/api/items', { token: admin, body: { barcode: `SMOKE-AM-${tag}`, name: 'SMOKE AutoMaking', itemType: 'ring', metalType: 'gold', purity: '22k', netWeight: 12, labourRate: 120, makingRate: 60, fixedMaking: 100, autoMaking: true } });
+    check('autoMaking: the server works the making charge out (12 x (120 + 60) + 100 = 2260)', r.status === 201 && unwrap(r.data)?.makingCharge === 2260, JSON.stringify(unwrap(r.data)?.makingCharge));
+    check('the weight class is worked out when the client sends none (12 g = Heavy)', unwrap(r.data)?.weightCategory === 'Heavy', String(unwrap(r.data)?.weightCategory));
+    {
+        const cw = await MongoClient.connect('mongodb://127.0.0.1:27018');
+        await cw.db('lgp_dev').collection('items').deleteMany({ barcode: `SMOKE-AM-${tag}` });
+        await cw.close();
+    }
+    r = await call('POST', '/api/purchases/calculate', { token: admin, body: { metalType: 'gold', quantity: 10, rate: 7000, transactionType: 'intra-state' } });
+    check('purchase calculate: taxable value, GST and input credit, nothing saved', r.status === 200 && r.data?.totalAmount === 70000 && r.data?.totalGst === 2100 && r.data?.totalItc === 2100, JSON.stringify(r.data).slice(0, 120));
+    r = await call('POST', '/api/purchases/calculate', { token: admin, body: {} });
+    check('purchase calculate: nothing entered is a clear 400', r.status === 400);
+    r = await call('POST', '/api/purchases/calculate', { token: viewer, body: { quantity: 10, rate: 7000 } });
+    check('purchase calculate: viewer cannot (403)', r.status === 403, `(${r.status})`);
+    {
+        const ph = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
+        const ph2 = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
+        r = await call('POST', '/api/directory/customers', { token: admin, body: { name: `SMOKE Partial ${tag}`, contacts: [{ number: ph, label: 'whatsapp' }, { number: ph2, label: 'mobile' }], fatherName: 'Keep Me', opening: { cash: { amount: 700, type: 'debit' } }, city: 'Howrah', notes: 'note kept' } });
+        const cid = r.data?._id;
+        r = await call('PUT', `/api/directory/customers/${cid}/partial`, { token: admin, body: { address: 'New partial address' } });
+        check('partial edit: changes only what was sent and keeps every other detail (numbers, father, opening balance, note)', r.status === 200 && r.data?.address === 'New partial address' && r.data?.profile?.contacts?.length === 2 && r.data?.profile?.fatherName === 'Keep Me' && r.data?.profile?.opening?.cash?.amount === 700 && r.data?.profile?.notes === 'note kept', JSON.stringify(r.json).slice(0, 160));
+        r = await call('PUT', `/api/directory/customers/${cid}/partial`, { token: viewer, body: { address: 'x' } });
+        check('partial edit: viewer cannot (403)', r.status === 403, `(${r.status})`);
+    }
+
+    // ── Audit log of admin actions ──────────────────────────────────────────────
+    section('Audit log');
+    r = await call('GET', '/api/admin/audit?limit=5', { token: admin });
+    check('the audit log lists entries newest first with a total', r.status === 200 && Array.isArray(r.json?.data) && r.json?.pagination?.total > 0);
+    r = await call('GET', '/api/admin/audit', { token: staff });
+    check('staff cannot read the audit log (403)', r.status === 403, `(${r.status})`);
+    r = await call('PUT', '/api/app-version', { token: admin, body: { latestVersion: '1.4.0', latestVersionCode: 4, forceUpdate: false } });
+    r = await call('GET', '/api/admin/audit?entity=app_update&limit=1', { token: admin });
+    check('publishing an app version leaves an audit line', r.status === 200 && r.json?.data?.[0]?.entity === 'app_update' && r.json.data[0].byName === 'Admin', JSON.stringify(r.json?.data?.[0] || {}).slice(0, 120));
+    r = await call('GET', '/api/stock-settings', { token: admin });
+    check('the stock settings answer also lists the allowed choices (for the website)', r.status === 200 && Array.isArray(r.json?.data?.options?.addStock?.valuation) && r.json.data.options.hallmark.type.includes('perGram'));
 
     // ── Admin console ───────────────────────────────────────────────────────
     section('Environment console');

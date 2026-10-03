@@ -30,6 +30,8 @@ exports.create = async (req, res, next) => {
         const date = ymd(b.date) || today;
         if (date > today) return res.status(400).json({ success: false, message: 'The date cannot be in the future' });
         const d = await Expense.create({ date, amount, mode, category, note: String(b.note || '').trim().slice(0, 200), createdBy: String(req.user._id), createdByName: req.user.name || '' });
+        require('../services/events').changed('expenses', d.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'expense', d._id, `${category} · ${date}`, 'recorded', [{ field: 'amount', to: String(amount) }, { field: 'mode', to: mode }]);
         res.status(201).json({ success: true, data: view(d.toObject()) });
     } catch (e) { next(e); }
 };
@@ -39,6 +41,8 @@ exports.cancel = async (req, res, next) => {
     try {
         const d = await Expense.findOneAndUpdate({ _id: req.params.id, status: 'active' }, { $set: { status: 'cancelled', cancelledByName: req.user.name || '' } }, { new: true }).lean();
         if (!d) return res.status(404).json({ success: false, message: 'Expense not found' });
+        require('../services/events').changed('expenses', d.branchId, { id: req.user._id, name: req.user.name });
+        require('../services/audit').record(req, 'expense', d._id, `${d.category} · ${d.date}`, 'cancelled', [{ field: 'amount', to: String(d.amount) }]);
         res.json({ success: true });
     } catch (e) { next(e); }
 };

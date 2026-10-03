@@ -519,6 +519,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 85,
+        // Capping the decoded size keeps a high-megapixel photo from ballooning memory while the camera app is in the
+        // foreground — that spike is what makes Android kill this app in the background and "restart" it on return.
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (image == null) return;

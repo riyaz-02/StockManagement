@@ -1,0 +1,51 @@
+<form class="toolbar" hx-get="/old-metal/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input, change from:find select, submit">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search customer or note" autocomplete="off"></div>
+    <select name="kind" aria-label="Kind">
+        <option value="">Old and raw</option>
+        <option value="old"{{ kind == 'old' ? ' selected' : '' }}>Old metal (from customers)</option>
+        <option value="raw"{{ kind == 'raw' ? ' selected' : '' }}>Raw metal (bought)</option>
+    </select>
+    <select name="used" aria-label="Used on a bill">
+        <option value="">All entries</option>
+        <option value="no"{{ used == 'no' ? ' selected' : '' }}>Not yet used on a bill</option>
+        <option value="yes"{{ used == 'yes' ? ' selected' : '' }}>Used on a bill</option>
+    </select>
+</form>
+
+<div class="grid grid-4">
+    <div class="card stat"><small>Entries</small><strong>{{ totals.count|default(0) }}</strong></div>
+    <div class="card stat"><small>Net weight</small><strong>{{ totals.net|default(0)|grams }}</strong></div>
+    <div class="card stat"><small>Fine weight</small><strong>{{ totals.fine|default(0)|grams }}</strong></div>
+    <div class="card stat stat-amber"><small>Value</small><strong>{{ totals.amount|default(0)|inr }}</strong></div>
+</div>
+
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Date</th><th>Customer</th><th>Metal</th><th class="num">Net</th><th class="num">Fine</th><th class="num">Rate</th><th class="num">Value</th><th>Status</th>{% if can('oldMetal.create') %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for r in rows %}
+                <tr>
+                    <td>{{ r.date|dmy }}<small>{{ r.kind == 'raw' ? 'Raw metal' : 'Old metal' }}</small></td>
+                    <td class="strong">{{ r.customerName ?: '–' }}<small>{{ r.customerMobile }}</small></td>
+                    <td>{{ r.metalType|capitalize }} {{ r.purity }}</td>
+                    <td class="num">{{ r.net|grams }}</td>
+                    <td class="num">{{ r.fine|default(0)|grams }}</td>
+                    <td class="num">{{ r.rate|inr }}</td>
+                    <td class="num strong">{{ r.amount|inr }}</td>
+                    <td>
+                        {% if r.status == 'cancelled' %}<span class="pill pill-grey">Cancelled</span>
+                        {% elseif r.usedOnInvoice %}<span class="pill pill-teal">On bill {{ r.usedOnInvoice }}</span>
+                        {% else %}<span class="pill pill-green">Available</span>{% endif %}
+                    </td>
+                    {% if can('oldMetal.create') %}<td class="num">{% if r.status == 'active' and not r.usedOnInvoice %}<button class="btn btn-sm btn-danger" type="button" hx-post="/old-metal/{{ r._id }}/cancel" hx-confirm="Cancel this entry? It leaves the stock and can no longer be used on a bill." hx-swap="none">Cancel</button>{% endif %}</td>{% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="t-empty">No entries here.</div>
+    {% endif %}
+</section>

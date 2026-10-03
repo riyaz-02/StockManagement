@@ -22,7 +22,7 @@
  */
 'use strict';
 
-const { getLgpAdminConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 const { hasPermission } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { Branch, resolveBranch } = require('../utils/branches');
@@ -33,12 +33,12 @@ const { toView, toRow, HIDDEN_STATUSES } = require('../services/billingView');
 const { ensureCustomerProfile } = require('./directoryController');
 const GstStates = require('../services/gstStates');
 
-const db = () => getLgpAdminConnection().db;
+const db = () => getConnection().db;
 const Invoices = () => db().collection('invoices');
 const ShopInfo = () => db().collection('shop_info');
 const Locks = () => db().collection('app_request_locks');
-const Customers = () => require('../models/directory/LgpCustomer')(getLgpAdminConnection());
-const Profiles = () => require('../models/directory/DirectoryCustomerProfile')(getLgpAdminConnection());
+const Customers = () => require('../models/directory/LgpCustomer')(getConnection());
+const Profiles = () => require('../models/directory/DirectoryCustomerProfile')(getConnection());
 const { ObjectId } = require('mongodb');
 
 const { str } = V;
@@ -274,6 +274,77 @@ exports.cashToday = async (req, res, next) => {
 const OldMetalModel = () => require('../models/OldMetal');
 const OrderModel = () => require('../models/CustomerOrder');
 
+/**
+ * GET /api/billing/stock-line?code=&goldRate=&silverRate= : a stock piece as a bill line, priced by the Stock Setting rules
+ * (the same result the app's scan gives). Lets the website add a piece without holding any rule itself.
+ */
+exports.stockLine = async (req, res, next) => {
+    try {
+        const code = str(req.query.code);
+        if (!code) return fail(res, 400, 'Enter the barcode');
+        const it = await StockItem().findOne({ barcode: code }).lean();
+        if (!it) return fail(res, 404, 'Item not found');
+        if (['sold', 'deleted'].includes(it.status)) return fail(res, 400, `This item is already ${it.status === 'sold' ? 'sold' : 'removed'}`);
+        const metal = Calc.metalOf(it.metalType);
+        let purity = str(it.purity).trim().toUpperCase();
+        if (metal === 'Gold' && /^\d{2}$/.test(purity)) purity += 'K';
+        const huid = (str(it.huidNumber) || str(it.huid)).trim().toUpperCase();
+        const cert = huid || it.certificationType === 'huid' ? 'huid' : (it.certificationType === 'hallmarked' ? 'hallmark' : '');
+        let making = Number(it.makingCharge) > 0 ? Number(it.makingCharge) : 0;
+        const net = Number(it.netWeight) || 0;
+        const rate = metal === 'Gold' ? Number(req.query.goldRate) || 0 : metal === 'Silver' ? Number(req.query.silverRate) || 0 : 0;
+        try {
+            const Rules = require('../services/stockRules');
+            const stored = await require('../models/AppStockSettings').findOne({ key: 'main' }).lean();
+            const rules = Rules.resolve(stored);
+            const sell = rules.sellStock || {};
+            if ((sell.makingChargesType === 'lastEntry' || sell.makingChargesType === 'userWiseLastEntry') && net > 0) {
+                const lm = await lastMakingFor(req, str(it.name), metal, sell.makingChargesType === 'userWiseLastEntry');
+                if (lm && lm.perGram > 0) making = Calc.r2(lm.perGram * net);
+            }
+            if (rate > 0 && net > 0) {
+                const price = require('../services/stockValuation').computeStock({
+                    net, gross: it.grossWeight, purity, wastage: it.wastage, custWastage: sell.custWastage === 'blank' ? 0 : it.custWastage, rate,
+                }, rules);
+                making = Calc.r2(Math.max(0, making + (price.metalValuation - net * rate)));
+            }
+        } catch (e) { /* keep the stored making charge */ }
+        const extras = Number(it.stoneValue) > 0 ? [{ kind: 'Stone', name: str(it.stoneNote), weight: Number(it.lessWeight) || 0, amount: Number(it.stoneValue) }] : [];
+        res.json({ success: true, data: {
+            particulars: str(it.name), metalType: metal, purity, netWt: net, grossWt: Number(it.grossWeight) || 0, makingCharge: making,
+            productCode: str(it.barcode) || code, itemId: String(it._id), huid, certification: cert, extras,
+        } });
+    } catch (e) { next(e); }
+};
+
+/** Live totals for the bill being typed (used by the website): the SAME maths as saving, but nothing is written. */
+exports.calculate = async (req, res, next) => {
+    try {
+        const b = req.body || {};
+        const branch = await resolveBranch(myBranch(req));
+        const sup = await supplierFor(branch);
+        const placeInfo = GstStates.parsePlace(GstStates.normalizePlace(b.placeOfSupply, sup.defaultPlace));
+        const interstate = placeInfo.code !== sup.stateCode;
+        const pays = readPayments(b);
+        let extra = 0;
+        const omIds = [...new Set((Array.isArray(b.oldMetalIds) ? b.oldMetalIds : []).map(String).filter((x) => /^[0-9a-f]{24}$/i.test(x)))].slice(0, 10);
+        if (omIds.length) {
+            const docs = await OldMetalModel().find({ _id: { $in: omIds }, status: 'active', kind: 'old' }).lean();
+            extra += docs.reduce((a, x) => a + (x.amount || 0), 0);
+        }
+        if (/^[0-9a-f]{24}$/i.test(str(b.orderId))) {
+            const o = await OrderModel().findOne({ _id: str(b.orderId) }).lean();
+            if (o) extra += o.advancePaid || 0;
+        }
+        const calc = Calc.computeInvoice({
+            items: b.items, goldRate: b.goldRate, silverRate: b.silverRate, interstate,
+            additionalCharges: b.additionalCharges, discount: b.discount, paidAmount: (pays.error ? 0 : pays.total) + extra,
+        });
+        if (!calc.ok) return fail(res, 400, calc.error);
+        res.json({ success: true, data: { ...calc, interstate, place: placeInfo, extraCredit: Calc.r2(extra), cashLimit: CASH_LIMIT, addressLimit: ADDRESS_LIMIT } });
+    } catch (e) { next(e); }
+};
+
 exports.createInvoice = async (req, res, next) => {
     let claimed = false;
     let claimedOm = false;
@@ -390,6 +461,7 @@ exports.createInvoice = async (req, res, next) => {
 
         // ── state / place of supply, exactly as the website derives them ──
         const invoiceDate = ymd(b.invoiceDate) || Calc.todayIST();
+        if (invoiceDate > Calc.todayIST()) return await release(b, res, 400, 'Bill date cannot be a future day');
         const deliveryDate = ymd(b.deliveryDate) || invoiceDate;
 
         // claim the old metal for this request first: one entry can only ever be adjusted once
@@ -483,6 +555,8 @@ exports.createInvoice = async (req, res, next) => {
         if (orderDoc) await OrderModel().updateOne({ _id: orderDoc._id }, { $set: { status: 'delivered', invoiceNumber: number, invoiceClaim: number }, $push: { history: { status: 'delivered', at: new Date(), byName: who.name || '' } } }).catch(() => {});
         await Locks().updateOne({ _id: b.requestId }, { $set: { status: 'done', invoice_id: String(inserted.insertedId), number } }).catch(() => {});
         claimed = false;
+        require('../services/events').changed('billing', doc.branch_id || 'main', { id: who.id, name: who.name });
+        require('../services/audit').record(req, 'invoice', inserted.insertedId, `${number} · ${str(doc.customer_name) || 'Walk-in'}`, 'created', [{ field: 'total', to: String(doc.total_payable_amount) }, { field: 'paid', to: String(doc.paid_amount) }]);
         res.status(201).json({ success: true, data: toView({ ...doc, _id: inserted.insertedId }) });
     } catch (e) {
         if (claimedOm) await OldMetalModel().updateMany({ usedOnInvoice: `req:${b.requestId}` }, { $set: { usedOnInvoice: '' } }).catch(() => {});
@@ -502,23 +576,26 @@ async function release(b, res, code, message, extra = {}) {
 // GET /api/billing/last-making?name=&metal=&userWise=1 : the making charge PER GRAM of the last sale of the same kind of
 // piece (same name and metal), for the Stock Setting rule "last entry" (userWise: only sales made by this user).
 const escapeRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+async function lastMakingFor(req, rawName, metalIn, userWise) {
+    const name = str(rawName).replace(/\s*\((hallmarked|huid)[^)]*\)\s*/ig, '').replace(/\s*\+\s*making charge\s*$/i, '').slice(0, 60);
+    if (name.length < 2) return null;
+    const and = await scope(req);
+    const starts = new RegExp('^' + escapeRe(name), 'i');
+    const match = { status: { $nin: HIDDEN_STATUSES }, items: { $elemMatch: { $or: [{ item_name: starts }, { particulars: starts }], net_wt: { $gt: 0 }, making_charge: { $gt: 0 } } } };
+    if (userWise) match.created_by_app_id = String(req.user._id);
+    if (and.length) match.$and = and;
+    const rows = await Invoices().find(match).sort({ _id: -1 }).limit(1).project({ items: 1, invoice_number: 1, invoice_date: 1 }).toArray();
+    const metal = str(metalIn).toLowerCase();
+    const ln = rows.length ? (rows[0].items || []).find((l) => Number(l.net_wt) > 0 && Number(l.making_charge) > 0 && starts.test(str(l.item_name || l.particulars)) && (!metal || str(l.metal_type).toLowerCase().startsWith(metal.slice(0, 3)))) : null;
+    if (!ln) return null;
+    return { perGram: Calc.r2(Number(ln.making_charge) / Number(ln.net_wt)), invoiceNumber: str(rows[0].invoice_number), date: str(rows[0].invoice_date) };
+}
+
 exports.lastMaking = async (req, res, next) => {
     try {
-        const name = str(req.query.name).replace(/\s*\((hallmarked|huid)[^)]*\)\s*/ig, '').replace(/\s*\+\s*making charge\s*$/i, '').slice(0, 60);
-        if (name.length < 2) return res.json({ success: true, data: null });
-        const and = await scope(req);
-        const starts = new RegExp('^' + escapeRe(name), 'i');
-        const match = { status: { $nin: HIDDEN_STATUSES }, items: { $elemMatch: { $or: [{ item_name: starts }, { particulars: starts }], net_wt: { $gt: 0 }, making_charge: { $gt: 0 } } } };
-        if (req.query.userWise === '1') match.created_by_app_id = String(req.user._id);
-        if (and.length) match.$and = and;
-        const rows = await Invoices().find(match).sort({ _id: -1 }).limit(1).project({ items: 1, invoice_number: 1, invoice_date: 1 }).toArray();
-        const metal = str(req.query.metal).toLowerCase();
-        const ln = rows.length ? (rows[0].items || []).find((l) => Number(l.net_wt) > 0 && Number(l.making_charge) > 0 && starts.test(str(l.item_name || l.particulars)) && (!metal || str(l.metal_type).toLowerCase().startsWith(metal.slice(0, 3)))) : null;
-        if (!ln) return res.json({ success: true, data: null });
-        res.json({ success: true, data: { perGram: Calc.r2(Number(ln.making_charge) / Number(ln.net_wt)), invoiceNumber: str(rows[0].invoice_number), date: str(rows[0].invoice_date) } });
+        res.json({ success: true, data: await lastMakingFor(req, req.query.name, req.query.metal, req.query.userWise === '1') });
     } catch (e) { next(e); }
 };
-
 
 // POST /api/billing/reconcile : run the cancelled-invoice reconcile now (also runs hourly)
 exports.reconcile = async (req, res, next) => {
@@ -585,6 +662,8 @@ exports.addPayment = async (req, res, next) => {
             if (now2 && (now2.payment_history || []).some((p) => p.request_id === b.requestId)) return res.json({ success: true, duplicate: true, data: toView(now2) });
             return fail(res, 409, now2 ? `Only ₹${toView(now2).dueAmount.toFixed(2)} is due on this invoice (someone else may have just received a payment)` : 'Invoice not found');
         }
+        require('../services/events').changed('billing', updated.branch_id || 'main', me(req));
+        require('../services/audit').record(req, 'invoice', id, `${str(updated.invoice_number)} · ${str(updated.customer_name) || 'Walk-in'}`, 'payment received', [{ field: 'amount', to: String(amount) }, { field: 'mode', to: mode }]);
         res.json({ success: true, data: toView(updated) });
     } catch (e) { next(e); }
 };
@@ -740,8 +819,8 @@ exports.dayBook = async (req, res, next) => {
         const start = new Date(`${from}T00:00:00+05:30`), end = new Date(`${to}T23:59:59.999+05:30`);
         const om = await OldMetal.aggregate([{ $match: { status: 'active', date: { $gte: start, $lte: end } } }, { $group: { _id: '$kind', count: { $sum: 1 }, amount: { $sum: '$amount' }, net: { $sum: '$net' } } }]);
         const oldOf = (k) => { const x = om.find((y) => y._id === k) || { count: 0, amount: 0, net: 0 }; return { count: x.count, amount: DB.r2(x.amount), net: Calc.r3(x.net) }; };
-        const Purchase = require('../models/Purchase')(require('../config/db').getShopmanageConnection());
-        const [pu] = await Purchase.aggregate([{ $match: { isDeleted: false, invoiceDate: { $gte: start, $lte: end } } }, { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$totalPayable' } } }]);
+        const Purchase = require('../models/Purchase')(require('../config/db').getConnection());
+        const [pu] = await Purchase.aggregate([{ $match: { invoice_date: { $gte: from, $lte: to } } }, { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: { $toDouble: '$total_amount' } } } }]);
         res.json({ success: true, data: {
             from, to, ...book,
             summary: {

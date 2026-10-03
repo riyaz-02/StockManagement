@@ -1,0 +1,101 @@
+{% extends 'app.twig' %}
+{% block title %}Stock history{% endblock %}
+{% block heading %}Stock history{% endblock %}
+
+{% macro sev(s) %}{% if s == 'high' %}<span class="pill pill-red">High</span>{% elseif s == 'moderate' %}<span class="pill pill-amber">Watch</span>{% elseif s == 'normal' %}<span class="pill pill-green">Normal</span>{% endif %}{% endmacro %}
+
+{% macro chart(c, title, cls) %}
+<section class="panel chart-panel">
+    <div class="panel-head"><h2 class="{{ cls }}">{{ title }}</h2>{% if c.ok %}<span class="muted">{{ c.first|date('d M Y') }} to {{ c.last|date('d M Y') }}</span>{% endif %}</div>
+    <div class="panel-body">
+        {% if c.ok %}
+        <svg viewBox="0 0 600 150" class="spark" role="img" aria-label="{{ title }}">
+            {% if c.zero is not null %}<line x1="10" x2="590" y1="{{ c.zero }}" y2="{{ c.zero }}" class="zero"/>{% endif %}
+            <path d="{{ c.path }}" class="line"/>
+            {% for p in c.points %}<circle cx="{{ p.x }}" cy="{{ p.y }}" r="2.6" class="dot"><title>{{ p.d }}: {{ p.v }} g</title></circle>{% endfor %}
+        </svg>
+        <div class="spark-scale muted"><span>{{ c.min }} g</span><span>latest {{ c.last_v }} g</span><span>{{ c.max }} g</span></div>
+        {% else %}<p class="muted">Not enough snapshots yet.</p>{% endif %}
+    </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+{% import _self as s %}
+<div class="page-head">
+    <div><h1>Stock history</h1><p class="muted">The metal balance saved each day. In and out are the change between snapshots; weekly and monthly rows show the last snapshot of the period (nothing is averaged).</p></div>
+    <div class="actions no-print">
+        <a class="btn" href="/stock/summary">Back to the summary</a>
+        <a class="btn" href="/stock/summary/history.csv?quick={{ quick }}&view={{ view }}&from={{ from }}&to={{ to }}">{{ icon('download', 17) }} Download CSV</a>
+        <button class="btn" type="button" onclick="window.print()">Print</button>
+    </div>
+</div>
+
+<form class="filters no-print" method="get" action="/stock/summary/history">
+    <div class="chips">
+        {% for q, label in {'30': 'Last 30 days', '90': 'Last 90 days', '365': 'Last year', 'all': 'All'} %}
+        <a class="chip{{ quick == q ? ' is-on' : '' }}" href="/stock/summary/history?quick={{ q }}&view={{ view }}&metal={{ metal }}">{{ label }}</a>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="quick" value="custom">
+    <label class="field"><span>From</span><input type="date" name="from" value="{{ from }}"></label>
+    <label class="field"><span>To</span><input type="date" name="to" value="{{ to }}"></label>
+    <label class="field"><span>Rows</span><select name="view">{% for v, l in {'daily': 'Daily', 'weekly': 'Weekly', 'monthly': 'Monthly'} %}<option value="{{ v }}"{{ view == v ? ' selected' : '' }}>{{ l }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Metal</span><select name="metal"><option value="">Both</option><option value="gold"{{ metal == 'gold' ? ' selected' : '' }}>Gold</option><option value="silver"{{ metal == 'silver' ? ' selected' : '' }}>Silver</option></select></label>
+    <button class="btn btn-primary" type="submit">Apply</button>
+</form>
+
+{% if rows|length %}
+{% set tr = trend %}
+{% if tr.enough|default(false) %}
+<div class="stats">
+    {% for key, name in {'gold': 'Gold', 'silver': 'Silver'} %}{% if metal == '' or metal == key %}
+    <div class="stat"><span>{{ name }} stock</span><strong>{{ tr[key].stockEnd|grams }}</strong><small>{{ tr[key].stockChange >= 0 ? '+' : '' }}{{ tr[key].stockChange|grams }} since {{ tr.from|date('d M Y') }}</small></div>
+    <div class="stat"><span>{{ name }} difference</span><strong>{{ tr[key].varianceEnd|grams }}</strong><small>{% if tr.comparable %}{{ tr[key].improving ? 'getting smaller' : 'getting bigger' }} ({{ tr[key].varianceChange >= 0 ? '+' : '' }}{{ tr[key].varianceChange|grams }}){% else %}not comparable with the old method{% endif %}</small></div>
+    {% endif %}{% endfor %}
+</div>
+{% endif %}
+{% if mixed %}
+<div class="notice notice-info">Before {{ changeDate ? changeDate|date('d M Y') : 'a certain day' }} the stock in these snapshots came from the hand-kept stock ledger of the old website; after that it is counted from the pieces in the shop and the bulk stock. The two are marked and not compared with each other.</div>
+{% endif %}
+
+<div class="charts">
+    {% if metal != 'silver' %}{{ s.chart(charts.gold_stock, 'Gold stock', 'gold-text') }}{{ s.chart(charts.gold_diff, 'Gold difference', 'gold-text') }}{% endif %}
+    {% if metal != 'gold' %}{{ s.chart(charts.silver_stock, 'Silver stock', 'silver-text') }}{{ s.chart(charts.silver_diff, 'Silver difference', 'silver-text') }}{% endif %}
+</div>
+
+<section class="panel">
+    <div class="table-wrap">
+        <table class="t hist">
+            <thead>
+                <tr>
+                    <th rowspan="2">{{ view == 'daily' ? 'Date' : (view == 'weekly' ? 'Week' : 'Month') }}</th>
+                    {% if metal != 'silver' %}<th colspan="4" class="grp gold-text">Gold (g)</th>{% endif %}
+                    {% if metal != 'gold' %}<th colspan="4" class="grp silver-text">Silver (g)</th>{% endif %}
+                </tr>
+                <tr>
+                    {% if metal != 'silver' %}<th class="num">Stock</th><th class="num">In</th><th class="num">Out</th><th class="num">Difference</th>{% endif %}
+                    {% if metal != 'gold' %}<th class="num">Stock</th><th class="num">In</th><th class="num">Out</th><th class="num">Difference</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in rows %}
+                <tr{{ r.methodChange ? ' class="method-change"' : '' }}>
+                    <td>{{ r.label }}{% if view != 'daily' %}<small class="muted"> · {{ r.snapshots }} snapshot{{ r.snapshots == 1 ? '' : 's' }}</small>{% endif %}{% if r.methodChange %}<small class="muted"> · method changed</small>{% endif %}</td>
+                    {% for m in ['gold', 'silver'] %}{% if (m == 'gold' and metal != 'silver') or (m == 'silver' and metal != 'gold') %}
+                    {% set x = r[m] %}
+                    <td class="num">{{ x.stock|grams }}</td>
+                    <td class="num">{{ x.in is null ? '–' : ((x.in >= 0 ? '+' : '') ~ (x.in|grams)) }}</td>
+                    <td class="num">{{ x.out is null ? '–' : ((x.out >= 0 ? '−' : '+') ~ (x.out|abs|grams)) }}</td>
+                    <td class="num diff {{ x.severity }}">{{ x.variance|grams }} <small>{{ x.variancePct|abs }}%</small> {{ s.sev(x.severity) }}</td>
+                    {% endif %}{% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% else %}
+<div class="panel"><div class="panel-body"><p class="muted">No snapshots in this period. Open the Summary to take today's, or <a href="/stock/summary/history?quick=all">show all</a>.</p></div></div>
+{% endif %}
+{% endblock %}

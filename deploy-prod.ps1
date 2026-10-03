@@ -79,7 +79,7 @@ if [ "`$BEFORE" != "`$AFTER" ] && git diff --name-only `$BEFORE `$AFTER | grep -
   echo 'dependencies changed -> npm install'; npm install --omit=dev
 fi
 # config sanity: key NAMES only, never values
-for k in MONGODB_URI SHOPMANAGE_DB_URI LGP_ADMIN_DB_URI JWT_SECRET; do
+for k in MONGODB_URI JWT_SECRET; do
   grep -q "^`$k=" .env || echo "WARNING: `$k missing in server .env"
 done
 pm2 restart $Pm2Name --update-env

@@ -1,0 +1,20 @@
+{% for r in rows %}
+    {% set cancelled = r.status in ['cancelled', 'void', 'deleted'] %}
+    <tr class="is-link" data-href="/billing/{{ r._id }}">
+        <td><a class="row-link" href="/billing/{{ r._id }}">{{ r.invoiceNumber }}</a><small>{{ r.invoiceDate|dmy }}</small></td>
+        <td class="strong">{{ r.customerName }}<small>{{ r.customerMobile }}</small></td>
+        <td>{{ r.itemsSummary.first|default('') }}{% if r.itemsSummary.count|default(0) > 1 %}<small>+{{ r.itemsSummary.count - 1 }} more item{{ r.itemsSummary.count > 2 ? 's' : '' }}</small>{% endif %}</td>
+        <td class="num strong">{{ r.totalPayableAmount|inr }}</td>
+        <td class="num">{{ r.paidAmount|inr }}</td>
+        <td>
+            {% if cancelled %}<span class="pill pill-grey">Cancelled</span>
+            {% elseif r.dueAmount > 0 %}<span class="pill pill-amber">Due {{ r.dueAmount|inr(0) }}</span>
+            {% else %}<span class="pill pill-green">Paid</span>{% endif %}
+        </td>
+        <td class="hide-sm">{{ r.paymentMode }}<small>{{ r.createdBy }}</small></td>
+    </tr>
+{% endfor %}
+{% if pg.hasMore|default(false) %}
+    <tr id="bill-more"><td colspan="7" class="more-cell"><button class="btn" type="button"
+        hx-get="/billing/list?{{ {q: q, status: status, from: from, to: to, page: page + 1}|filter(v => v != '')|url_encode }}" hx-target="#bill-more" hx-swap="outerHTML">Show more</button></td></tr>
+{% endif %}

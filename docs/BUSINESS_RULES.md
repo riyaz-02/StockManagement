@@ -41,5 +41,11 @@ Place of supply for over-the-counter buyers from other states (customer state au
 ## Purchase hallmark fee and editing a purchase
 - Purchase valuation: goods taxable = metal + labour (3% GST). A hallmark fee (per piece or per gram, from the Hallmark settings) is a separate service charge: it carries its own GST (9+9 / 18) when the Purchase rule "Hallmark GST" is on, none when off; the fee and its GST are input credit.
 - A credit note refund can never exceed what the customer paid (a bill with a round-off is paid a few paise below taxable + tax), nor the refunds already made on the invoice.
-- A purchase's valuation can be edited (amount, GST, ITC and the stock ledger are re-worked) until the GSTR-3B of its period is filed; after that a correction belongs in the next return.
+- A purchase's valuation can be edited (amount, GST and ITC are re-worked) until the GSTR-3B of its period is filed; after that a correction belongs in the next return.
 
+
+## Stock
+- Stock is what is in the shop: the barcoded pieces present (tracked by barcode and tally) plus the Bulk stock entered explicitly (dust, parts, sub-items, raw, in-process, reserved metal kept together). There are no manual daily stock in / out entries.
+- Selling a piece = saving a GST bill with it (the bill marks the piece sold). There is no separate quick-sale record.
+- Check (reconciliation), per metal: what came in = purchases x 1.10 (gold) / x 1.20 (silver) + old metal and raw metal taken in; what is accounted for = present stock + sold on bills + approved wastage. The difference should be near zero (alert above 1 g). A big difference usually means bulk metal is not entered yet.
+- Stock Summary (the check above, in full; `docs/STOCK_SUMMARY.md`): in whole milligrams, Receipts = purchases x (1 + allowance %) + old metal + raw metal; Stock = in shop + out for repair/agent/customer + bulk; Out = sold (non-cancelled bill lines, net of restocked returns) + APPROVED wastage; difference = Receipts - (Stock + Out), as % of Receipts: normal below 1.5 %, watch below 5 %, high above, never an alert for 1 g or less. Wastage needs a second person to approve; admin/owner can reverse an approval. Daily snapshot: one per day, built by the server.

@@ -106,6 +106,11 @@ exports.updateRoleGrid = async (req, res) => {
             ...permissions
         };
 
+        {
+            const prev = existing ? existing.permissions : DEFAULT_GRIDS[role];
+            const changes = Object.keys(permissions).filter((k) => !!(prev || {})[k] !== !!permissions[k]).map((k) => ({ field: k, from: (prev || {})[k] ? 'allowed' : 'blocked', to: permissions[k] ? 'allowed' : 'blocked' }));
+            if (changes.length) require('../services/audit').record(req, 'permission', role, `Role: ${role}`, 'role permissions changed', changes);
+        }
         const updated = await RolePermission.findOneAndUpdate(
             { role },
             { role, permissions: mergedPermissions, updatedBy: req.user.id },
@@ -113,6 +118,7 @@ exports.updateRoleGrid = async (req, res) => {
         );
 
         permissionCache.invalidate();
+        require('../services/events').emit('permissions.changed', { role }, { roles: [role], actor: { id: req.user._id, name: req.user.name } });
 
         res.status(200).json({
             success: true,
@@ -173,10 +179,18 @@ exports.updateUserOverrides = async (req, res) => {
                 nextOverrides[key] = !!value;
             }
         }
+        const overridesBefore = { ...(user.permissionOverrides || {}) };
         user.permissionOverrides = nextOverrides;
         user.markModified('permissionOverrides');
 
         await user.save();
+        {
+            const keys = Object.keys(overrides);
+            const show = (o, k) => (o[k] === undefined ? 'role default' : (o[k] ? 'allowed' : 'blocked'));
+            const changes = keys.filter((k) => show(overridesBefore, k) !== show(nextOverrides, k)).map((k) => ({ field: k, from: show(overridesBefore, k), to: show(nextOverrides, k) }));
+            if (changes.length) require('../services/audit').record(req, 'permission', user._id, `${user.name} (${user.mobile})`, 'person permissions changed', changes);
+        }
+        require('../services/events').emit('permissions.changed', { userId: String(user._id) }, { userIds: [String(user._id)], actor: { id: req.user._id, name: req.user.name } });
 
         res.status(200).json({
             success: true,

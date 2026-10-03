@@ -11,7 +11,9 @@ Notes for the PHP client: send `Authorization: Bearer <jwt>` (+ optional `X-Bran
 ## Feature status (app → web)
 | Feature | App | Key endpoints | Web notes |
 |---|---|---|---|
+| Data backup (paste a MongoDB address, download every record raw + restore) | web only (Admin Control) | `/admin/backup/inspect`, `/admin/backup/download` | done in the portal: `/admin/backup`; Admin/Owner only; read-only; mongodump-format zip |
 | Login / roles / permissions | done | `/auth`, `/permissions` | secure token storage on web |
+| Common users (app + website): sign in by mobile / username / e-mail, one password, Username + E-mail on Staff & Roles | done (dev) | `/auth/login`, `PUT /users/:id` | production merge awaits the owner (`docs/DB_UNIFICATION.md`) |
 | GST Billing create (3 steps, split pay, discount, HUID, scan) | done | `/billing/meta`, `POST /billing/invoices` | scan → typed product code / webcam later |
 | Invoice list/detail/PDF/payments | done | `/billing/invoices*` | PDF via printing |
 | GST Summary (6 tabs, filters, ITC, calendar, filings, reminders, checks) | done | `/gst-reports/*` | CSV via Blob download |
@@ -24,11 +26,15 @@ Notes for the PHP client: send `Authorization: Bearer <jwt>` (+ optional `X-Bran
 | Today's rate, Expenses, Day Book, Pending dues | done | `/rates`, `/expenses`, `/billing/daybook`, `/billing/dues` | simple pages; rate strip in the header |
 | Estimates (quotations, PDF, make invoice) | done | `/estimates` | same item lines as an invoice |
 | Stock tally (auto snapshot, box-by-box, missing list) | done | `/tally/*` | scan by typed barcode on web |
+| Bulk stock (dust, parts, sub-items, raw, in-process: explicit entries counted as stock) + "Check the stock" (purchases + old/raw metal vs present, sold, wastage) | done (app + web) | `/stock/bulk-weights`, `/stock/reconciliation` | web: Stock page panels; stock = items present + bulk, no manual ledger |
+| Stock Summary: metal balance (receipts vs stock + sold + approved wastage), difference + level, data checks, confidence, insights, movements, daily snapshot, history (daily/weekly/monthly, CSV), wastage reports with approval | done (app + web) | `/stock/summary*`, `/stock/wastage*` | web: Stock Summary menu, `/stock/summary`, `/stock/summary/history`, `/stock/wastage`; app: Store > Summary tab, history and wastage screens; spec `docs/STOCK_SUMMARY.md` |
+| GST filed returns in the website's `gst_data` (old records visible, new ones added to the same quarter document) | done | `/gst-reports/filings` | one list for app, web and the old site |
 | Customer orders (advance, karigar, delivery, deliver-and-bill) | done | `/orders`, `orderId` on invoices | order list + detail pages |
 | Inventory: items/containers/tally/repair/booking | done | `/items` `/containers` … | not yet reviewed for web |
 | Tag printing | done | `/tag-print` | printing plugin |
 | Push notifications | done | `/notifications` | web push optional |
 | User directory / admin console | done | `/directory`, `/admin` | admin console already web-like |
+| Web portal: Day Book, Expenses, Dues, Orders, Old Metal, GST Billing, Estimates | built in `portal/` | `/billing/calculate`, `/billing/stock-line` + existing | see `docs/WEB_PORTAL_PLAN.md`; stock/tally/GST/admin pages follow |
 
 ## Testing the PHP site
 Backend suites are the contract (`docs/DEV_TESTING.md`). Manual pass per feature: billing -> PDF -> payment -> GST Summary. The site must never write to production while testing (dev DB only).

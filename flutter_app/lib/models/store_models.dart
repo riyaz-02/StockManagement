@@ -6,6 +6,9 @@ class BulkWeight {
   final DateTime date;
   final bool isActive;
   final DateTime updatedAt;
+  final String category;
+  final String purity;
+  final int? pieces;
 
   const BulkWeight({
     required this.id,
@@ -15,7 +18,22 @@ class BulkWeight {
     required this.date,
     this.isActive = true,
     required this.updatedAt,
+    this.category = 'other',
+    this.purity = '',
+    this.pieces,
   });
+
+  /// The kinds of bulk stock (what is kept together without a barcode), as the server names them.
+  static const Map<String, String> categoryLabels = {
+    'dust': 'Dust / filings',
+    'parts': 'Parts',
+    'sub_items': 'Sub items',
+    'raw': 'Raw metal',
+    'in_process': 'In process',
+    'reserved': 'Reserved',
+    'other': 'Other',
+  };
+  String get categoryLabel => categoryLabels[category] ?? 'Other';
 
   factory BulkWeight.fromJson(Map<String, dynamic> json) {
     return BulkWeight(
@@ -28,6 +46,9 @@ class BulkWeight {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
+      category: (json['category'] ?? 'other').toString(),
+      purity: (json['purity'] ?? '').toString(),
+      pieces: json['pieces'] == null ? null : (json['pieces'] as num).toInt(),
     );
   }
 }

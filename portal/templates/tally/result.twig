@@ -1,0 +1,17 @@
+{% if r.ok is defined %}
+    <div class="scan-result {{ r.out ? 'is-warn' : 'is-ok' }}">
+        <strong>{{ r.out ? 'Counted, but it was not in stock' : 'Found' }}: {{ r.ok.name }}</strong>
+        <span>{{ r.ok.barcode }} · {{ r.ok.metalType|capitalize }} {{ r.ok.purity|default('') }} · {{ r.ok.netWeight|grams }} · {{ r.count }} of {{ r.of }} checked</span>
+    </div>
+{% elseif r.error is defined %}
+    <div class="scan-result is-bad"><strong>{{ r.error }}</strong>{% if r.code %}<span>{{ r.code }}</span>{% endif %}</div>
+{% elseif r.verify is defined %}
+    <form class="scan-result is-warn" hx-post="/tally/{{ r.id }}/verify" hx-target="#scan-result" hx-swap="innerHTML">
+        {{ csrf_field() }}
+        <input type="hidden" name="itemId" value="{{ r.verify._id }}">
+        <input type="hidden" name="barcode" value="{{ r.verify.barcode }}">
+        <strong>Weigh this piece: {{ r.verify.name }}</strong>
+        <span>{{ r.verify.barcode }} · its weight is not exact (system says {{ r.verify.netWeight|grams }}). Put it on the scale and type the weight.</span>
+        <div class="row-gap"><input type="number" name="verifiedWeight" step="0.001" min="0" placeholder="Weight in grams" required autofocus> <button class="btn btn-primary" type="submit">Save weight</button></div>
+    </form>
+{% endif %}

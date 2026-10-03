@@ -1,0 +1,25 @@
+{% if more %}{% include 'billing/rows.twig' %}{% else %}
+{% set tabs = [['', 'All'], ['due', 'Money due'], ['paid', 'Paid']] %}
+<form class="toolbar" hx-get="/billing/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input[type=search], change from:find input[type=date], submit">
+    <div class="chips">
+        {% for tb in tabs %}
+            <button type="button" class="chip{{ status == tb[0] ? ' is-on' : '' }}" hx-get="/billing/list?status={{ tb[0] }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ tb[1] }}</button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search bill number, name or mobile" autocomplete="off"></div>
+    <input type="date" name="from" value="{{ from }}" aria-label="From">
+    <span class="muted">to</span>
+    <input type="date" name="to" value="{{ to }}" aria-label="To">
+</form>
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Bill</th><th>Customer</th><th>Items</th><th class="num">Total</th><th class="num">Paid</th><th>Status</th><th class="hide-sm">Paid by</th></tr></thead>
+            <tbody>{% include 'billing/rows.twig' %}</tbody>
+        </table>
+    </div>
+    {% else %}<div class="t-empty">No bills found.</div>{% endif %}
+</section>
+{% endif %}

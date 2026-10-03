@@ -1,0 +1,13 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.estimates') }}{% endblock %}
+{% block heading %}{{ t('nav.estimates') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Estimates</h1><p class="muted">Price quotes for customers. Nothing is billed until you make the bill from one.</p></div>
+    <div class="actions">{% if can('estimates.create') %}<a class="btn btn-primary" href="/estimates/new">{{ icon('plus', 17) }} New estimate</a>{% endif %}</div>
+</div>
+<div class="live-block" hx-get="/estimates/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

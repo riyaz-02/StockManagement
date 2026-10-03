@@ -78,6 +78,16 @@ const schema = new mongoose.Schema(
             silver: metal,
         },
 
+        // The app's own extras about a customer (they never go on the website's record):
+        // pieces the customer asked about, and the bookings made for them.
+        wishlist: [{
+            _id: false,
+            item: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+            addedAt: { type: Date, default: Date.now },
+            status: { type: String, enum: ['active', 'removed'], default: 'active' },
+        }],
+        bookings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Booking' }],
+
         // Provenance, so migrated and app-created rows can always be told apart.
         source: { type: String, default: 'app' },            // app | lgpadmin | shopmanage
         sourceId: { type: String },                          // original id in the source system

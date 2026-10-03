@@ -272,8 +272,10 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
     String? path;
     String mime = 'image/jpeg', name = 'photo.jpg';
     if (camera) {
-      final img = await ImagePicker()
-          .pickImage(source: ImageSource.camera, imageQuality: 85);
+      // maxWidth/maxHeight bound the decoded size so a high-megapixel photo cannot spike memory while the camera app is
+      // in the foreground (that spike is what makes Android kill this app in the background and "restart" it on return).
+      final img = await ImagePicker().pickImage(
+          source: ImageSource.camera, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
       if (img == null) return;
       path = img.path;
       name = img.name;

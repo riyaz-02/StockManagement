@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/stock_summary_models.dart';
 import '../services/api_service.dart';
 import '../models/purchase_model.dart';
 import '../models/store_models.dart';
@@ -70,6 +71,19 @@ class StoreProvider extends ChangeNotifier {
   bool get isReconcileLoading => _isReconcileLoading;
   bool get hasReconcileAlert => _hasReconcileAlert;
 
+  // ── Stock Summary (the metal balance), history, wastage ───────────────
+  StockSummary? _summary;
+  bool _isSummaryBusy = false;
+  String? _summaryError;
+  StockSummary? get summary => _summary;
+  bool get isSummaryBusy => _isSummaryBusy;
+  String? get summaryError => _summaryError;
+
+  StockHistory? _history;
+  bool _isHistoryLoading = false;
+  StockHistory? get history => _history;
+  bool get isHistoryLoading => _isHistoryLoading;
+
   // ────────────────────────────────────────────────────────────────────────
   // ITC SUMMARY
   // ────────────────────────────────────────────────────────────────────────
@@ -131,12 +145,18 @@ class StoreProvider extends ChangeNotifier {
     required String metalType,
     required double weightGrams,
     required String description,
+    String category = 'other',
+    String purity = '',
+    int? pieces,
   }) async {
     try {
       final resp = await _api.addBulkWeight({
         'metalType': metalType,
         'weightGrams': weightGrams,
         'description': description,
+        'category': category,
+        if (purity.isNotEmpty) 'purity': purity,
+        if (pieces != null) 'pieces': pieces,
       });
       if (resp['success'] == true) {
         await fetchStockDashboard();
@@ -149,11 +169,15 @@ class StoreProvider extends ChangeNotifier {
   }
 
   Future<bool> updateBulkWeight(
-      String id, double weightGrams, String description) async {
+      String id, double weightGrams, String description,
+      {String? category, String? purity, int? pieces}) async {
     try {
       final resp = await _api.updateBulkWeight(id, {
         'weightGrams': weightGrams,
         'description': description,
+        if (category != null) 'category': category,
+        if (purity != null) 'purity': purity,
+        if (pieces != null) 'pieces': pieces,
       });
       if (resp['success'] == true) {
         await fetchStockDashboard();
@@ -406,24 +430,114 @@ class StoreProvider extends ChangeNotifier {
   // RECONCILIATION
   // ────────────────────────────────────────────────────────────────────────
 
-  Future<void> fetchReconciliation() async {
-    _isReconcileLoading = true;
-    notifyListeners();
+  /// Kept by its old name (the Store screen calls it): it now loads the whole Summary.
+  Future<void> fetchReconciliation() => fetchSummary();
 
+  /// The Summary: balance, data checks, insights, movements. The server works everything out.
+  Future<void> fetchSummary() async {
+    _isReconcileLoading = true;
+    _summaryError = null;
+    notifyListeners();
     try {
-      final resp = await _api.getStockReconciliation();
+      final resp = await _api.getStockSummary();
       if (resp['success'] == true) {
-        final data = resp['data'] as Map<String, dynamic>;
-        _reconciliation =
-            Map<String, dynamic>.from(data['reconciliation'] as Map? ?? {});
-        _hasReconcileAlert = data['anyAlert'] == true;
+        _summary = StockSummary.fromJson(Map<String, dynamic>.from(resp['data'] as Map));
+        _hasReconcileAlert = _summary!.anyAlert || _summary!.confidenceLevel == 'fix';
       }
-    } catch (_) {
-      _reconciliation = {};
-      _hasReconcileAlert = false;
+    } catch (e) {
+      _summaryError = e.toString().replaceFirst('Exception: ', '');
     } finally {
       _isReconcileLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<List<Movement>> fetchMovements({int limit = 30}) async {
+    try {
+      final resp = await _api.getSummaryMovements(limit: limit);
+      if (resp['success'] == true) {
+        return (resp['data']['movements'] as List? ?? [])
+            .map((e) => Movement.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Save today's snapshot (built by the server). Returns a message to show.
+  Future<String> saveSnapshot() async {
+    _isSummaryBusy = true;
+    notifyListeners();
+    try {
+      final resp = await _api.saveStockSnapshot();
+      await fetchSummary();
+      return (resp['message'] ?? 'Snapshot saved').toString();
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isSummaryBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchHistory({String view = 'daily', String? from, String? to}) async {
+    _isHistoryLoading = true;
+    notifyListeners();
+    try {
+      final resp = await _api.getSummaryHistory(view: view, from: from, to: to);
+      if (resp['success'] == true) {
+        _history = StockHistory.fromJson(Map<String, dynamic>.from(resp['data'] as Map));
+      }
+    } catch (_) {
+      _history = const StockHistory([], false, false, {});
+    } finally {
+      _isHistoryLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── wastage reports ─────────────────────────────────────────────────────
+
+  Future<({List<WastageReport> reports, Map<String, dynamic> totals})> fetchWastage({String? status, String? metal}) async {
+    try {
+      final resp = await _api.getWastageReports(status: status, metal: metal, limit: 100);
+      if (resp['success'] == true) {
+        final d = Map<String, dynamic>.from(resp['data'] as Map);
+        return (
+          reports: (d['reports'] as List? ?? []).map((e) => WastageReport.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+          totals: Map<String, dynamic>.from(d['totals'] as Map? ?? {}),
+        );
+      }
+    } catch (_) {}
+    return (reports: <WastageReport>[], totals: <String, dynamic>{});
+  }
+
+  /// null = done; otherwise the message to show (the server's own words).
+  Future<String?> reportWastage(Map<String, dynamic> body, {String? editId}) async {
+    try {
+      if (editId == null) {
+        await _api.createWastage(body);
+      } else {
+        await _api.updateWastage(editId, body);
+      }
+      await fetchSummary();
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
+
+  Future<String?> decideWastage(String id, {required bool approve, String comment = ''}) async {
+    try {
+      if (approve) {
+        await _api.approveWastage(id, comment);
+      } else {
+        await _api.rejectWastage(id, comment);
+      }
+      await fetchSummary();
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
     }
   }
 }

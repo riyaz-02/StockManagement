@@ -1,0 +1,13 @@
+{% set pending = d.totals.pending|default({}) %}
+{% set pendCount = (pending.gold.count|default(0)) + (pending.silver.count|default(0)) %}
+<section class="panel">
+    <div class="panel-head">
+        <div><h2>Wastage reports <span class="bn-inline">মেটাল ক্ষতির রিপোর্ট</span></h2>
+        <p class="muted">Metal lost in making. A report counts in the balance only once someone else approves it.{% if pendCount %} <strong>{{ pendCount }} waiting for approval.</strong>{% endif %}</p></div>
+        <div class="actions">
+            <a class="btn btn-sm" href="/stock/wastage">View all</a>
+            {% if can('wastage.report') %}<button class="btn btn-primary btn-sm" type="button" hx-get="/stock/wastage/new" hx-target="#modal-body">{{ icon('plus', 16) }} Report wastage</button>{% endif %}
+        </div>
+    </div>
+    {% include 'wastage/table.twig' with {reports: d.reports|default([])} %}
+</section>

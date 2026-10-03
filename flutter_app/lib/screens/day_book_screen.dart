@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/bill_ui.dart';
 import 'expenses_screen.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -19,7 +20,13 @@ class DayBookScreen extends StatefulWidget {
   State<DayBookScreen> createState() => _DayBookScreenState();
 }
 
-class _DayBookScreenState extends State<DayBookScreen> {
+class _DayBookScreenState extends State<DayBookScreen> with LiveRefresh<DayBookScreen> {
+  @override
+  List<String> get liveModules => ['billing', 'expenses', 'orders', 'oldmetal'];
+
+  @override
+  void onLiveChange() => _load();
+
   final _api = ApiService();
   DateTime _from = DateTime.now(), _to = DateTime.now();
   Map<String, dynamic> _d = {};
@@ -29,7 +36,14 @@ class _DayBookScreenState extends State<DayBookScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    disposeLive();
+    super.dispose();
   }
 
   Future<void> _load() async {

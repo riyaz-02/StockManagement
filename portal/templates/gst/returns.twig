@@ -1,0 +1,95 @@
+{% extends 'gst/base.twig' %}
+{% block controls %}{% include 'gst/_period.twig' %}{% endblock %}
+
+{% block tabbody %}
+{% if r.gstr1 is defined %}
+{% set g1 = r.gstr1 %}{% set g3 = r.gstr3b %}
+<div class="grid grid-2">
+    {% for type in ['GSTR-1', 'GSTR-3B'] %}
+        {% set filed = null %}{% for f in r.filings|default([]) %}{% if f.returnType == type %}{% set filed = f %}{% endif %}{% endfor %}
+        <section class="panel"><div class="panel-body kv">
+            <div class="kv-row"><span><strong>{{ type }}</strong> for {{ r.period.label }}</span>{% if filed %}<span class="pill pill-green">Filed {{ filed.filedOn|dmy }}</span>{% elseif r.due[type] < today %}<span class="pill pill-red">Overdue</span>{% else %}<span class="pill pill-amber">Not filed yet</span>{% endif %}</div>
+            <div class="kv-row"><span>Due date</span><strong>{{ r.due[type]|dmy }}</strong></div>
+            {% if filed and filed.arn %}<div class="kv-row"><span>ARN</span><strong>{{ filed.arn }}</strong></div>{% endif %}
+        </div></section>
+    {% endfor %}
+</div>
+
+{% if r.checks|length %}
+<section class="panel"><div class="panel-head"><h2>Checks before you file</h2></div><div class="panel-body">
+    {% for c in r.checks %}
+        <div class="check-row is-{{ c.severity }}"><strong>{{ c.title }}</strong><span>{{ c.detail }}</span>{% if c.invoices|default([])|length %}<small>Bills: {{ c.invoices|join(', ') }}{% if c.more|default(0) > 0 %} and {{ c.more }} more{% endif %}</small>{% endif %}</div>
+    {% endfor %}
+</div></section>
+{% endif %}
+
+<h2 class="section-title">GSTR-1 (sales)</h2>
+<div class="stats">
+    <div class="stat"><span>Bills</span><strong>{{ g1.totals.invoices }}</strong></div>
+    <div class="stat"><span>Taxable value</span><strong>{{ g1.totals.taxable|inr(0) }}</strong></div>
+    <div class="stat"><span>GST</span><strong>{{ (g1.totals.cgst + g1.totals.sgst + g1.totals.igst)|inr(0) }}</strong></div>
+    <div class="stat"><span>Invoice value</span><strong>{{ g1.totals.invoiceValue|inr(0) }}</strong></div>
+</div>
+<section class="panel"><div class="panel-head"><h2>Table 7: B2C (small) by state</h2><a class="btn" href="/gst/export?{{ {gstin: gstin, from: r.period.from, to: r.period.to, type: 'b2cs'}|url_encode }}">CSV</a></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Place of supply</th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th></tr></thead>
+        <tbody>{% for x in g1.b2cs %}<tr><td class="strong">{{ x.place }}</td><td class="num">{{ x.rate }}%</td><td class="num">{{ x.taxable|inr }}</td><td class="num">{{ x.cgst|inr }}</td><td class="num">{{ x.sgst|inr }}</td><td class="num">{{ x.igst|inr }}</td></tr>{% else %}<tr><td colspan="6" class="t-empty">None</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+{% if g1.b2cl|length %}
+<section class="panel"><div class="panel-head"><h2>Table 5: B2C large (other state, above {{ g1.b2clThreshold|inr(0) }})</h2><a class="btn" href="/gst/export?{{ {gstin: gstin, from: r.period.from, to: r.period.to, type: 'b2cl'}|url_encode }}">CSV</a></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Bill</th><th>Date</th><th>Place</th><th class="num">Value</th><th class="num">Taxable</th><th class="num">IGST</th></tr></thead>
+        <tbody>{% for x in g1.b2cl %}<tr><td class="strong">{{ x.number }}</td><td>{{ x.date|dmy }}</td><td>{{ x.place }}</td><td class="num">{{ x.value|inr }}</td><td class="num">{{ x.taxable|inr }}</td><td class="num">{{ x.igst|inr }}</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+{% endif %}
+<section class="panel"><div class="panel-head"><h2>Table 12: HSN summary</h2><a class="btn" href="/gst/export?{{ {gstin: gstin, from: r.period.from, to: r.period.to, type: 'hsn'}|url_encode }}">CSV</a></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>HSN</th><th>Unit</th><th class="num">Quantity</th><th class="num">Value</th><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th></tr></thead>
+        <tbody>{% for x in g1.hsn %}<tr><td class="strong">{{ x.hsn }}</td><td>{{ x.uqc }}</td><td class="num">{{ x.qty }}</td><td class="num">{{ x.value|inr }}</td><td class="num">{{ x.taxable|inr }}</td><td class="num">{{ x.cgst|inr }}</td><td class="num">{{ x.sgst|inr }}</td><td class="num">{{ x.igst|inr }}</td></tr>{% else %}<tr><td colspan="8" class="t-empty">None</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+<section class="panel"><div class="panel-head"><h2>Table 13: documents issued</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Series</th><th>From</th><th>To</th><th class="num">Total</th><th class="num">Cancelled</th><th class="num">Net issued</th></tr></thead>
+        <tbody>{% for x in g1.docs %}<tr><td class="strong">{{ x.series }}</td><td>{{ x.from }}</td><td>{{ x.to }}</td><td class="num">{{ x.total }}</td><td class="num">{{ x.cancelled }}</td><td class="num">{{ x.net }}</td></tr>{% else %}<tr><td colspan="6" class="t-empty">None</td></tr>{% endfor %}</tbody>
+    </table></div></section>
+{% if r.creditNotes.count|default(0) > 0 %}
+<section class="panel"><div class="panel-head"><h2>Table 9B: credit notes (returns / refunds)</h2></div><div class="panel-body kv">
+    <div class="kv-row"><span>Notes that reduce your tax</span><strong>{{ r.creditNotes.count }}</strong></div>
+    <div class="kv-row"><span>Taxable value taken back</span><strong>{{ r.creditNotes.taxable|inr }}</strong></div>
+    <div class="kv-row"><span>Tax taken back</span><strong>{{ (r.creditNotes.cgst + r.creditNotes.sgst + r.creditNotes.igst)|inr }}</strong></div>
+    {% if r.creditNotes.late > 0 %}<div class="kv-row"><span>Made too late to reduce tax</span><strong>{{ r.creditNotes.late }}</strong></div>{% endif %}
+</div></section>
+{% endif %}
+
+<h2 class="section-title">GSTR-3B (summary and payment)</h2>
+<div class="grid grid-2">
+    <section class="panel"><div class="panel-head"><h2>3.1 Sales (outward supplies)</h2></div><div class="panel-body kv">
+        <div class="kv-row"><span>Taxable value</span><strong>{{ g3.outward.taxable|inr }}</strong></div>
+        <div class="kv-row"><span>CGST · SGST · IGST</span><strong>{{ g3.outward.cgst|inr }} · {{ g3.outward.sgst|inr }} · {{ g3.outward.igst|inr }}</strong></div>
+    </div></section>
+    <section class="panel"><div class="panel-head"><h2>4. Input credit you can claim</h2></div><div class="panel-body kv">
+        <div class="kv-row"><span>From {{ g3.itc.purchases }} purchase(s)</span><strong>{{ (g3.itc.claim.cgst + g3.itc.claim.sgst + g3.itc.claim.igst)|inr }}</strong></div>
+        <div class="kv-row"><span>CGST · SGST · IGST</span><strong>{{ g3.itc.claim.cgst|inr }} · {{ g3.itc.claim.sgst|inr }} · {{ g3.itc.claim.igst|inr }}</strong></div>
+        {% if g3.itc.riskPurchases > 0 %}<div class="kv-row"><span>Not claimable: supplier has no GSTIN ({{ g3.itc.riskPurchases }})</span><strong>{{ (g3.itc.atRisk.cgst + g3.itc.atRisk.sgst + g3.itc.atRisk.igst)|inr }}</strong></div>{% endif %}
+    </div></section>
+</div>
+{% if g3.interstateToUnregistered|length %}
+<section class="panel"><div class="panel-head"><h2>3.2 Other-state sales to unregistered buyers</h2></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>State</th><th class="num">Taxable</th><th class="num">IGST</th></tr></thead>
+        <tbody>{% for x in g3.interstateToUnregistered %}<tr><td class="strong">{{ x.place }}</td><td class="num">{{ x.taxable|inr }}</td><td class="num">{{ x.igst|inr }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endif %}
+{% set L = g3.ledger %}
+<section class="panel"><div class="panel-head"><h2>How the tax is paid</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th></th><th class="num">IGST</th><th class="num">CGST</th><th class="num">SGST</th></tr></thead>
+        <tbody>
+            <tr><td>Credit brought forward</td><td class="num">{{ L.opening.igst|inr }}</td><td class="num">{{ L.opening.cgst|inr }}</td><td class="num">{{ L.opening.sgst|inr }}</td></tr>
+            <tr><td>Added from purchases</td><td class="num">{{ L.added.igst|inr }}</td><td class="num">{{ L.added.cgst|inr }}</td><td class="num">{{ L.added.sgst|inr }}</td></tr>
+            <tr><td>Tax to pay on sales</td><td class="num">{{ L.liability.igst|inr }}</td><td class="num">{{ L.liability.cgst|inr }}</td><td class="num">{{ L.liability.sgst|inr }}</td></tr>
+            <tr class="strong"><td>Cash to pay</td><td class="num">{{ L.cash.igst|inr }}</td><td class="num">{{ L.cash.cgst|inr }}</td><td class="num">{{ L.cash.sgst|inr }}</td></tr>
+            <tr><td>Credit carried forward</td><td class="num">{{ L.closing.igst|inr }}</td><td class="num">{{ L.closing.cgst|inr }}</td><td class="num">{{ L.closing.sgst|inr }}</td></tr>
+        </tbody>
+    </table></div>
+</section>
+{% endif %}
+{% endblock %}

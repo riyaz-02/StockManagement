@@ -1,0 +1,25 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="{{ id ? '/stock/wastage/' ~ id : '/stock/wastage' }}" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>{{ id ? 'Change wastage report' : 'Report wastage' }}</h2>
+    <p class="muted">Metal lost in making or polishing. It is saved as "waiting"; it counts in the stock balance only after someone else approves it.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        {{ ui.field('Date', 'date', v.date|default(''), {type: 'date', max: 'now'|date('Y-m-d'), required: true}) }}
+        <label class="field">
+            <span>Metal *</span>
+            <select name="metal">{% for k, label in metals %}<option value="{{ k }}"{{ k == v.metal|default('gold')|lower ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
+        </label>
+        {{ ui.field('Weight lost (grams)', 'amount', v.amount|default(''), {type: 'number', step: '0.001', min: '0', required: true, autofocus: true, inputmode: 'decimal'}) }}
+        <label class="field">
+            <span>Category *</span>
+            <select name="category">{% for c in categories %}<option value="{{ c }}"{{ c|lower == v.category|default('Manufacturing')|lower ? ' selected' : '' }}>{{ c }}</option>{% endfor %}</select>
+        </label>
+        <div class="span-2">{{ ui.field('What happened', 'reason', v.reason|default(''), {placeholder: 'e.g. filing loss while making a 3.75 g ornament'}) }}</div>
+        <div class="span-2">{{ ui.field('Note (optional)', 'remarks', v.remarks|default(''), {}) }}</div>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ id ? 'Save changes' : 'Report wastage' }}</button>
+    </div>
+</form>

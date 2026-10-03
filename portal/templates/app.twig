@@ -1,0 +1,65 @@
+{% extends 'base.twig' %}
+
+{% block body_class %}has-shell{% endblock %}
+{% block body_attrs %} data-live="1" data-screen="{{ active|default('') ? t('nav.' ~ active) : '' }}"{% endblock %}
+
+{% block body %}
+<div class="shell" :class="shellClass" x-data="shell" @keydown.escape.window="close">
+    <div class="scrim" x-show="open" @click="close" x-cloak></div>
+
+    <aside class="sidebar" :class="sidebarClass">
+        <a href="/" class="brand">
+            <img src="{{ asset('img/logo.png') }}" alt="{{ app_name() }}">
+        </a>
+        <nav class="menu" aria-label="Main menu">
+            {% for group in nav() %}
+                {% if group.section %}
+                    <div class="menu-section{{ group.admin ? ' is-admin' : '' }}">{{ t('nav.s.' ~ group.section) }}</div>
+                {% endif %}
+                {% for it in group.items %}
+                    <a href="{{ it.href }}" title="{{ t('nav.' ~ it.key) }}" class="menu-item{{ active == it.key ? ' is-active' : '' }}{{ it.ready ? '' : ' is-soon' }}">
+                        {{ icon(it.icon, 19) }}
+                        <span>{{ t('nav.' ~ it.key) }}</span>
+                        {% if not it.ready %}<em class="tag-soon">{{ t('common.soon') }}</em>{% endif %}
+                    </a>
+                {% endfor %}
+            {% endfor %}
+        </nav>
+        <div class="sidebar-foot">
+            <div class="who">
+                <div class="avatar">{{ (user().name|default('U'))|slice(0, 1)|upper }}</div>
+                <div class="who-text">
+                    <strong>{{ user().name }}</strong>
+                    <small>{{ user().role|capitalize }} · {{ user().branchName|default('Main branch') }}</small>
+                </div>
+            </div>
+            <form method="post" action="/logout">
+                {{ csrf_field() }}
+                <button class="btn-ghost" type="submit">{{ icon('logout', 17) }} <span>{{ t('common.signout') }}</span></button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <button class="icon-btn menu-toggle" type="button" @click="menu" aria-label="{{ t('common.menu') }}" title="{{ t('common.menu') }}">{{ icon('menu', 20) }}</button>
+            {# named to avoid clashing with any page's own "meta" (billing/estimates use that name for their form data) #}
+            {% set pageBadge = active|default('') ? nav_meta(active) : null %}
+            <div class="topbar-title">
+                {% if pageBadge %}<span class="mod-ico" style="--m: {{ pageBadge.color }}">{{ icon(pageBadge.icon, 15) }}</span>{% endif %}
+                {% block heading %}{% endblock %}
+            </div>
+            <span id="live-dot" class="live-dot" title="Live updates" aria-label="Live updates"><i></i><em>Live</em></span>
+            <div id="rate-strip" class="rate-strip" hx-get="/partials/rate" hx-trigger="load, rate-saved from:body" hx-swap="innerHTML"></div>
+        </header>
+        <main class="content" id="content">
+            {% if flash|default(false) %}
+                <div class="notice notice-{{ flash.type }}">{{ flash.text }}</div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<dialog id="modal" class="modal"><div id="modal-body"></div></dialog>
+{% endblock %}

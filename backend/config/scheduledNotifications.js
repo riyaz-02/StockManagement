@@ -92,6 +92,13 @@ function checkAllJobs() {
     require('../services/cancelReconcile').reconcileCancelled().catch(err => {
         logger.error(`[Scheduler] cancel reconcile failed: ${err.message}`);
     });
+    // the daily stock snapshot: from 9 pm (shop time) today's snapshot is taken / refreshed, the first time it is looked at otherwise
+    try {
+        const hourIST = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date()));
+        if (hourIST >= 21) {
+            require('../services/stockSummaryData').saveSnapshot({ source: 'auto' }).catch(err => logger.error(`[Scheduler] stock snapshot failed: ${err.message}`));
+        }
+    } catch (err) { logger.error(`[Scheduler] stock snapshot failed: ${err.message}`); }
     JOBS.forEach(job => {
         runJobIfDue(job).catch(err => {
             logger.error(`[Scheduler] Job "${job.name}" failed: ${err.message}`);

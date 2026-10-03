@@ -57,6 +57,7 @@ router.get('/suggestions', requirePermission('purchases.view'), ctrl.getPurchase
 
 // ── Standard CRUD ─────────────────────────────────────────────────────────────
 router.get('/preview-gst', requirePermission('purchases.view'), ctrl.previewGst);
+router.post('/calculate', requirePermission('purchases.create'), ctrl.calculate);
 router.get('/', requirePermission('purchases.view'), ctrl.getPurchases);
 router.get('/:id', requirePermission('purchases.view'), ctrl.getPurchase);
 router.post('/', requirePermission('purchases.create'), ctrl.createPurchase);

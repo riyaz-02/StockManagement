@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ inv.invoiceNumber }} · Tax invoice</title>
+    <link rel="stylesheet" href="{{ asset('css/print.css') }}">
+    <script src="{{ asset('js/print.js') }}" defer></script>
+</head>
+<body>
+<div class="bar no-print">
+    <button type="button" data-print>Print / save as PDF</button>
+    <a href="/billing/{{ inv._id }}">Back</a>
+</div>
+<main class="sheet">
+    <header class="head">
+        <div>
+            <h1>{{ seller.firmName }}</h1>
+            <p>{{ seller.address }}</p>
+            <p>Phone: {{ seller.phone }}</p>
+            <p><strong>GSTIN: {{ seller.gstin }}</strong> · State: {{ seller.state }} ({{ seller.stateCode }})</p>
+        </div>
+        <div class="tag"><strong>TAX INVOICE</strong><span>{{ printType }}</span></div>
+    </header>
+
+    <section class="cols">
+        <div>
+            <h3>Billed to</h3>
+            <p><strong>{{ inv.customerName }}</strong></p>
+            {% if inv.customerAddress %}<p>{{ inv.customerAddress }}</p>{% endif %}
+            {% if inv.customerMobile %}<p>Mobile: {{ inv.customerMobile }}</p>{% endif %}
+            {% if inv.customerPan %}<p>PAN: {{ inv.customerPan }}</p>{% endif %}
+            <p>Place of supply: {{ inv.placeOfSupply }}</p>
+        </div>
+        <div class="right">
+            <p>Invoice no: <strong>{{ inv.invoiceNumber }}</strong></p>
+            <p>Date: <strong>{{ inv.invoiceDate|dmy }}</strong></p>
+            <p>Reverse charge: {{ inv.reverseCharge ?: 'No' }}</p>
+            <p>Gold {{ inv.goldRate|inr(0) }} · Silver {{ inv.silverRate|inr(0) }} per gram</p>
+        </div>
+    </section>
+
+    <table class="items">
+        <thead><tr><th>#</th><th>Description</th><th>HSN</th><th class="n">Net wt (g)</th><th class="n">Rate</th><th class="n">Making</th><th class="n">Taxable</th>{% if inv.gstType == 'IGST' %}<th class="n">IGST</th>{% else %}<th class="n">CGST</th><th class="n">SGST</th>{% endif %}<th class="n">Total</th></tr></thead>
+        <tbody>
+        {% for i in inv.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ i.particular }}{% if i.purity %} ({{ i.purity }}){% endif %}{% if i.huid %}<br><small>HUID {{ i.huid }}</small>{% endif %}</td>
+                <td>{{ i.hsnCode }}</td>
+                <td class="n">{{ '%.3f'|format(i.netWt) }}</td>
+                <td class="n">{{ i.rate|inr }}</td>
+                <td class="n">{{ i.makingCharge|inr }}</td>
+                <td class="n">{{ i.taxableAmount|inr }}</td>
+                {% if inv.gstType == 'IGST' %}<td class="n">{{ i.igst|inr }}</td>{% else %}<td class="n">{{ i.cgst|inr }}</td><td class="n">{{ i.sgst|inr }}</td>{% endif %}
+                <td class="n">{{ i.total|inr }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <section class="cols end">
+        <div>
+            <p class="words"><strong>Amount in words:</strong> {{ inv.amountInWords }}</p>
+            {% if inv.paymentHistory|length %}<p><strong>Received:</strong> {% for p in inv.paymentHistory %}{{ p.mode }} {{ p.amount|inr }}{{ loop.last ? '' : ', ' }}{% endfor %}</p>{% endif %}
+            {% if inv.oldMetal|length %}<p><strong>Old metal adjusted:</strong> {{ inv.oldMetalAmount|inr }}</p>{% endif %}
+        </div>
+        <table class="sum">
+            <tr><td>Taxable value</td><td class="n">{{ inv.gstSummary.taxableValue|inr }}</td></tr>
+            {% if inv.gstType == 'IGST' %}<tr><td>IGST 3%</td><td class="n">{{ inv.gstSummary.igst|inr }}</td></tr>
+            {% else %}<tr><td>CGST 1.5%</td><td class="n">{{ inv.gstSummary.cgst|inr }}</td></tr><tr><td>SGST 1.5%</td><td class="n">{{ inv.gstSummary.sgst|inr }}</td></tr>{% endif %}
+            {% if inv.additionalCharges > 0 %}<tr><td>Extra charges</td><td class="n">{{ inv.additionalCharges|inr }}</td></tr>{% endif %}
+            {% if inv.discountGiven > 0 %}<tr><td>Discount</td><td class="n">− {{ inv.discountGiven|inr }}</td></tr>{% endif %}
+            {% if inv.roundOff != 0 %}<tr><td>Round off</td><td class="n">{{ inv.roundOff|inr }}</td></tr>{% endif %}
+            <tr class="grand"><td>Total</td><td class="n">{{ inv.totalPayableAmount|inr }}</td></tr>
+            <tr><td>Paid</td><td class="n">{{ inv.paidAmount|inr }}</td></tr>
+            {% if inv.dueAmount > 0 %}<tr><td>Due</td><td class="n">{{ inv.dueAmount|inr }}</td></tr>{% endif %}
+        </table>
+    </section>
+
+    <footer class="foot">
+        <div>
+            <h3>Terms and conditions</h3>
+            <ol>{% for t in terms %}<li>{{ t }}</li>{% endfor %}</ol>
+            {% if declaration %}<p><strong>Declaration:</strong> {{ declaration }}</p>{% endif %}
+        </div>
+        <div class="sign"><p>For {{ seller.firmName }}</p><p class="line">Authorised signatory</p></div>
+    </footer>
+</main>
+</body>
+</html>

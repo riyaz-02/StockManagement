@@ -1,11 +1,15 @@
 /**
- * db.js — Dual MongoDB Connection Manager
+ * db.js — MongoDB connection
  *
- * Connection 1 (primary):  jewellery_stock  → existing app data (Items, Containers, etc.)
- * Connection 2 (shopmanage): shopmanage      → new store management modules
- *                            (Purchases, StockEntries, BulkWeights, GstConfig)
+ * ONE database holds everything: the website's `shopmanage` (its customers, users, invoices ...) plus the app's own
+ * collections (`items`, `containers`, `app_*` ...), so the phone app, the new website and the old website all work on the
+ * same records. MONGODB_URI is the only address, and it must end with the database name (.../shopmanage). There is one
+ * connection: `mongoose.connection`, returned by getConnection().
  *
- * Both connections share the same cluster and credentials.
+ * Collections the PHP website owns are never created or re-indexed by this app: their models say `autoIndex: false,
+ * autoCreate: false` (see models/User.js, models/directory/*), and raw reads/writes go through getConnection().db.
+ *
+ * The old split layout (a separate app database) is gone; docs/DB_UNIFICATION.md has the design and the merge steps.
  */
 
 const mongoose = require('mongoose');
@@ -18,124 +22,38 @@ const mongoOptions = {
     socketTimeoutMS: 45000,
 };
 
-// ─── Primary connection (jewellery_stock) ───────────────────────────────────
-// This is the default mongoose connection — all existing models use it.
+/** The host part of an address, for logs: never the user name or password. */
+const hostOf = (uri) => String(uri).replace(/^mongodb(\+srv)?:\/\//i, '').replace(/^[^@/]*@/, '').split(/[/?]/)[0];
+
+/** The database name an address ends with ('' when it has none). */
+const dbNameOf = (uri) => {
+    const m = String(uri).match(/^mongodb(?:\+srv)?:\/\/[^/]*\/([^?]*)/i);
+    return m ? decodeURIComponent(m[1]) : '';
+};
+
 const connectPrimary = async () => {
     const uri = process.env.MONGODB_URI;
     if (!uri) {
         logger.error('❌ MONGODB_URI environment variable is not set!');
         process.exit(1);
     }
+    if (!dbNameOf(uri)) {
+        // without a name Mongo would silently use a database called "test"
+        logger.error('❌ MONGODB_URI must end with the database name, e.g. ...mongodb.net/shopmanage?retryWrites=true');
+        process.exit(1);
+    }
 
-    logger.info(`[DB] Connecting to jewellery_stock: ${uri.substring(0, 40)}...`);
-
+    logger.info(`[DB] Connecting to ${hostOf(uri)} ...`);
     await mongoose.connect(uri, mongoOptions);
-    logger.info('✅ [DB] jewellery_stock connected');
-    logger.info(`[DB] Primary database: ${mongoose.connection.name}`);
+    logger.info(`✅ [DB] connected (database: ${mongoose.connection.name})`);
 };
 
-// ─── Secondary connection (shopmanage) ─────────────────────────────────────
-// A separate mongoose connection for the store management collections.
-let shopmanageConnection = null;
+/** The one connection. Every model and every raw collection read goes through it. */
+const getConnection = () => mongoose.connection;
 
-const connectShopmanage = async () => {
-    const uri = process.env.SHOPMANAGE_DB_URI;
-    if (!uri) {
-        logger.warn('⚠️  [DB] SHOPMANAGE_DB_URI not set — store management features will be unavailable.');
-        return null;
-    }
-
-    logger.info(`[DB] Connecting to shopmanage: ${uri.substring(0, 40)}...`);
-
-    shopmanageConnection = mongoose.createConnection(uri, mongoOptions);
-
-    shopmanageConnection.on('connected', () => {
-        logger.info(`✅ [DB] shopmanage connected (db: ${shopmanageConnection.name})`);
-    });
-
-    shopmanageConnection.on('error', (err) => {
-        logger.error('[DB] shopmanage connection error:', err.message);
-    });
-
-    shopmanageConnection.on('disconnected', () => {
-        logger.warn('[DB] shopmanage disconnected');
-    });
-
-    // Wait for connection to be ready
-    await shopmanageConnection.asPromise();
-
-    return shopmanageConnection;
-};
-
-// ─── Third connection (LGP admin cluster → shopmanage db) ──────────────────
-// Holds the legacy web-admin data: customers, staff login users, GST data.
-// The app treats this DB as PRODUCTION: routes built on it are read + insert
-// only (see controllers/directoryController.js). Never add update/delete
-// paths against the pre-existing collections here.
-let lgpAdminConnection = null;
-
-const connectLgpAdmin = async () => {
-    const uri = process.env.LGP_ADMIN_DB_URI;
-    if (!uri) {
-        logger.warn('⚠️  [DB] LGP_ADMIN_DB_URI not set — User Directory will be unavailable.');
-        return null;
-    }
-
-    logger.info('[DB] Connecting to LGP admin cluster...');
-
-    lgpAdminConnection = mongoose.createConnection(uri, {
-        ...mongoOptions,
-        // Never let Mongoose create indexes/collections on this production DB.
-        autoIndex: false,
-        autoCreate: false,
-    });
-
-    lgpAdminConnection.on('connected', () => {
-        logger.info(`✅ [DB] LGP admin connected (db: ${lgpAdminConnection.name})`);
-    });
-    lgpAdminConnection.on('error', (err) => {
-        logger.error('[DB] LGP admin connection error:', err.message);
-    });
-    lgpAdminConnection.on('disconnected', () => {
-        logger.warn('[DB] LGP admin disconnected');
-    });
-
-    await lgpAdminConnection.asPromise();
-    return lgpAdminConnection;
-};
-
-const getLgpAdminConnection = () => {
-    if (!lgpAdminConnection) {
-        throw new Error('LGP admin connection is not initialized (LGP_ADMIN_DB_URI missing?).');
-    }
-    return lgpAdminConnection;
-};
-
-// ─── Getters ────────────────────────────────────────────────────────────────
-const getShopmanageConnection = () => {
-    if (!shopmanageConnection) {
-        throw new Error('shopmanage connection is not initialized. Call connectShopmanage() first.');
-    }
-    return shopmanageConnection;
-};
-
-// ─── Graceful shutdown ──────────────────────────────────────────────────────
 const closeAll = async () => {
     await mongoose.connection.close();
-    if (shopmanageConnection) {
-        await shopmanageConnection.close();
-    }
-    if (lgpAdminConnection) {
-        await lgpAdminConnection.close();
-    }
-    logger.info('[DB] All connections closed.');
+    logger.info('[DB] Connection closed.');
 };
 
-module.exports = {
-    connectPrimary,
-    connectShopmanage,
-    getShopmanageConnection,
-    connectLgpAdmin,
-    getLgpAdminConnection,
-    closeAll,
-};
+module.exports = { connectPrimary, getConnection, closeAll, dbNameOf, hostOf };

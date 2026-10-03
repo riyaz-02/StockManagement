@@ -1,0 +1,20 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/admin/staff" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>Add staff</h2>
+    <p class="muted">One login for the phone app, this website and the old website: they sign in with their mobile number (or the username below) and the same password everywhere.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        <div class="span-2">{{ ui.field('Name', 'name', v.name|default(''), {required: true, autofocus: true}) }}</div>
+        {{ ui.field('Mobile number', 'mobile', v.mobile|default(''), {type: 'tel', inputmode: 'numeric', required: true}) }}
+        {{ ui.field('Password (6 or more)', 'password', v.password|default(''), {required: true}) }}
+        {{ ui.field('Username (optional)', 'username', v.username|default(''), {hint: 'For the old website. Leave empty to use the mobile number.'}) }}
+        {{ ui.field('E-mail (optional)', 'email', v.email|default(''), {type: 'email'}) }}
+        <label class="field"><span>Role</span><select name="role">{% for k, label in roles %}<option value="{{ k }}"{{ k == v.role|default('staff') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Branch</span><select name="branchId">{% for b in branches %}<option value="{{ b._id }}"{{ b._id == v.branchId|default('main') ? ' selected' : '' }}>{{ b.name }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+</form>

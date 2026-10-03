@@ -1,0 +1,16 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/tally/{{ id }}/lock" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>Finish and lock</h2>
+    {% if sum.left|default(0) > 0 %}
+        <div class="notice notice-info">{{ sum.left }} pieces were not found. You can still lock, but write why (for example "kept at home", "sent to karigar"). Their box and slot are saved in the report.</div>
+    {% else %}
+        <p class="muted">Every piece was found. Locking stops any more counting.</p>
+    {% endif %}
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    {{ ui.field('Remarks' ~ (sum.left|default(0) > 0 ? '' : ' (optional)'), 'remarks', v.remarks|default(''), {type: 'textarea', rows: 3, required: sum.left|default(0) > 0}) }}
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-ok">Lock the tally</button>
+    </div>
+</form>

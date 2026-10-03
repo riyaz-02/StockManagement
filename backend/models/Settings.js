@@ -43,4 +43,6 @@ const settingsSchema = new mongoose.Schema({
 // Create compound index for category + type (unique combination)
 settingsSchema.index({ category: 1, type: 1 }, { unique: true });
 
+// 'app_settings', not 'settings': the website's code also reads a collection called `settings` (see docs/DB_UNIFICATION.md)
+settingsSchema.set('collection', 'app_settings');
 module.exports = mongoose.model('Settings', settingsSchema);

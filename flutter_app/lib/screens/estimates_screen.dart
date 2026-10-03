@@ -11,6 +11,7 @@ import '../widgets/bill_ui.dart';
 import '../widgets/customer_field.dart';
 import 'create_invoice_screen.dart';
 import 'invoice_item_sheet.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -24,7 +25,13 @@ class EstimatesScreen extends StatefulWidget {
   State<EstimatesScreen> createState() => _EstimatesScreenState();
 }
 
-class _EstimatesScreenState extends State<EstimatesScreen> {
+class _EstimatesScreenState extends State<EstimatesScreen> with LiveRefresh<EstimatesScreen> {
+  @override
+  List<String> get liveModules => ['estimates'];
+
+  @override
+  void onLiveChange() => _load();
+
   final _api = ApiService();
   final _q = TextEditingController();
   String _status = 'open';
@@ -35,12 +42,14 @@ class _EstimatesScreenState extends State<EstimatesScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _load();
   }
 
   @override
   void dispose() {
     _q.dispose();
+    disposeLive();
     super.dispose();
   }
 

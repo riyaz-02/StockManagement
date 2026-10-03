@@ -1,0 +1,35 @@
+{% set tabs = [['active', 'Active', counts.active|default(0)], ['overdue', 'Overdue', counts.overdue|default(0)], ['ready', 'Ready', counts.ready|default(0)], ['delivered', 'Delivered', 0], ['cancelled', 'Cancelled', 0]] %}
+<form class="toolbar" hx-get="/orders/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input, submit">
+    <div class="chips">
+        {% for tb in tabs %}
+            <button type="button" class="chip{{ status == tb[0] ? ' is-on' : '' }}" hx-get="/orders/list?status={{ tb[0] }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ tb[1] }}{% if tb[2] > 0 %}<b>{{ tb[2] }}</b>{% endif %}</button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search name, mobile, number or item" autocomplete="off"></div>
+</form>
+
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Order</th><th>Customer</th><th>What</th><th>Delivery</th><th>Status</th><th class="num">Advance</th></tr></thead>
+            <tbody>
+            {% for o in rows %}
+                {% set tone = o.overdue ? 'red' : {new: 'blue', making: 'amber', ready: 'green', delivered: 'grey', cancelled: 'grey'}[o.status]|default('grey') %}
+                <tr>
+                    <td><a class="row-link" href="/orders/{{ o.id }}">{{ o.number }}</a><small>{{ o.date|dmy }}</small></td>
+                    <td class="strong">{{ o.customerName }}<small>{{ o.customerMobile }}</small></td>
+                    <td>{{ o.description }}<small>{{ o.metalType|capitalize }} {{ o.purity }}{% if o.approxWeight|default(0) > 0 %} · ~{{ o.approxWeight|grams }}{% endif %}{% if o.karigar %} · karigar {{ o.karigar }}{% endif %}</small></td>
+                    <td>{{ o.deliveryDate|dmy }}<small>{% if o.status in ['new', 'making', 'ready'] %}{{ o.overdue ? (-o.daysLeft) ~ ' days late' : (o.daysLeft == 0 ? 'due today' : 'in ' ~ o.daysLeft ~ ' days') }}{% endif %}</small></td>
+                    <td><span class="pill pill-{{ tone }}">{{ o.overdue ? 'Overdue' : {new: 'New', making: 'Being made', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled'}[o.status]|default(o.status) }}</span></td>
+                    <td class="num"><strong>{{ o.advancePaid|default(0) > 0 ? o.advancePaid|inr : '–' }}</strong>{% if o.estimatedPrice|default(0) > 0 and o.status in ['new', 'making', 'ready'] %}<small>Balance ~{{ o.balanceEstimate|inr }}</small>{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="t-empty">No orders here.</div>
+    {% endif %}
+</section>

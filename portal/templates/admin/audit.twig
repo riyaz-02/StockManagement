@@ -1,0 +1,47 @@
+{% extends 'app.twig' %}
+{% block title %}Audit log{% endblock %}
+{% block heading %}Audit log{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Audit log</h1><p class="muted">Every recorded action from the phone app and this website, in one place: bills, returns, orders, stock, purchases, old metal, tallies, expenses, GST filings, staff, permissions and rules.</p></div></div>
+<form class="toolbar" method="get" action="/admin/audit">
+    <select name="entity" aria-label="What" data-autosubmit>{% for k, label in kinds %}<option value="{{ k }}"{{ entity == k ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search a name, person or field"></div>
+    <input type="date" name="from" value="{{ from }}" aria-label="From" data-autosubmit>
+    <span class="muted">to</span>
+    <input type="date" name="to" value="{{ to }}" aria-label="To" data-autosubmit>
+    <button class="btn" type="submit">Search</button>
+</form>
+<p class="muted small">{{ pg.total|default(0) }} entries</p>
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>When</th><th>Who</th><th>Where</th><th>Action</th><th>Changes</th></tr></thead>
+        <tbody>{% for r in rows %}
+            {% set act = r.action|default('') %}
+            {% set tone = act matches '/(cancel|delet|remov|force.locked|deactivat)/' ? 'red' : (act matches '/(creat|record|receiv|issu|restor|put back|publish|sent|sold|billed)/' ? 'green' : (act matches '/(chang|updat|revis|status|reset)/' ? 'blue' : 'grey')) %}
+            {% set changes = r.changes|default([]) %}
+            {% set where = (kinds[r.entity]|default(r.entity)) ~ (r.entityLabel ? ' · ' ~ r.entityLabel : '') %}
+            <tr>
+                <td>{{ r.at|dmy_time }}</td>
+                <td class="strong">{{ r.byName|default('') ?: 'System' }}</td>
+                <td><span class="pill pill-grey">{{ kinds[r.entity]|default(r.entity) }}</span><small>{{ r.entityLabel }}</small></td>
+                <td><span class="pill pill-{{ tone }}">{{ act|pretty }}</span></td>
+                <td class="chg-cell">
+                    {% if changes|length %}
+                        <div class="chg-line"><strong>{{ changes[0].field }}</strong>{% if changes[0].from|default('') != '' %} <span class="muted">{{ changes[0].from }}</span> →{% endif %} {{ changes[0].to|default('') }}</div>
+                        {% if changes|length > 1 %}<small class="muted">+{{ changes|length - 1 }} more field{{ changes|length > 2 ? 's' : '' }}</small>{% endif %}
+                        <button type="button" class="link-btn small" data-audit-view='{{ {when: r.at|dmy_time, who: r.byName|default('') ?: 'System', where: where, action: act|pretty, changes: changes}|json_encode|e('html_attr')|raw }}'>Details</button>
+                    {% else %}<span class="muted">–</span>{% endif %}
+                </td>
+            </tr>
+        {% endfor %}</tbody>
+    </table></div>
+    <div class="pager">
+        {% if page > 1 %}<a class="btn" href="/admin/audit?{{ {entity: entity, q: q, from: from, to: to, page: page - 1}|filter(v => v != '')|url_encode }}">← Newer</a>{% endif %}
+        <span class="muted">Page {{ page }}</span>
+        {% if pg.hasMore|default(false) %}<a class="btn" href="/admin/audit?{{ {entity: entity, q: q, from: from, to: to, page: page + 1}|filter(v => v != '')|url_encode }}">Older →</a>{% endif %}
+    </div>
+    {% else %}<div class="t-empty">Nothing recorded for this search.</div>{% endif %}
+</section>
+{% endblock %}

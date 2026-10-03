@@ -32,6 +32,8 @@ exports.update = async (req, res, next) => {
             { key: 'main' },
             { $set: { gold: Math.round(gold * 100) / 100, silver: Math.round(silver * 100) / 100, updatedByName: by }, $push: { history: { $each: [{ at: new Date(), gold, silver, by }], $slice: -50 } }, $setOnInsert: { key: 'main' } },
             { upsert: true, new: true }).lean();
-        res.json({ success: true, data: view(doc) });
+        const v = view(doc);
+        require('../services/events').emit('rate.changed', { gold: v.gold, silver: v.silver, updatedByName: v.updatedByName }, { actor: { id: req.user._id, name: req.user.name } });
+        res.json({ success: true, data: v });
     } catch (e) { next(e); }
 };

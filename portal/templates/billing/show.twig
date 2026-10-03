@@ -1,0 +1,102 @@
+{% extends 'app.twig' %}
+{% block title %}{{ inv.invoiceNumber }}{% endblock %}
+{% block heading %}{{ inv.invoiceNumber }}{% endblock %}
+
+{% block content %}
+{% set cancelled = inv.status in ['cancelled', 'void', 'deleted'] %}
+<div class="page-head">
+    <div>
+        <h1>{{ inv.customerName }}
+            {% if cancelled %}<span class="pill pill-grey">Cancelled</span>{% elseif inv.dueAmount > 0 %}<span class="pill pill-amber">Due {{ inv.dueAmount|inr }}</span>{% else %}<span class="pill pill-green">Paid</span>{% endif %}
+        </h1>
+        <p class="muted">Bill {{ inv.invoiceNumber }} · {{ inv.invoiceDate|dmy }}{% if inv.customerMobile %} · {{ inv.customerMobile }}{% endif %}{% if inv.branchName %} · {{ inv.branchName }}{% endif %}{% if inv.createdBy %} · by {{ inv.createdBy }}{% endif %}</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/billing/{{ inv._id }}/print" target="_blank" rel="noopener">{{ icon('receipt', 17) }} Print</a>
+        {% if not cancelled and inv.dueAmount > 0 and can('billing.receivePayment') %}<button class="btn btn-ok" type="button" hx-get="/dues/pay/{{ inv._id }}" hx-target="#modal-body">Receive payment</button>{% endif %}
+        {% if not cancelled and can('billing.creditNote') %}<button class="btn" type="button" hx-get="/billing/{{ inv._id }}/return" hx-target="#modal-body">Return / refund</button>{% endif %}
+        <a class="btn" href="/billing">All bills</a>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Customer</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Name</span><strong>{{ inv.customerName }}{% if inv.walkIn %} (walk-in){% endif %}</strong></div>
+            {% if inv.customerMobile %}<div class="kv-row"><span>Mobile</span><strong>{{ inv.customerMobile }}</strong></div>{% endif %}
+            {% if inv.customerAddress %}<div class="kv-row"><span>Address</span><strong>{{ inv.customerAddress }}</strong></div>{% endif %}
+            {% if inv.customerPan %}<div class="kv-row"><span>PAN</span><strong>{{ inv.customerPan }}</strong></div>{% endif %}
+            <div class="kv-row"><span>Place of supply</span><strong>{{ inv.placeOfSupply }}</strong></div>
+            <div class="kv-row"><span>Rates that day</span><strong>Gold {{ inv.goldRate|inr(0) }} · Silver {{ inv.silverRate|inr(0) }}</strong></div>
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>Amount</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Taxable value</span><strong>{{ inv.gstSummary.taxableValue|inr }}</strong></div>
+            {% if inv.gstType == 'IGST' %}<div class="kv-row"><span>IGST 3%</span><strong>{{ inv.gstSummary.igst|inr }}</strong></div>
+            {% else %}<div class="kv-row"><span>CGST 1.5%</span><strong>{{ inv.gstSummary.cgst|inr }}</strong></div><div class="kv-row"><span>SGST 1.5%</span><strong>{{ inv.gstSummary.sgst|inr }}</strong></div>{% endif %}
+            {% if inv.additionalCharges > 0 %}<div class="kv-row"><span>Extra charges</span><strong>{{ inv.additionalCharges|inr }}</strong></div>{% endif %}
+            {% if inv.discountGiven > 0 %}<div class="kv-row"><span>Discount given</span><strong class="neg">− {{ inv.discountGiven|inr }}</strong></div>{% endif %}
+            {% if inv.roundOff != 0 %}<div class="kv-row"><span>Round off</span><strong>{{ inv.roundOff|inr }}</strong></div>{% endif %}
+            <div class="kv-row total"><span>Bill total</span><strong>{{ inv.totalPayableAmount|inr }}</strong></div>
+            <div class="kv-row"><span>Received</span><strong class="pos">{{ inv.paidAmount|inr }}</strong></div>
+            {% if inv.dueAmount > 0 %}<div class="kv-row"><span>Still due</span><strong class="neg">{{ inv.dueAmount|inr }}</strong></div>{% endif %}
+            {% if inv.advanceAmount > 0 %}<div class="kv-row"><span>Advance (extra paid)</span><strong>{{ inv.advanceAmount|inr }}</strong></div>{% endif %}
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Items</h2></div>
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Item</th><th class="num">Net wt</th><th class="num">Rate</th><th class="num">Making</th><th class="num">Taxable</th><th class="num">Total</th></tr></thead>
+            <tbody>
+            {% for i in inv.items %}
+                <tr>
+                    <td class="strong">{{ i.particular }}<small>{{ i.metalType }}{% if i.purity %} {{ i.purity }}{% endif %} · HSN {{ i.hsnCode }}{% if i.huid %} · HUID {{ i.huid }}{% endif %}{% if i.productCode %} · {{ i.productCode }}{% endif %}</small></td>
+                    <td class="num">{{ i.netWt|grams }}</td>
+                    <td class="num">{{ i.rate|inr(0) }}</td>
+                    <td class="num">{{ i.makingCharge|inr }}</td>
+                    <td class="num">{{ i.taxableAmount|inr }}</td>
+                    <td class="num strong">{{ i.total|inr }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if inv.paymentHistory|length or inv.oldMetal|length %}
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Payments</h2></div>
+        <div class="panel-body kv">
+            {% for p in inv.paymentHistory %}<div class="kv-row"><span>{{ p.date|dmy }} · {{ p.mode }}{% if p.reference %} · {{ p.reference }}{% endif %}{% if p.receivedBy %} · {{ p.receivedBy }}{% endif %}</span><strong class="pos">{{ p.amount|inr }}</strong></div>{% else %}<div class="muted">No payment yet.</div>{% endfor %}
+        </div>
+    </section>
+    {% if inv.oldMetal|length %}
+    <section class="panel">
+        <div class="panel-head"><h2>Old metal adjusted</h2></div>
+        <div class="panel-body kv">
+            {% for o in inv.oldMetal %}<div class="kv-row"><span>{{ o.metal|capitalize }} {{ o.purity }} · net {{ o.net|grams }} · fine {{ o.fine|grams }}</span><strong>{{ o.amount|inr }}</strong></div>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if notes|length %}
+<section class="panel">
+    <div class="panel-head"><h2>Credit notes (returns and refunds)</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Note</th><th>Date</th><th>Reason</th><th class="num">Amount</th><th class="num">Refunded</th></tr></thead>
+        <tbody>{% for n in notes %}
+            <tr><td class="strong">{{ n.number }}</td><td>{{ n.date|dmy }}</td><td>{{ n.reason|pretty }}</td><td class="num">{{ n.total|default(0)|inr }}</td><td class="num">{{ n.refundAmount|default(0) > 0 ? (n.refundAmount|inr) ~ ' (' ~ n.refundMode ~ ')' : '–' }}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
+{% endblock %}

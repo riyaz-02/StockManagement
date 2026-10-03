@@ -1,0 +1,38 @@
+<div class="cards">
+    {% if sales is not null %}
+    <a class="card stat stat-amber" href="/billing">
+        <div class="stat-ico">{{ icon('receipt', 22) }}</div>
+        <small>{{ t('home.sales') }}</small>
+        <strong>{{ sales.sales|default(0)|inr }}</strong>
+        <span>{{ t('home.bills', {n: sales.invoices|default(0)}) }}</span>
+    </a>
+    {% endif %}
+    {% if book is not null %}
+    <a class="card stat stat-teal" href="/day-book">
+        <div class="stat-ico">{{ icon('book', 22) }}</div>
+        <small>{{ t('home.money_in') }}</small>
+        <strong>{{ book.totals.in|default(0)|inr }}</strong>
+        {% set cash = null %}{% for m in book.modes|default([]) %}{% if m.mode == 'Cash' %}{% set cash = m %}{% endif %}{% endfor %}
+        <span>{{ t('home.cash', {amount: (cash ? cash.net : 0)|inr}) }}</span>
+    </a>
+    {% endif %}
+    {% if dues is not null %}
+    <a class="card stat stat-red" href="/dues">
+        <div class="stat-ico">{{ icon('hourglass', 22) }}</div>
+        <small>{{ t('home.dues') }}</small>
+        <strong>{{ dues.total|default(0)|inr }}</strong>
+        <span>{{ t('home.customers', {n: dues.customers|default(0)}) }}</span>
+    </a>
+    {% endif %}
+    {% if orders is not null %}
+    <a class="card stat stat-blue" href="/orders">
+        <div class="stat-ico">{{ icon('hammer', 22) }}</div>
+        <small>{{ t('home.orders') }}</small>
+        <strong>{{ orders.active|default(0) }}</strong>
+        <span>{{ t('home.orders_line', {overdue: orders.overdue|default(0), ready: orders.ready|default(0)}) }}</span>
+    </a>
+    {% endif %}
+    {% if sales is null and book is null and dues is null and orders is null %}
+    <div class="card empty">{{ t('home.none') }}</div>
+    {% endif %}
+</div>

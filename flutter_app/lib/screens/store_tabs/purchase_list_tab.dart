@@ -402,15 +402,17 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
 
               // Financial row — full amounts, small font, no overflow
               Row(children: [
-                // Taxable
+                // Taxable (a purchase from the old website has only its invoice total: no GST was recorded)
                 Expanded(
-                    child: _amtCol('Taxable', '₹${_rupee(p.totalAmount)}',
-                        Colors.grey[800]!)),
+                    child: _amtCol(p.gstRecorded ? 'Taxable' : 'Amount',
+                        '₹${_rupee(p.totalAmount)}', Colors.grey[800]!)),
                 _chevron(),
                 // GST
                 Expanded(
-                    child: _amtCol('GST ${p.gstRate.toStringAsFixed(0)}%',
-                        '+₹${_rupee(p.totalGst)}', Colors.indigo)),
+                    child: p.gstRecorded
+                        ? _amtCol('GST ${p.gstRate.toStringAsFixed(0)}%',
+                            '+₹${_rupee(p.totalGst)}', Colors.indigo)
+                        : _amtCol('GST', 'not recorded', Colors.grey)),
                 if (p.tdsApplicable) ...[
                   _chevron(),
                   Expanded(
@@ -653,20 +655,25 @@ class _PurchaseListTabState extends State<PurchaseListTab> {
                     if (p.description.isNotEmpty)
                       _d2('Description', p.description),
                   ]),
-                  _section('Transaction', [
-                    _d2('Type', p.transactionType),
-                    _d2('HSN Code', p.hsnCode),
-                    _d2('GST Rate', '${p.gstRate.toStringAsFixed(0)}%'),
-                  ]),
+                  if (p.gstRecorded)
+                    _section('Transaction', [
+                      _d2('Type', p.transactionType),
+                      _d2('HSN Code', p.hsnCode),
+                      _d2('GST Rate', '${p.gstRate.toStringAsFixed(0)}%'),
+                    ])
+                  else
+                    _section('GST', [
+                      _d2('GST', 'Not recorded (made on the old website: no GST or input credit is counted)'),
+                    ]),
                   _section('Financial Summary', [
-                    _d2('Taxable Value', '₹${_rupee(p.totalAmount)}'),
+                    _d2(p.gstRecorded ? 'Taxable Value' : 'Invoice amount', '₹${_rupee(p.totalAmount)}'),
                     if (p.cgstAmount > 0) ...[
                       _d2('CGST', '+₹${_rupee(p.cgstAmount)}'),
                       _d2('SGST', '+₹${_rupee(p.sgstAmount)}'),
                     ],
                     if (p.igstAmount > 0)
                       _d2('IGST', '+₹${_rupee(p.igstAmount)}'),
-                    _d2('Total GST', '₹${_rupee(p.totalGst)}'),
+                    if (p.gstRecorded) _d2('Total GST', '₹${_rupee(p.totalGst)}'),
                     _d2('Invoice Total', '₹${_rupee(p.totalPayable)}',
                         bold: true),
                     if (p.tdsApplicable) ...[

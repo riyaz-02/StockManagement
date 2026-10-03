@@ -1,0 +1,19 @@
+{% extends 'gst/base.twig' %}
+{% block controls %}<span class="muted small">Returns you have already filed on the GST portal. Note them here so the reminders stop.</span>{% endblock %}
+
+{% block tabbody %}
+{% if can('gst.manageFilings') %}
+<div class="row-gap" style="margin-bottom: 12px"><button class="btn btn-primary" type="button" hx-get="/gst/filings/new?gstin={{ gstin }}" hx-target="#modal-body">{{ icon('plus', 17) }} Record a filing</button></div>
+{% endif %}
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Return</th><th>Period</th><th>Filed on</th><th>ARN</th><th class="num">Tax</th><th class="num">Credit used</th><th class="num">Cash paid</th></tr></thead>
+        <tbody>{% for f in rows %}
+            <tr><td class="strong">{{ f.returnType }}{% if f.nil %} <span class="pill pill-grey">Nil</span>{% endif %}</td><td>{{ f.period }}</td><td>{{ f.filedOn|dmy }}</td><td>{{ f.arn ?: '–' }}</td>
+                <td class="num">{{ f.taxLiability|inr(0) }}</td><td class="num">{{ f.itcUsed|inr(0) }}</td><td class="num">{{ f.cashPaid|inr(0) }}{% if f.lateFee > 0 or f.interest > 0 %}<small>late fee {{ f.lateFee|inr(0) }}, interest {{ f.interest|inr(0) }}</small>{% endif %}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="t-empty">No filings recorded yet.</div>{% endif %}
+</section>
+{% endblock %}

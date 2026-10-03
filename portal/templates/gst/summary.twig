@@ -1,0 +1,74 @@
+{% extends 'gst/base.twig' %}
+{% macro delta(now, before) %}{% if before > 0 %}{% set d = ((now - before) / before * 100)|round(1) %}<small class="{{ d >= 0 ? 'pos' : 'neg' }}">{{ d >= 0 ? '▲' : '▼' }} {{ d|abs }}% vs before</small>{% else %}<small>&nbsp;</small>{% endif %}{% endmacro %}
+{% block controls %}{% include 'gst/_range.twig' %}{% endblock %}
+
+{% block tabbody %}
+{% if s.totals is defined %}
+{% set t = s.totals %}{% set pv = s.previous %}
+<div class="stats">
+    <div class="stat"><span>Bills</span><strong>{{ t.invoices }}</strong>{{ _self.delta(t.invoices, pv.invoices) }}</div>
+    <div class="stat"><span>Sales (with GST)</span><strong>{{ t.invoiceValue|inr(0) }}</strong>{{ _self.delta(t.invoiceValue, pv.invoiceValue) }}</div>
+    <div class="stat"><span>Taxable value</span><strong>{{ t.taxable|inr(0) }}</strong>{{ _self.delta(t.taxable, pv.taxable) }}</div>
+    <div class="stat"><span>GST collected</span><strong>{{ t.tax|inr(0) }}</strong>{{ _self.delta(t.tax, pv.tax) }}</div>
+    <div class="stat"><span>Weight sold</span><strong>{{ t.weight|grams }}</strong>{{ _self.delta(t.weight, pv.weight) }}</div>
+    <div class="stat"><span>Making charges</span><strong>{{ t.making|inr(0) }}</strong>{{ _self.delta(t.making, pv.making) }}</div>
+</div>
+{% if s.partial %}<div class="notice notice-info">Some branches are hidden from you, so these figures cover only the branches you can see.</div>{% endif %}
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Tax split</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>CGST</span><strong>{{ t.cgst|inr }}</strong></div>
+            <div class="kv-row"><span>SGST</span><strong>{{ t.sgst|inr }}</strong></div>
+            <div class="kv-row"><span>IGST</span><strong>{{ t.igst|inr }}</strong></div>
+            <div class="kv-row total"><span>Total GST</span><strong>{{ t.tax|inr }}</strong></div>
+            <div class="kv-row"><span>Within the state · other states</span><strong>{{ t.intra }} · {{ t.inter }} bills</strong></div>
+            {% if t.tds > 0 %}<div class="kv-row"><span>TDS on big bills (194O/206C)</span><strong>{{ t.tds|inr }}</strong></div>{% endif %}
+            {% if t.discount > 0 %}<div class="kv-row"><span>Discount given</span><strong>{{ t.discount|inr }}</strong></div>{% endif %}
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>How customers paid</h2></div>
+        <div class="panel-body kv">
+            {% for p in s.payments %}<div class="kv-row"><span>{{ p.mode }} · {{ p.count }} payments</span><strong>{{ p.amount|inr }}</strong></div>{% else %}<div class="muted">No payments in this time.</div>{% endfor %}
+            <div class="kv-row total"><span>Still due from customers</span><strong class="{{ t.due > 0 ? 'neg' : '' }}">{{ t.due|inr }}</strong></div>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>By metal</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Metal</th><th class="num">Pieces</th><th class="num">Weight</th><th class="num">Metal value</th><th class="num">Making</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead>
+        <tbody>{% for m in s.byMetal %}<tr><td class="strong">{{ m.metal }}</td><td class="num">{{ m.pieces }}</td><td class="num">{{ m.weight|grams }}</td><td class="num">{{ m.metalValue|inr(0) }}</td><td class="num">{{ m.making|inr(0) }}</td><td class="num">{{ m.taxable|inr(0) }}</td><td class="num">{{ m.tax|inr(0) }}</td><td class="num strong">{{ m.total|inr(0) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Best selling items</h2></div>
+        <div class="table-wrap"><table class="t">
+            <thead><tr><th>Item</th><th class="num">Pieces</th><th class="num">Weight</th><th class="num">Total</th></tr></thead>
+            <tbody>{% for i in s.byItem|slice(0, 10) %}<tr><td class="strong">{{ i.item }}<small>{{ i.metal }}</small></td><td class="num">{{ i.pieces }}</td><td class="num">{{ i.weight|grams }}</td><td class="num">{{ i.total|inr(0) }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>By purity</h2></div>
+        <div class="table-wrap"><table class="t">
+            <thead><tr><th>Metal</th><th>Purity</th><th class="num">Pieces</th><th class="num">Weight</th><th class="num">Taxable</th></tr></thead>
+            <tbody>{% for p in s.byPurity %}<tr><td>{{ p.metal }}</td><td class="strong">{{ p.purity ?: '–' }}</td><td class="num">{{ p.pieces }}</td><td class="num">{{ p.weight|grams }}</td><td class="num">{{ p.taxable|inr(0) }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>By place of supply</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>State</th><th class="num">Bills</th><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Value</th></tr></thead>
+        <tbody>{% for p in s.byPlace %}<tr><td class="strong">{{ p.place }}{% if p.inter %} <span class="pill pill-blue">other state</span>{% endif %}</td><td class="num">{{ p.invoices }}</td><td class="num">{{ p.taxable|inr(0) }}</td><td class="num">{{ p.cgst|inr(0) }}</td><td class="num">{{ p.sgst|inr(0) }}</td><td class="num">{{ p.igst|inr(0) }}</td><td class="num strong">{{ p.value|inr(0) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% if s.notes.cancelled|default(0) > 0 %}<p class="muted small">{{ s.notes.cancelled }} cancelled bill(s) are left out of these figures.</p>{% endif %}
+{% endif %}
+{% endblock %}

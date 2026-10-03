@@ -368,17 +368,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> sellItem(
-      String id, Map<String, dynamic> data) async {
-    final response = await http.put(
-      Uri.parse('${AppConstants.baseUrl}/items/$id/sell'),
-      headers: await _getHeaders(),
-      body: json.encode(data),
-    );
-    return _handleResponse(response);
-  }
-
-  Future<Map<String, dynamic>> markItemAsNoSell(String id) async {
+    Future<Map<String, dynamic>> markItemAsNoSell(String id) async {
     final response = await http.put(
       Uri.parse('${AppConstants.baseUrl}/items/$id/mark-no-sell'),
       headers: await _getHeaders(),
@@ -1217,6 +1207,102 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // ── Stock Summary (metal balance and difference), history, snapshot ─────
+
+  Future<Map<String, dynamic>> getStockSummary() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/stock/summary'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getSummaryMovements({int limit = 30}) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/stock/summary/movements?limit=$limit'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> saveStockSnapshot() async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/stock/summary/snapshot'),
+      headers: await _getHeaders(),
+      body: json.encode({}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getSummaryHistory(
+      {String view = 'daily', String? from, String? to}) async {
+    final params = <String, String>{'view': view};
+    if (from != null) params['from'] = from;
+    if (to != null) params['to'] = to;
+    final uri = Uri.parse('${AppConstants.baseUrl}/stock/summary/history')
+        .replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  // ── Wastage reports ──────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getWastageReports(
+      {String? status, String? metal, int page = 1, int limit = 20}) async {
+    final params = <String, String>{'page': '$page', 'limit': '$limit'};
+    if (status != null && status.isNotEmpty) params['status'] = status;
+    if (metal != null && metal.isNotEmpty) params['metal'] = metal;
+    final uri = Uri.parse('${AppConstants.baseUrl}/stock/wastage')
+        .replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getWastageReport(String id) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/stock/wastage/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createWastage(Map<String, dynamic> body) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/stock/wastage'),
+      headers: await _getHeaders(),
+      body: json.encode(body),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateWastage(
+      String id, Map<String, dynamic> body) async {
+    final response = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/stock/wastage/$id'),
+      headers: await _getHeaders(),
+      body: json.encode(body),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> approveWastage(String id, String comment) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/stock/wastage/$id/approve'),
+      headers: await _getHeaders(),
+      body: json.encode({'comment': comment}),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> rejectWastage(String id, String comment) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/stock/wastage/$id/reject'),
+      headers: await _getHeaders(),
+      body: json.encode({'comment': comment}),
+    );
+    return _handleResponse(response);
+  }
+
   // ── Purchases ───────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getPurchases({
@@ -1421,6 +1507,22 @@ class ApiService {
       body: json.encode(data),
     );
     return _handleResponse(response);
+  }
+
+  // ── Presence ("I'm here, on this screen") for the website's Staff & Roles > Live now ──────
+  // Best-effort only: a missed heartbeat must never surface as an error anywhere in the app.
+  Future<void> pingPresence({required String screen}) async {
+    try {
+      await http
+          .post(
+            Uri.parse('${AppConstants.baseUrl}/presence/ping'),
+            headers: await _getHeaders(),
+            body: json.encode({'platform': 'app', 'screen': screen}),
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // no connection, or the server is asleep — the next scheduled ping tries again
+    }
   }
 
   // ── Push Notifications ─────────────────────────────────────────────────────

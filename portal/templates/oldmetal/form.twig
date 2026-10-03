@@ -1,0 +1,26 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/old-metal" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form modal-form-wide" hx-trigger="submit">
+    {{ csrf_field() }}
+    <input type="hidden" name="rid" value="{{ rid }}">
+    <input type="hidden" name="kind" value="{{ v.kind|default('old') }}">
+    <h2>{{ v.kind|default('old') == 'raw' ? 'Buy raw metal' : 'Receive old metal' }}</h2>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        {{ ui.customer_picker(v.customerName|default(''), v.customerMobile|default(''), v.customerId|default('')) }}
+        {{ ui.field('Metal', 'metalType', v.metalType|default('gold'), {type: 'select', options: ['gold', 'silver', 'platinum', 'other']}) }}
+        {{ ui.field('Purity', 'purity', v.purity|default('22K'), {type: 'select', options: purities}) }}
+        {{ ui.field('Gross weight (g)', 'gross', v.gross|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+        {{ ui.field('Less / stone (g)', 'less', v.less|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+        {{ ui.field('Net weight (g)', 'net', v.net|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal', required: true}) }}
+        {{ ui.field('Deduction % (melting loss)', 'deduction', v.deduction|default(''), {type: 'number', step: '0.01', min: '0', inputmode: 'decimal'}) }}
+        {{ ui.field('Rate per gram', 'rate', v.rate|default(''), {type: 'number', step: '0.01', min: '0', money: true, required: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Note (optional)', 'note', v.note|default(''), {span: true}) }}
+    </div>
+    <div class="calc-box" hx-post="/old-metal/calc" hx-include="closest form" hx-trigger="load, input from:closest form delay:300ms" hx-target="this" hx-swap="innerHTML">
+        <div class="muted small">Worked out by the shop's rules...</div>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>

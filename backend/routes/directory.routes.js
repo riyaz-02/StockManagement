@@ -43,6 +43,7 @@ router.get('/customers/lookup', requirePermission('directory.view'), ctrl.lookup
 router.get('/customers/:id', requirePermission('directory.view'), ctrl.getCustomer);
 router.post('/customers', requirePermission('directory.create'), ctrl.createCustomer);
 router.put('/customers/:id', requirePermission('directory.edit'), ctrl.updateCustomer);
+router.put('/customers/:id/partial', requirePermission('directory.edit'), ctrl.patchCustomer);
 
 router.get('/suppliers', requirePermission('directory.view'), ctrl.listSuppliers);
 router.get('/suppliers/:id', requirePermission('directory.view'), ctrl.getSupplier);

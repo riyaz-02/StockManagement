@@ -867,7 +867,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               _placeField(),
               const SizedBox(height: 12),
               Row(children: [
-                Expanded(child: _dateBox('Invoice date', _date, (d) => setState(() => _date = d!), required: true)),
+                Expanded(child: _dateBox('Invoice date', _date, (d) => setState(() => _date = d!), required: true, notFuture: true)),
                 const SizedBox(width: 8),
                 Expanded(child: _dateBox('Delivery', _delivery, (d) => setState(() => _delivery = d))),
               ]),
@@ -997,10 +997,13 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
         TextField(controller: _address, style: const TextStyle(fontSize: 14), decoration: billDec('Address', _blue)),
       ];
 
-  Widget _dateBox(String label, DateTime? v, ValueChanged<DateTime?> onPick, {bool required = false}) => InkWell(
+  // notFuture: the invoice date can be today or an earlier day (the server refuses a future bill date)
+  Widget _dateBox(String label, DateTime? v, ValueChanged<DateTime?> onPick, {bool required = false, bool notFuture = false}) => InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () async {
-          final d = await showDatePicker(context: context, initialDate: v ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
+          final now = DateTime.now();
+          final last = notFuture ? DateTime(now.year, now.month, now.day) : DateTime(2100);
+          final d = await showDatePicker(context: context, initialDate: (v != null && v.isAfter(last)) ? last : (v ?? now), firstDate: DateTime(2020), lastDate: last);
           if (d != null) onPick(d);
         },
         child: InputDecorator(

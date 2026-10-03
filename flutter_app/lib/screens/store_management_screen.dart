@@ -5,7 +5,7 @@ import '../utils/app_colors.dart';
 import 'store_tabs/stock_dashboard_tab.dart';
 import 'store_tabs/purchase_list_tab.dart';
 import 'store_tabs/stock_summary_tab.dart';
-import 'store_tabs/reconciliation_tab.dart';
+import 'store_tabs/summary_tab.dart';
 
 class StoreManagementScreen extends StatefulWidget {
   const StoreManagementScreen({super.key});
@@ -22,8 +22,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   static const _tabs = [
     _TabMeta(Icons.inventory_2_outlined, 'Stock', 'Live stock weight'),
     _TabMeta(Icons.receipt_long_outlined, 'Purchases', 'All purchase entries'),
-    _TabMeta(Icons.bar_chart_rounded, 'Summary', 'Daily in/out ledger'),
-    _TabMeta(Icons.balance_outlined, 'Reconcile', 'Balance check'),
+    _TabMeta(Icons.bar_chart_rounded, 'Daily', 'Daily in/out ledger'),
+    _TabMeta(Icons.balance_outlined, 'Summary', 'Metal balance and differences'),
   ];
 
   @override
@@ -134,7 +134,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 StockDashboardTab(),
                 PurchaseListTab(),
                 StockSummaryTab(),
-                ReconciliationTab(),
+                SummaryTab(),
               ],
             ),
           ),

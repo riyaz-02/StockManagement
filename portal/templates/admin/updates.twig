@@ -1,0 +1,59 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}App updates{% endblock %}
+{% block heading %}App updates{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>App updates</h1><p class="muted">Tell every phone that a new version is ready, and control who can sign in. Open phones and browser tabs hear it at once.</p></div></div>
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Right now</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Latest version</span><strong>{{ cur.latestVersion }} (build {{ cur.latestVersionCode }})</strong></div>
+            <div class="kv-row"><span>Must everyone update?</span><strong class="{{ cur.forceUpdate ? 'neg' : 'pos' }}">{{ cur.forceUpdate ? 'Yes, now' : 'No, optional' }}</strong></div>
+            <div class="kv-row"><span>Download page</span><strong>{{ cur.downloadUrl ?: 'Not set' }}</strong></div>
+            <div class="kv-row"><span>Message shown</span><strong>{{ cur.updateMessage ?: '–' }}</strong></div>
+            <div class="kv-row"><span>Sign-ins</span><strong class="{{ cur.maintenanceMode.enabled ? 'neg' : 'pos' }}">{{ cur.maintenanceMode.enabled ? 'Gated (Admin / Owner only)' : 'Open to everyone' }}</strong></div>
+        </div>
+    </section>
+    <form method="post" action="/admin/updates" class="panel">
+        {{ csrf_field() }}
+        <div class="panel-head"><h2>Publish a new version</h2></div>
+        <div class="panel-body">
+            {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+            <div class="form-grid">
+                {{ ui.field('Version (as shown to people)', 'latestVersion', v.latestVersion|default(cur.latestVersion), {required: true, placeholder: 'e.g. 1.5.0'}) }}
+                {{ ui.field('Build number', 'latestVersionCode', v.latestVersionCode|default(cur.latestVersionCode), {type: 'number', step: '1', min: '1', required: true, hint: 'The number after the + in the app version. It must go up.'}) }}
+                {{ ui.field('Download page', 'downloadUrl', v.downloadUrl|default(cur.downloadUrl), {span: true}) }}
+                {{ ui.field('Message (optional)', 'updateMessage', v.updateMessage|default(cur.updateMessage), {span: true, placeholder: 'What is new, in a line'}) }}
+            </div>
+            <label class="check"><input type="checkbox" name="forceUpdate" value="1"{{ v.forceUpdate|default(cur.forceUpdate) ? ' checked' : '' }}> <span>Everyone must update before using the app (use only for something important)</span></label>
+        </div>
+        <div class="panel-foot"><button class="btn btn-primary" type="submit" data-confirm="Tell every phone about this version?">Publish</button></div>
+    </form>
+</div>
+
+<div class="grid grid-2">
+    <form method="post" action="/admin/updates/maintenance" class="panel">
+        {{ csrf_field() }}
+        <div class="panel-head"><h2>Sign-in gate</h2></div>
+        <div class="panel-body">
+            {% if mError %}<div class="notice notice-error" role="alert">{{ mError }}</div>{% endif %}
+            <p class="muted small">Stop new sign-ins for a while — a lost phone, or a change in progress. Admin and Owner can always still get in to turn it back off, and anyone already signed in keeps working.</p>
+            <label class="check"><input type="checkbox" name="enabled" value="1"{{ mv.enabled|default(cur.maintenanceMode.enabled) ? ' checked' : '' }}> <span>Stop new sign-ins now</span></label>
+            {{ ui.field('Message shown to a blocked sign-in', 'message', mv.message|default(cur.maintenanceMode.message), {span: true}) }}
+        </div>
+        <div class="panel-foot"><button class="btn btn-primary" type="submit" data-confirm="Change who can sign in?">Save</button></div>
+    </form>
+    <section class="panel">
+        <div class="panel-head"><h2>Recent publishes</h2></div>
+        {% if history|length %}
+        <div class="panel-body kv">
+            {% for h in history %}
+                <div class="kv-row"><span>{{ h.at|dmy_time }} · {{ h.byName|default('') ?: 'System' }}</span><strong>{{ h.entityLabel }} <span class="pill pill-grey">{{ h.action|pretty }}</span></strong></div>
+            {% endfor %}
+        </div>
+        {% else %}<div class="t-empty">Nothing published yet.</div>{% endif %}
+    </section>
+</div>
+{% endblock %}

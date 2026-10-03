@@ -56,14 +56,14 @@ StockManagement/
    Edit `.env` file:
    ```env
    PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/jewellery_stock
+   MONGODB_URI=mongodb://localhost:27017/shopmanage
    JWT_SECRET=your_secure_random_string_here
    JWT_EXPIRE=7d
    ```
 
    For MongoDB Atlas:
    ```env
-   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jewellery_stock
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/shopmanage
    ```
 
 4. **Seed the database** (creates admin user and sample containers):

@@ -1,0 +1,54 @@
+{% extends 'app.twig' %}
+{% block title %}Data backup{% endblock %}
+{% block heading %}Data backup{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Data backup</h1><p class="muted">Download a complete, raw copy of your database to this computer, so that whatever goes wrong you can bring every record back.</p></div></div>
+
+<form method="post" action="/admin/backup/download" data-no-enter autocomplete="off">
+    {{ csrf_field() }}
+    <section class="panel">
+        <div class="panel-head"><h2>1. Connect</h2></div>
+        <div class="panel-body">
+            <div x-data="passwordField">
+                <label class="field" style="margin-top: 0">
+                    <span>MongoDB connection string</span>
+                    <div class="field-row">
+                        <input :type="type" name="uri" placeholder="mongodb+srv://user:password@cluster.mongodb.net/databasename" autocomplete="off" spellcheck="false" autocapitalize="off" data-lpignore="true" required>
+                        <button type="button" class="link-btn" @click="toggle" x-text="label"></button>
+                    </div>
+                </label>
+            </div>
+            <ul class="backup-notes">
+                <li><strong>Read only.</strong> It reads your data and never changes or deletes anything in the database.</li>
+                <li><strong>Not saved.</strong> The address is used for this one request and forgotten. It is never stored, shown again or written into the file.</li>
+                <li><strong>Safer still:</strong> in Atlas, make a database user that only has the <em>read</em> role and use that one here.</li>
+            </ul>
+        </div>
+        <div class="panel-foot">
+            <button class="btn btn-primary" type="button" hx-post="/admin/backup/inspect" hx-include="closest form" hx-target="#backup-result" hx-swap="innerHTML" hx-disabled-elt="this">Check connection</button>
+        </div>
+    </section>
+    <div id="backup-result" aria-live="polite"></div>
+</form>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Recent backups</h2></div>
+        {% if history|length %}
+        <div class="panel-body kv">
+            {% for h in history %}
+                <div class="kv-row"><span>{{ h.at|dmy_time }} · {{ h.byName|default('') ?: 'System' }}</span><strong>{{ h.entityLabel }}{% if h.changes|length > 2 %} <span class="muted">· {{ h.changes[2].to|number_format }} documents</span>{% endif %}</strong></div>
+            {% endfor %}
+        </div>
+        {% else %}<div class="t-empty">No backup has been taken from this page yet.</div>{% endif %}
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>If you ever need to restore</h2></div>
+        <div class="panel-body">
+            <p class="small">The zip holds the data in MongoDB's own dump format, so it can be put back exactly (every number, date and id as it was). A <strong>README-restore.txt</strong> inside has the steps, and <strong>manifest.json</strong> has a count and fingerprint of every file so a damaged copy is noticed.</p>
+            <p class="small muted">Restoring only ever <em>adds</em> what is missing; nothing that already exists is overwritten. Keep a copy of the zip somewhere other than this computer too (a drive or cloud folder).</p>
+        </div>
+    </section>
+</div>
+{% endblock %}

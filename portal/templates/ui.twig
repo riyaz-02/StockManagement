@@ -1,0 +1,55 @@
+{# Small reusable pieces for the daily pages. Usage: {% import 'ui.twig' as ui %} #}
+
+{# A date-range bar that reloads the block it sits in. url = the partial to load. #}
+{% macro range_bar(url, range, extra = '') %}
+<form class="toolbar" hx-get="{{ url }}" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="change">
+    <div class="chips">
+        {% for q, label in {today: 'Today', yesterday: 'Yesterday', month: 'This month'} %}
+            <button type="button" class="chip{{ range.quick == q ? ' is-on' : '' }}" hx-get="{{ url }}?quick={{ q }}{{ extra }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ label }}</button>
+        {% endfor %}
+    </div>
+    <input type="date" name="from" value="{{ range.from }}" max="{{ 'now'|date('Y-m-d') }}" aria-label="From">
+    <span class="muted">to</span>
+    <input type="date" name="to" value="{{ range.to }}" max="{{ 'now'|date('Y-m-d') }}" aria-label="To">
+</form>
+{% endmacro %}
+
+{% macro pill(text, tone = 'grey') %}<span class="pill pill-{{ tone }}">{{ text }}</span>{% endmacro %}
+
+{# Text / number / date / select fields with the label above and an optional hint or error. #}
+{% macro field(label, name, value = '', opts = {}) %}
+{% set o = {type: 'text', span: false, required: false, money: false, autofocus: false, hint: '', placeholder: '', inputmode: '', step: '', min: '', max: '', attrs: '', rows: 3, options: []}|merge(opts) %}
+<label class="field{{ o.span ? ' span-2' : '' }}">
+    <span>{{ label }}{% if o.required %} *{% endif %}</span>
+    {% if o.type == 'select' %}
+        <select name="{{ name }}"{{ o.required ? ' required' : '' }}>
+            {% for opt in o.options %}<option value="{{ opt }}"{{ opt == value ? ' selected' : '' }}>{{ opt }}</option>{% endfor %}
+        </select>
+    {% elseif o.type == 'textarea' %}
+        <textarea name="{{ name }}" rows="{{ o.rows }}"{{ o.required ? ' required' : '' }}>{{ value }}</textarea>
+    {% else %}
+        {% if o.money %}<div class="money-input">{% endif %}
+        <input type="{{ o.type }}" name="{{ name }}" value="{{ value }}"{% if o.step != '' %} step="{{ o.step }}"{% endif %}{% if o.min != '' %} min="{{ o.min }}"{% endif %}{% if o.max != '' %} max="{{ o.max }}"{% endif %}{% if o.placeholder != '' %} placeholder="{{ o.placeholder }}"{% endif %}{% if o.inputmode != '' %} inputmode="{{ o.inputmode }}"{% endif %}{{ o.required ? ' required' : '' }}{{ o.autofocus ? ' autofocus' : '' }}>
+        {% if o.money %}</div>{% endif %}
+    {% endif %}
+    {% if o.hint != '' %}<small class="hint">{{ o.hint }}</small>{% endif %}
+</label>
+{% endmacro %}
+
+{# The customer search box: type a name or number, pick from the list, or keep the typed name. Fills customerId / customerName / customerMobile. #}
+{% macro customer_picker(name = '', mobile = '', id = '') %}
+<div class="picker span-2" x-data="picker">
+    <input type="hidden" name="customerId" value="{{ id }}">
+    <label class="field">
+        <span>Customer name *</span>
+        <input type="text" name="customerName" value="{{ name }}" autocomplete="off" placeholder="Search by name or mobile, or type a new name" required
+               hx-get="/lookup/customers" hx-trigger="input changed delay:250ms" hx-target="next .picker-list" hx-swap="innerHTML"
+               @input="typed" @keydown.escape="hide">
+    </label>
+    <div class="picker-list" x-show="open" x-cloak @click="pick"></div>
+</div>
+<label class="field">
+    <span>Mobile *</span>
+    <input type="tel" name="customerMobile" value="{{ mobile }}" inputmode="numeric" maxlength="14" placeholder="10-digit number" required>
+</label>
+{% endmacro %}

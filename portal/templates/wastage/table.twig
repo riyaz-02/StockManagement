@@ -1,0 +1,22 @@
+{% if reports|length %}
+<div class="table-wrap">
+    <table class="t">
+        <thead><tr><th>Date</th><th>Metal</th><th class="num">Weight</th><th>Category</th><th>Status</th><th class="hide-sm">Reported by</th><th></th></tr></thead>
+        <tbody>
+        {% for r in reports %}
+            <tr>
+                <td>{{ r.date|date('d M Y') }}</td>
+                <td>{{ r.metal|capitalize }}</td>
+                <td class="num strong">{{ r.amount|grams }}</td>
+                <td>{{ r.category }}</td>
+                <td>{% if r.status == 'approved' %}<span class="pill pill-green">Approved</span>{% elseif r.status == 'rejected' %}<span class="pill pill-red">Rejected</span>{% else %}<span class="pill pill-amber">Waiting</span>{% endif %}</td>
+                <td class="hide-sm">{{ r.reportedBy.name|default('–') }}</td>
+                <td class="num"><button class="btn btn-sm" type="button" hx-get="/stock/wastage/{{ r._id }}" hx-target="#modal-body">View</button></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="panel-body"><p class="muted">No wastage reports found.</p></div>
+{% endif %}

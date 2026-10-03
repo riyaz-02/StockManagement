@@ -1,0 +1,31 @@
+{% if c %}{% for l in c.items %}{% if keys[loop.index0] is defined %}<output id="amt-{{ keys[loop.index0] }}" class="line-amt" hx-swap-oob="true">{{ l.total|inr }}</output>{% endif %}{% endfor %}{% endif %}
+{% if c %}
+<div class="kv">
+    {% if c.discountGiven > 0 %}<div class="kv-row"><span>Price before discount</span><strong>{{ c.billBeforeDiscount|inr }}</strong></div>
+    <div class="kv-row"><span>Discount</span><strong class="neg">− {{ c.discountGiven|inr }}</strong></div>{% endif %}
+    <div class="kv-row"><span>Taxable value</span><strong>{{ c.gstSummary.total_taxable_amount|inr }}</strong></div>
+    {% if c.gstType == 'IGST' %}
+        <div class="kv-row"><span>IGST 3%</span><strong>{{ c.gstSummary.total_igst|default(0)|inr }}</strong></div>
+    {% else %}
+        <div class="kv-row"><span>CGST 1.5%</span><strong>{{ c.gstSummary.total_cgst|inr }}</strong></div>
+        <div class="kv-row"><span>SGST 1.5%</span><strong>{{ c.gstSummary.total_sgst|inr }}</strong></div>
+    {% endif %}
+    {% if c.additionalCharges > 0 %}<div class="kv-row"><span>Extra charge</span><strong>{{ c.additionalCharges|inr }}</strong></div>{% endif %}
+    {% if c.roundOff != 0 %}<div class="kv-row"><span>Round off</span><strong>{{ c.roundOff|inr }}</strong></div>{% endif %}
+    <div class="kv-row total"><span>Bill total</span><strong>{{ c.totalPayableAmount|inr(0) }}</strong></div>
+    {% if mode == 'bill' %}
+        {% if c.extraCredit > 0 %}<div class="kv-row"><span>Old metal / order advance</span><strong class="pos">− {{ c.extraCredit|inr }}</strong></div>{% endif %}
+        <div class="kv-row"><span>Paid now</span><strong>{{ (c.paidAmount - c.extraCredit)|inr }}</strong></div>
+        {% if c.dueAmount > 0 %}<div class="kv-row"><span>Will stay due</span><strong class="neg">{{ c.dueAmount|inr }}</strong></div>
+        {% elseif c.advanceAmount > 0 %}<div class="kv-row"><span>Extra paid (advance)</span><strong>{{ c.advanceAmount|inr }}</strong></div>
+        {% else %}<div class="kv-row"><span>Balance</span><strong class="pos">Nil</strong></div>{% endif %}
+    {% endif %}
+</div>
+{% if c.maxDiscount > 0 %}<p class="muted small">Most discount possible on this bill: {{ c.maxDiscount|inr(0) }}.</p>{% endif %}
+{% if mode == 'bill' and c.totalPayableAmount >= c.addressLimit %}<p class="notice notice-info">A bill of {{ c.addressLimit|inr(0) }} or more needs the customer's address.</p>{% endif %}
+{% if c.tdsApplicable %}<p class="notice notice-info">Above ₹2,00,000: the customer's PAN is needed (TDS {{ c.tdsRate }}% = {{ c.tdsAmount|inr }}).</p>{% endif %}
+{% elseif err %}
+    <p class="notice notice-error" role="alert">{{ err }}</p>
+{% else %}
+    <p class="muted">Add an item to see the total.</p>
+{% endif %}

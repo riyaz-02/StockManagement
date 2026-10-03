@@ -7,7 +7,8 @@ const { sendPushToTokens } = require('../config/firebaseAdmin');
 async function resolveTargetTokens({ targetType, targetRole }) {
     const filter = { isActive: true, 'fcmTokens.0': { $exists: true } };
     if (targetType === 'role') {
-        filter.role = targetRole;
+        // the website may have stored 'Admin' / 'Staff' with a capital: match the role whatever its case
+        filter.role = new RegExp('^' + String(targetRole).replace(/[^A-Za-z0-9_]/g, '') + '$', 'i');
     }
 
     const users = await User.find(filter).select('fcmTokens');
@@ -64,6 +65,8 @@ exports.sendNotification = async (req, res) => {
             failureCount: result.failureCount,
         });
 
+        require('../services/audit').record(req, 'notification', notification._id, title, 'sent', [{ field: 'to', to: resolvedTargetType === 'role' ? 'role: ' + targetRole : 'everyone' }, { field: 'delivered', to: `${result.successCount} device(s)` }]);
+        require('../services/events').emit('notification.new', { id: String(notification._id), title, body }, { roles: resolvedTargetType === 'role' ? [targetRole] : [], actor: { id: req.user._id, name: req.user.name } });
         res.status(200).json({
             success: true,
             message: result.disabled

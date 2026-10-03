@@ -1,5 +1,7 @@
-const Customer = require('../models/Customer');
 const Booking = require('../models/Booking');
+const store = require('../services/customerStore');
+
+const by = (req) => ({ id: String(req.user._id), name: req.user.name || '', branchId: req.user.branchId, branchName: req.user.branchName });
 
 // @desc    Add item to wishlist
 // @route   POST /api/customers/wishlist
@@ -15,40 +17,20 @@ exports.addToWishlist = async (req, res) => {
             });
         }
 
-        // Find or create customer
-        let customer = await Customer.findOne({ mobile });
-        if (!customer) {
-            customer = await Customer.create({
-                mobile,
-                name,
-                address,
-                wishlist: [{ item: itemId }]
-            });
-        } else {
-            // Update details if provided
-            if (name) customer.name = name;
-            if (address) customer.address = address;
-
-            // Check if item already in wishlist
-            const existingWishlistItem = customer.wishlist.find(w => w.item.toString() === itemId);
-            if (!existingWishlistItem) {
-                customer.wishlist.push({ item: itemId, status: 'active' });
-            } else if (existingWishlistItem.status === 'removed') {
-                existingWishlistItem.status = 'active';
-                existingWishlistItem.addedAt = Date.now();
-            }
-            await customer.save();
-        }
+        // The website's customer with this number (any of their numbers), made the website's way if new.
+        // An existing customer's name and address are NOT changed from here.
+        const { customer } = await store.findOrCreate({ name, mobile, address }, by(req));
+        await store.addToWishlist(customer, itemId, by(req));
 
         res.status(200).json({
             success: true,
-            data: { customer }
+            data: { customer: { _id: customer._id, ...store.display(customer) } }
         });
     } catch (error) {
         console.error('Wishlist error:', error);
-        res.status(500).json({
+        res.status(error.statusCode || 500).json({
             success: false,
-            message: 'Server error'
+            message: error.statusCode ? error.message : 'Server error'
         });
     }
 };
@@ -67,15 +49,8 @@ exports.removeFromWishlist = async (req, res) => {
             });
         }
 
-        const customer = await Customer.findOne({ mobile });
-
-        if (customer) {
-            const wItem = customer.wishlist.find(w => w.item.toString() === itemId);
-            if (wItem) {
-                wItem.status = 'removed';
-                await customer.save();
-            }
-        }
+        const customer = await store.findByNumber(mobile);
+        if (customer) await store.removeFromWishlist(customer, itemId);
 
         res.status(200).json({
             success: true,
@@ -97,34 +72,24 @@ exports.getItemInteractions = async (req, res) => {
     try {
         const { itemId } = req.params;
 
-        // Find customers who have this item in wishlist (active)
-        const wishlistCustomers = await Customer.find({
-            wishlist: { $elemMatch: { item: itemId, status: 'active' } }
-        }).select('name mobile address wishlist bookings');
+        // Customers who have this item in their wishlist (active)
+        const wishlistedBy = (await store.wishlistedBy(itemId)).map(({ customer, addedAt }) => ({
+            ...store.display(customer),
+            date: addedAt
+        }));
 
-        // Find bookings for this item (exclude cancelled)
+        // Bookings for this item (exclude cancelled)
         const bookings = await Booking.find({
             itemId,
             status: { $ne: 'cancelled' }
-        }).populate('customerId');
+        });
+        const people = new Map((await store.byIds(bookings.map((b) => b.customerId).filter(Boolean))).map((c) => [String(c._id), c]));
 
-        // Merge lists? 
-        // Actually, let's just return the two lists separately for the UI to display.
-
-        // Wishlisted By
-        const wishlistedBy = wishlistCustomers.map(c => ({
-            name: c.name,
-            mobile: c.mobile,
-            address: c.address,
-            date: c.wishlist.find(w => w.item.toString() === itemId && w.status === 'active')?.addedAt
-        }));
-
-        // Booked By
         const bookedBy = bookings.map(b => ({
             id: b._id,
-            name: b.customerName, // Use booking snapshot or b.customerId.name
+            name: b.customerName, // the booking's own snapshot
             mobile: b.mobile,
-            address: b.customerId?.address,
+            address: b.customerId ? (people.get(String(b.customerId)) || {}).address : undefined,
             bookingDate: b.bookingDate,
             expiryDate: b.expiryDate,
             advance: b.advanceAmount,

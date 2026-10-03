@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/secure_credential_storage.dart';
 import '../services/biometric_auth_service.dart';
+import '../services/live_service.dart';
+import '../services/presence_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -15,6 +18,25 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   Map<String, bool> _permissions = {};
+  StreamSubscription<LiveEvent>? _liveSub;
+
+  /// Keep the live channel in step with the login: open it when signed in, close it on sign-out, and re-read this
+  /// person's access when an admin changes it (on the website or another phone).
+  void _syncLive() {
+    if (_token != null && _user != null) {
+      LiveService.instance.start(_token!);
+      PresenceService.instance.start();
+      _liveSub ??= LiveService.instance.events.listen((e) async {
+        if (e.type == 'permissions.changed') {
+          await _fetchPermissions();
+          notifyListeners();
+        }
+      });
+    } else {
+      LiveService.instance.stop();
+      PresenceService.instance.stop();
+    }
+  }
 
   User? get user => _user;
   String? get token => _token;
@@ -87,8 +109,13 @@ class AuthProvider with ChangeNotifier {
         final userData = await _storage.getUser();
         if (userData != null) {
           _user = User.fromJson(userData);
-          await _fetchPermissions();
-          await _restoreBranch();
+          // Admin/Owner bypass the permission map entirely (see can()), so there is nothing to fetch for them — that
+          // saves a network round trip on every app start. Everyone else's fetch runs alongside restoring the branch
+          // choice (a local read) instead of after it, since neither depends on the other.
+          await Future.wait([
+            if (!_user!.hasFullAccess) _fetchPermissions(),
+            _restoreBranch(),
+          ]);
         }
       }
     } catch (e) {
@@ -96,6 +123,7 @@ class AuthProvider with ChangeNotifier {
     }
 
     _isLoading = false;
+    _syncLive();
     notifyListeners();
   }
 
@@ -118,6 +146,7 @@ class AuthProvider with ChangeNotifier {
         await _fetchPermissions();
 
         _isLoading = false;
+        _syncLive();
         notifyListeners();
         return true;
       } else {
@@ -142,6 +171,7 @@ class AuthProvider with ChangeNotifier {
     ApiService.activeBranch = '';
     ApiService.activeGstin = '';
     _branchName = '';
+    _syncLive();
     await _storage.clearAll();
     // Forget saved fingerprint-login credentials — this device may be
     // shared by other staff, so a logout shouldn't leave a shortcut that
@@ -190,6 +220,7 @@ class AuthProvider with ChangeNotifier {
         await _storage.saveUser(response['data']['user']);
         await _fetchPermissions();
         _isLoading = false;
+        _syncLive();
         notifyListeners();
         return 'success';
       } else {

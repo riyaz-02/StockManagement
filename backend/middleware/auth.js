@@ -27,7 +27,8 @@ exports.protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             // Get user from token
-            req.user = await User.findById(decoded.id);
+            // (a person merged from the app's old list keeps their old id in legacyAppIds, so a phone still holding an old token works)
+            req.user = (await User.findById(decoded.id)) || (await User.findOne({ legacyAppIds: String(decoded.id) }));
 
             if (!req.user) {
                 return res.status(401).json({

@@ -1,0 +1,58 @@
+{% extends 'app.twig' %}
+{% block title %}Staff &amp; roles{% endblock %}
+{% block heading %}Staff &amp; roles{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Staff &amp; roles</h1><p class="muted">Who can sign in, and what each kind of person is allowed to do. Changes reach the phone app at once.</p></div>
+    <div class="actions">{% if tab == 'people' %}<button class="btn btn-primary" type="button" hx-get="/admin/staff/new" hx-target="#modal-body">{{ icon('plus', 17) }} Add staff</button>{% endif %}</div>
+</div>
+<div class="chips gst-tabs">
+    <a class="chip{{ tab == 'people' ? ' is-on' : '' }}" href="/admin/staff">People</a>
+    <a class="chip{{ tab == 'roles' ? ' is-on' : '' }}" href="/admin/staff?tab=roles">What each role can do</a>
+</div>
+
+{% if tab == 'people' %}
+<section class="panel">
+    <div class="panel-head"><h2>Live now</h2><span class="live-dot is-on" title="Updates every 15 seconds"><i></i><em>Live</em></span></div>
+    <div class="panel-body" hx-get="/admin/staff/live" hx-trigger="load, every 15s" hx-swap="innerHTML">
+        <div class="loading"><span class="spinner"></span></div>
+    </div>
+</section>
+<section class="panel">
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Name</th><th>Mobile</th><th class="hide-sm">Username</th><th>Role</th><th class="hide-sm">Branch</th><th>Login</th></tr></thead>
+        <tbody>{% for u in users %}
+            <tr class="is-link" data-href="/admin/staff/{{ u._id }}">
+                <td><a class="row-link" href="/admin/staff/{{ u._id }}">{{ u.name }}</a></td>
+                <td>{{ u.mobile ?: '–' }}</td>
+                <td class="hide-sm">{{ u.username|default('–') }}</td>
+                <td><span class="pill pill-{{ {admin: 'indigo', owner: 'indigo', manager: 'blue', staff: 'teal', viewer: 'grey'}[u.role]|default('grey') }}">{{ names[u.role]|default(u.role) }}</span></td>
+                <td class="hide-sm">{{ u.branchName|default('Main branch') }}</td>
+                <td>{% if u.isActive %}<span class="pill pill-green">On</span>{% else %}<span class="pill pill-grey">Off</span>{% endif %}</td>
+            </tr>
+        {% endfor %}</tbody>
+    </table></div>
+</section>
+{% else %}
+<div class="chips" style="margin-bottom: 14px">
+    {% for k, label in roles %}<a class="chip{{ role == k ? ' is-on' : '' }}" href="/admin/staff?tab=roles&role={{ k }}">{{ label }}</a>{% endfor %}
+</div>
+<p class="muted">Tick what a <strong>{{ roles[role] }}</strong> can do. Admin and Owner can always do everything. You can still allow or block one person on their own page.</p>
+<form hx-post="/admin/roles/{{ role }}" hx-swap="none">
+    {{ csrf_field() }}
+    {% for g in groups %}
+        <section class="panel">
+            <div class="panel-head"><h2>{{ g.group }}</h2></div>
+            <div class="panel-body perm-grid">
+                {% for k in g.keys %}
+                    <input type="hidden" name="allkeys[]" value="{{ k.key }}">
+                    <label class="check"><input type="checkbox" name="perm[]" value="{{ k.key }}"{{ grid[k.key]|default(false) ? ' checked' : '' }}> <span>{{ k.label }}</span></label>
+                {% endfor %}
+            </div>
+        </section>
+    {% endfor %}
+    <div class="sticky-actions"><button class="btn btn-primary" type="submit">Save this role</button></div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'gst/base.twig' %}
+{% macro th(label, key, sort, dir, base, num) %}<th class="{{ num ? 'num' : '' }}"><a href="/gst?{{ base|merge({sort: key, dir: (sort == key and dir == 'desc') ? 'asc' : 'desc'})|url_encode }}">{{ label }}{% if sort == key %} {{ dir == 'desc' ? '▼' : '▲' }}{% endif %}</a></th>{% endmacro %}
+{% block controls %}{% include 'gst/_range.twig' %}
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search bill number, name or mobile"></div>
+    <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dir }}">
+    <button class="btn" type="submit">Search</button>
+{% endblock %}
+
+{% block tabbody %}
+{% if reg.rows is defined %}
+{% set base = {tab: 'register', gstin: gstin, from: range.from, to: range.to, q: q} %}
+<div class="stats">
+    <div class="stat"><span>Bills</span><strong>{{ reg.total }}</strong></div>
+    <div class="stat"><span>Taxable value</span><strong>{{ reg.totals.taxable|inr(0) }}</strong></div>
+    <div class="stat"><span>GST</span><strong>{{ reg.totals.tax|inr(0) }}</strong></div>
+    <div class="stat"><span>Bill value</span><strong>{{ reg.totals.invoiceValue|inr(0) }}</strong></div>
+</div>
+<section class="panel">
+    {% if reg.rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr>{{ _self.th('Bill', 'invoiceNumber', sort, dir, base, false) }}{{ _self.th('Date', 'date', sort, dir, base, false) }}<th>Customer</th><th class="hide-sm">State</th>{{ _self.th('Taxable', 'taxable', sort, dir, base, true) }}{{ _self.th('GST', 'tax', sort, dir, base, true) }}{{ _self.th('Value', 'value', sort, dir, base, true) }}</tr></thead>
+        <tbody>{% for r in reg.rows %}
+            <tr class="is-link" data-href="/billing/{{ r._id }}">
+                <td><a class="row-link" href="/billing/{{ r._id }}">{{ r.invoiceNumber }}</a>{% if r.status in ['cancelled', 'void', 'deleted'] %} <span class="pill pill-grey">Cancelled</span>{% endif %}<small>{{ r.branchName }}</small></td>
+                <td>{{ r.date|dmy }}</td>
+                <td class="strong">{{ r.customerName }}<small>{{ r.metals }}</small></td>
+                <td class="hide-sm">{{ r.place }}<small>{{ r.taxType }}</small></td>
+                <td class="num">{{ r.taxable|inr }}</td><td class="num">{{ r.tax|inr }}</td><td class="num strong">{{ r.value|inr }}</td>
+            </tr>
+        {% endfor %}</tbody>
+    </table></div>
+    {% if pages > 1 %}
+    <div class="pager">
+        {% if page > 1 %}<a class="btn" href="/gst?{{ base|merge({sort: sort, dir: dir, page: page - 1})|url_encode }}">← Newer</a>{% endif %}
+        <span class="muted">Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}<a class="btn" href="/gst?{{ base|merge({sort: sort, dir: dir, page: page + 1})|url_encode }}">Older →</a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}<div class="t-empty">No bills in this time.</div>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

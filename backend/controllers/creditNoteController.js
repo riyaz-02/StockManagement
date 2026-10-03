@@ -2,13 +2,13 @@
 const mongoose = require('mongoose');
 const CreditNote = require('../models/CreditNote');
 const CN = require('../services/creditNote');
-const { getLgpAdminConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 const { getSeller } = require('../services/billingSeller');
 const { restorePiece } = require('../services/cancelReconcile');
 const { resolveBranch } = require('../utils/branches');
 const Calc = require('../services/billingCalc');
 
-const invoices = () => getLgpAdminConnection().db.collection('invoices');
+const invoices = () => getConnection().db.collection('invoices');
 const fail = (res, code, message) => res.status(code).json({ success: false, message });
 const str = (v) => (v == null ? '' : String(v).trim());
 const oid = (v) => /^[0-9a-f]{24}$/i.test(str(v));
@@ -130,6 +130,8 @@ exports.create = async (req, res, next) => {
             reason, note: str(b.note).slice(0, 300), refundMode, refundAmount, reducesTax: CN.reducesTax(str(inv.invoice_date), today), branchId,
             createdBy: who.id, createdByName: who.name,
         });
+        require('../services/events').changed('billing', branchId, { id: who.id, name: who.name });
+        require('../services/audit').record(req, 'credit_note', note._id, `${number} · ${str(inv.customer_name) || 'Walk-in'} (bill ${str(inv.invoice_number)})`, 'return / refund issued', [{ field: 'reason', to: reason }, { field: 'credit total', to: String(c.total) }, { field: 'refund', to: String(refundAmount) }]);
         res.status(201).json({ success: true, data: { note } });
     } catch (e) { next(e); }
 };

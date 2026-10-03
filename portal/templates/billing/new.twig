@@ -1,0 +1,140 @@
+{% extends 'app.twig' %}
+{% set is_bill = mode == 'bill' %}
+{% block title %}{{ is_bill ? 'New bill' : 'New estimate' }}{% endblock %}
+{% block heading %}{{ is_bill ? 'New bill' : 'New estimate' }}{% endblock %}
+{% block head_extra %}
+    <script src="{{ asset('js/billing-calc.js') }}" defer></script>
+    <script src="{{ asset('js/bill.js') }}" defer></script>
+{% endblock %}
+
+{# a small labelled field for the dense forms; attrs are fixed strings written in this file #}
+{% macro f(label, name, value, type = 'text', attrs = '', cls = '', tip = '') %}
+<label class="cf {{ cls }}"><span>{{ label }}{% if tip %} <i class="tip" data-tip="{{ tip }}" data-tip0="{{ tip }}">?</i>{% endif %}</span><input type="{{ type }}" name="{{ name }}" value="{{ value }}" {{ attrs|raw }} autocomplete="off"></label>
+{% endmacro %}
+
+{% block content %}
+<form method="post" action="{{ is_bill ? '/billing' : '/estimates' }}" id="bill-form" class="pos" data-no-enter novalidate
+      data-mode="{{ mode }}" data-state-code="{{ meta.supplyStateCode|default('19') }}" data-cash-limit="{{ meta.cashLimit|default(200000) }}"
+      data-address-limit="{{ meta.addressLimit|default(50000) }}" data-tds="{{ meta.tdsThreshold|default(200000) }}"
+      data-purities="{{ {Gold: ['24K', '22K', '20K', '18K', '14K'], Silver: ['999', '925', '800']}|json_encode }}"
+      data-advance="{{ v.orderAdvance|default(0) }}">
+    {{ csrf_field() }}
+    <input type="hidden" name="rid" value="{{ rid }}">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    {% if v.orderId|default('') %}<input type="hidden" name="orderId" value="{{ v.orderId }}">{% endif %}
+    {% if v.estimateId|default('') %}<input type="hidden" name="estimateId" value="{{ v.estimateId }}">{% endif %}
+
+    <div class="pos-main">
+        <div class="pos-title">
+            <h1>{{ is_bill ? 'GST tax invoice' : 'Estimate (quotation)' }}</h1>
+            <div class="title-fields">
+                {% if is_bill %}{{ _self.f('Bill date', 'invoiceDate', v.invoiceDate|default(meta.today|default('')), 'date', 'max="' ~ meta.today|default('') ~ '"', 'cf-date') }}{% endif %}
+                {{ _self.f('Gold rate ₹/g', 'goldRate', v.goldRate|default(''), 'text', 'inputmode="decimal" data-dp="2"', 'cf-rate cf-gold') }}
+                {{ _self.f('Silver rate ₹/g', 'silverRate', v.silverRate|default(''), 'text', 'inputmode="decimal" data-dp="2"', 'cf-rate cf-silver') }}
+            </div>
+        </div>
+        {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+        {% if note %}<div class="notice notice-info">{{ note }}</div>{% endif %}
+
+        {# ── 1. customer ── #}
+        <section class="panel c-blue">
+            <div class="panel-head"><h2><i class="step-no">1</i> Customer</h2><span class="step-hint" id="cash-hint"></span></div>
+            <div class="pos-head">
+                <div class="pos-cust picker s3" x-data="picker">
+                    <input type="hidden" name="customerId" value="{{ v.customerId|default('') }}">
+                    <label class="cf"><span>Customer name *</span>
+                        <input type="text" name="customerName" value="{{ v.customerName|default('') }}" autocomplete="off" placeholder="Search a saved customer, or type a new name"
+                               hx-get="/lookup/customers" hx-trigger="input changed delay:250ms" hx-target="next .picker-list" hx-swap="innerHTML" @input="typed" @keydown.escape="hide">
+                    </label>
+                    <div class="picker-list" x-show="open" x-cloak @click="pick"></div>
+                </div>
+                {{ _self.f('Mobile', 'customerMobile', v.customerMobile|default(''), 'tel', 'inputmode="numeric" maxlength="14" placeholder="10 digits"', 's2') }}
+                {% if is_bill %}
+                    <label class="cf s3"><span>Address <i class="tip" data-tip="Needed on a bill of ₹50,000 or more (GST Rule 46)." data-tip0="Needed on a bill of ₹50,000 or more (GST Rule 46).">?</i></span><input type="text" name="customerAddress" value="{{ v.customerAddress|default('') }}" autocomplete="off" placeholder="House, street, city"></label>
+                    {{ _self.f('PAN', 'customerPan', v.customerPan|default(''), 'text', 'maxlength="10" placeholder="ABCDE1234F" data-upper', 'cf-pan s2', 'Needed when the bill is above ₹2,00,000 (TDS). Format: ABCDE1234F.') }}
+                    {% set cur = v.placeOfSupply|default(meta.defaultPlace|default('')) %}
+                    <label class="cf s2"><span>Place of supply</span>
+                        <select name="placeOfSupply">{% for s in meta.states|default([]) %}<option value="{{ s.place }}" data-code="{{ s.code }}" title="{{ s.name }}{% if s.code == meta.supplyStateCode|default('19') %} (same state: CGST + SGST){% else %} (other state: IGST){% endif %}"{{ s.place == cur ? ' selected' : '' }}>{{ s.name }} ({{ s.code }})</option>{% endfor %}</select>
+                    </label>
+                {% else %}
+                    {{ _self.f('Valid for (days)', 'validDays', v.validDays|default(7), 'number', 'min="1" max="90"', 's2') }}
+                {% endif %}
+            </div>
+        </section>
+
+        {# ── 2. items ── #}
+        <section class="panel c-amber">
+            <div class="panel-head">
+                <h2><i class="step-no">2</i> Items</h2>
+                <div class="stock-search">
+                    <span class="ico-in">{{ icon('search', 15) }}</span>
+                    <input type="text" name="code" placeholder="Search stock by name or scan a barcode, then Enter" autocomplete="off" data-stock-code
+                           hx-get="/billing/stock-search" hx-trigger="input changed delay:200ms" hx-target="#stock-hits" hx-swap="innerHTML">
+                    <button type="button" class="btn" hx-get="/billing/stock-row" hx-include="[name=code],[name=goldRate],[name=silverRate]" hx-target="#items" hx-swap="beforeend" data-stock-add hidden>Add</button>
+                    <div id="stock-hits" class="stock-hits"></div>
+                </div>
+            </div>
+            <div class="items-scroll"><div class="items-inner">
+            <div class="item-head"><span>#</span><span>Item</span><span>Metal</span><span>Purity</span><span class="r">Gross g</span><span class="r">Net g</span><span class="r">Rate ₹/g</span><span class="r">Making ₹</span><span class="r" ><span class="hd">Taxable ₹ <i class="tip tip-r" data-tip="Worked out for you. Type a price here to change it, e.g. when the making charge is 0 and you agreed one price. It cannot be below the metal value.">?</i></span></span><span>Hallmark</span><span>HUID</span><span class="r">Fee ₹</span><span>HSN</span><span class="r">Amount ₹</span><span></span></div>
+            <div id="items">
+                {% for k, it in v.items %}{% include 'billing/row.twig' with {k: k ~ 'r', it: it} %}{% endfor %}
+            </div>
+            </div></div>
+            <div class="items-foot">
+                <button type="button" class="btn btn-soft" hx-get="/billing/row" hx-target="#items" hx-swap="beforeend">{{ icon('plus', 15) }} Add item</button>
+            </div>
+        </section>
+
+        <div class="pos-bottom{{ is_bill ? '' : ' is-estimate' }}">
+            {% if is_bill %}
+            <section class="panel c-amber">
+                <div class="panel-head"><h2>Old metal from this customer</h2></div>
+                <div class="panel-body"><div id="old-metal" hx-get="/billing/old-metal" hx-trigger="load, customer-changed from:#bill-form" hx-include="[name=customerName],[name=customerMobile]" hx-target="this" hx-swap="innerHTML"></div>
+                    <label class="cf note-cf"><span>Note on the bill</span><textarea name="note" rows="2" class="note-box" placeholder="Anything to print or remember (optional)">{{ v.note|default('') }}</textarea></label>
+                </div>
+            </section>
+            {% endif %}
+            <section class="panel c-indigo">
+                <div class="panel-head"><h2><i class="step-no">3</i> Discount <i class="tip" id="tip-disc" data-tip="Comes off the making charge. The metal, stones and hallmark are never discounted." data-tip0="Comes off the making charge. The metal, stones and hallmark are never discounted.">?</i></h2></div>
+                <div class="panel-body">
+                    <div class="pos-grid2">
+                        {{ _self.f('Extra charge ₹ (with GST)', 'additionalCharges', v.additionalCharges|default(''), 'text', 'inputmode="decimal" data-dp="2" placeholder="0.00"') }}
+                        {{ _self.f('Discount ₹', 'discount', v.discount|default(''), 'text', 'inputmode="decimal" data-dp="0" placeholder="0"') }}
+                        <label class="cf"><span>Final amount ₹</span><input type="text" inputmode="decimal" id="final-amount" autocomplete="off" placeholder="0"></label>
+                        <div class="cf"><span>Round the bill to</span><div class="round-btns"><button type="button" class="chip" data-round="10">10</button><button type="button" class="chip" data-round="100">100</button><button type="button" class="chip" data-round="500">500</button><button type="button" class="chip" data-round="1000">1000</button></div></div>
+                    </div>
+                    {% if not is_bill %}{{ _self.f('Note', 'note', v.note|default('')) }}{% endif %}
+                </div>
+            </section>
+            {% if is_bill %}
+            <section class="panel c-green">
+                <div class="panel-head"><h2><i class="step-no">4</i> Payment received <i class="tip" id="tip-pay" data-tip="Cash of ₹2,00,000 or more from one customer in a day is not allowed (s.269ST)." data-tip0="Cash of ₹2,00,000 or more from one customer in a day is not allowed (s.269ST).">?</i></h2></div>
+                <div class="panel-body">
+                    <div class="pos-pay">
+                        {% for i in 0..1 %}
+                            {% set p = v.payments[i]|default({mode: i == 0 ? 'Cash' : 'Online', amount: ''}) %}
+                            <select name="payments[{{ i }}][mode]" aria-label="Paid by">{% for m in modes %}<option{{ m == p.mode|default('Cash') ? ' selected' : '' }}>{{ m }}</option>{% endfor %}</select>
+                            <input type="text" inputmode="decimal" name="payments[{{ i }}][amount]" value="{{ p.amount|default('') }}" data-dp="2" placeholder="{{ i == 0 ? 'Amount received' : 'Second payment (optional)' }}" class="r" aria-label="Amount" data-pay="{{ i }}"{{ p.amount|default('') != '' ? ' data-touched="1"' : '' }}>
+                        {% endfor %}
+                        <input type="text" name="payments[0][reference]" value="{{ v.payments[0].reference|default('') }}" placeholder="UPI / cheque no. (optional)" class="pay-ref">
+                    </div>
+                    <div class="quick-pay"><button type="button" class="chip" data-pay-frac="1">Full</button><button type="button" class="chip" data-pay-frac="0.5">Half</button><button type="button" class="chip" data-pay-frac="0">On credit</button></div>
+                </div>
+            </section>
+            {% endif %}
+            <section class="panel pos-total c-indigo">
+                <div class="panel-head"><h2>Bill summary</h2></div>
+                <div class="panel-body" id="totals"><p class="muted">Add an item to see the total.</p></div>
+            </section>
+        </div>
+    </div>
+
+    <div class="pos-bar">
+        <div class="bar-fig"><span>Bill total</span><b id="bar-total">₹0</b></div>
+        {% if is_bill %}<div class="bar-fig"><span>Received</span><b id="bar-recv">₹0</b></div><div class="bar-fig"><span>Balance</span><b id="bar-due">₹0</b></div>{% endif %}
+        <div class="bar-msg" id="bar-msg">Add an item to start.</div>
+        <a class="btn" href="{{ is_bill ? '/billing' : '/estimates' }}">{{ t('common.cancel') }}</a>
+        <button class="btn btn-primary btn-lg" type="submit" id="save-btn">{{ is_bill ? 'Save bill' : 'Save estimate' }}</button>
+    </div>
+</form>
+{% endblock %}

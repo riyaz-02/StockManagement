@@ -1,0 +1,27 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/gst/filings" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form modal-wide">
+    {{ csrf_field() }}
+    <input type="hidden" name="gstin" value="{{ gstin }}">
+    <h2>Record a filing</h2>
+    <p class="muted">You filed this on the GST portal. Note it here so the reminders stop and the record is complete.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        {{ ui.field('Return', 'returnType', v.returnType|default('GSTR-3B'), {type: 'select', options: types}) }}
+        <label class="field"><span>Period</span>
+            <select name="period">{% for k, label in periods %}<option value="{{ k }}"{{ k == v.period|default('') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
+        </label>
+        {{ ui.field('Filed on', 'filedOn', v.filedOn|default(''), {type: 'date', required: true}) }}
+        {{ ui.field('ARN (from the portal)', 'arn', v.arn|default(''), {}) }}
+        {{ ui.field('Tax on sales', 'taxLiability', v.taxLiability|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Credit used', 'itcUsed', v.itcUsed|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Cash paid', 'cashPaid', v.cashPaid|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Late fee', 'lateFee', v.lateFee|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Interest', 'interest', v.interest|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+        {{ ui.field('Note (optional)', 'note', v.note|default(''), {}) }}
+    </div>
+    <label class="check"><input type="checkbox" name="nil" value="1"{{ v.nil|default('') ? ' checked' : '' }}> <span>It was a nil return</span></label>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>

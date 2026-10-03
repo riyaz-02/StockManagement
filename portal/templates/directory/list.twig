@@ -1,0 +1,20 @@
+{% if more %}{% include 'directory/rows.twig' %}{% else %}
+<form class="toolbar" hx-get="/directory/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input[type=search], submit">
+    <div class="chips">
+        {% for k, label in tabs %}
+            <button type="button" class="chip{{ tab == k ? ' is-on' : '' }}" hx-get="/directory/list?tab={{ k }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ label }}</button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search name or mobile" autocomplete="off"></div>
+</form>
+<p class="muted small">{{ pg.total|default(0) }} {{ tabs[tab]|lower }}</p>
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Name</th><th>Mobile</th><th class="hide-sm">{{ tab == 'customers' ? 'Address' : 'City' }}</th></tr></thead>
+        <tbody>{% include 'directory/rows.twig' %}</tbody>
+    </table></div>
+    {% else %}<div class="t-empty">Nobody found.</div>{% endif %}
+</section>
+{% endif %}

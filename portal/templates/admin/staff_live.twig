@@ -1,0 +1,15 @@
+{% if rows|length %}
+<div class="table-wrap"><table class="t">
+    <thead><tr><th>Staff</th><th>Channel</th><th>Screen</th><th>Last seen</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+        <tr>
+            <td class="strong">{{ r.name }}<small>{{ r.mobile }}{% if r.branchName %} · {{ r.branchName }}{% endif %}</small></td>
+            <td><span class="pill pill-{{ r.platform == 'app' ? 'blue' : 'teal' }}">{{ r.platform == 'app' ? 'Phone app' : 'Website' }}</span></td>
+            <td>{{ r.screen ?: '–' }}</td>
+            <td class="muted small">{{ r.secondsAgo < 10 ? 'just now' : (r.secondsAgo < 60 ? r.secondsAgo ~ 's ago' : ((r.secondsAgo / 60)|round) ~ 'm ago') }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table></div>
+{% else %}<div class="t-empty">Nobody is signed in right now.</div>{% endif %}

@@ -9,6 +9,7 @@ import '../utils/bilingual.dart';
 import '../widgets/bill_ui.dart';
 import 'create_invoice_screen.dart';
 import 'invoice_detail_screen.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -21,7 +22,13 @@ class BillingScreen extends StatefulWidget {
   State<BillingScreen> createState() => _BillingScreenState();
 }
 
-class _BillingScreenState extends State<BillingScreen> {
+class _BillingScreenState extends State<BillingScreen> with LiveRefresh<BillingScreen> {
+  @override
+  List<String> get liveModules => ['billing'];
+
+  @override
+  void onLiveChange() => _reset();
+
   final _api = ApiService();
   final _search = TextEditingController();
   final _scroll = ScrollController();
@@ -43,6 +50,7 @@ class _BillingScreenState extends State<BillingScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _scroll.addListener(() {
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 300) _load();
     });
@@ -55,6 +63,7 @@ class _BillingScreenState extends State<BillingScreen> {
     _search.dispose();
     _scroll.dispose();
     _statsPage.dispose();
+    disposeLive();
     super.dispose();
   }
 

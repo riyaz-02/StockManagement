@@ -8,7 +8,8 @@
 const logger = require('../config/logger');
 const G = require('./gstReports');
 const Notification = require('../models/Notification');
-const { GstFiling, GstReminderLog } = require('../models/AppGst');
+const { GstReminderLog } = require('../models/AppGst');
+const Filings = require('./gstFilings');
 const { sendPushToTokens } = require('../config/firebaseAdmin');
 
 /**
@@ -16,7 +17,7 @@ const { sendPushToTokens } = require('../config/firebaseAdmin');
  * a registration other than the firm's default carry a "<GSTIN>#" prefix so they never clash.
  */
 async function runGstReminders(now = new Date()) {
-    const { _loadSettings, _filingFilter } = require('../controllers/gstReportsController');
+    const { _loadSettings, _filingKey } = require('../controllers/gstReportsController');
     const { resolveTargetTokens, pruneInvalidTokens } = require('../controllers/notificationController');
     const { loadRegistrations } = require('./registrations');
     const regs = await loadRegistrations();
@@ -28,7 +29,7 @@ async function runGstReminders(now = new Date()) {
         if (settings.reminders.enabled === false) continue;
         const prefix = reg.isDefault ? '' : `${reg.gstin}#`;
         const mine = new Set([...sent].filter((k) => (prefix ? k.startsWith(prefix) : !k.includes('#'))).map((k) => k.slice(prefix.length)));
-        const filings = await GstFiling.find(_filingFilter(reg)).lean();
+        const filings = await Filings.list({ gstin: _filingKey(reg) });
         const due = G.pendingReminders(settings, filings, today, mine);
         if (!due.length) continue;
         const tokens = await resolveTargetTokens({ targetType: 'role', targetRole: 'admin' });

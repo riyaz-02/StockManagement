@@ -33,7 +33,6 @@ const cloudinaryRoutes = require('./routes/cloudinary.routes');
 const purchaseRoutes = require('./routes/purchase.routes');
 const stockRoutes    = require('./routes/stock.routes');
 const gstRoutes      = require('./routes/gst.routes');
-const invoiceRoutes  = require('./routes/invoice.routes');
 
 // Initialize express app
 const app = express();
@@ -83,9 +82,12 @@ app.use('/api/', limiter);
 // Stricter rate limiting for auth routes (login/register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Increased from 5 to 10 to allow more login attempts
+  max: parseInt(process.env.AUTH_LIMIT_MAX, 10) || 10, // failed logins per address per 15 minutes (AUTH_LIMIT_MAX raises it for local test runs)
   message: 'Too many login attempts, please try again later.',
   skipSuccessfulRequests: true,
+  // the website logs everyone in from one address: it passes the visitor's address with a shared secret (see utils/clientIp.js)
+  keyGenerator: (req) => require('./utils/clientIp').trustedClientIp(req),
+  validate: { keyGeneratorIpFallback: false },
 });
 
 // ======================
@@ -133,6 +135,10 @@ app.use(compression({
     if (req.headers['x-no-compression']) {
       return false;
     }
+    // the live stream must not be buffered by compression
+    if (req.path.startsWith('/api/live') && !req.path.startsWith('/api/live/events') && !req.path.startsWith('/api/live/ticket')) {
+      return false;
+    }
     return compression.filter(req, res);
   },
   level: 6 // Balance between compression ratio and speed
@@ -162,8 +168,8 @@ if (process.env.NODE_ENV !== 'production') {
   mongoose.set('debug', true);
 }
 
-// Dual-DB: jewellery_stock (primary) + shopmanage (store management)
-const { connectPrimary, connectShopmanage, connectLgpAdmin } = require('./config/db');
+// ONE database, ONE connection (see config/db.js)
+const { connectPrimary } = require('./config/db');
 
 // The server answers /health as soon as it listens, but says "starting" (503) until every database is connected, so the
 // app never opens onto a server that cannot yet log anyone in. A database that is slow at boot (the machine has just
@@ -181,14 +187,10 @@ const withRetry = async (name, fn, tries = 4) => {
   }
 };
 
-Promise.all([
-  withRetry('jewellery_stock', connectPrimary),
-  withRetry('shopmanage', connectShopmanage),
-  withRetry('lgp admin', connectLgpAdmin),
-])
+withRetry('database', connectPrimary)
   .then(() => {
     dbReady = true;
-    logger.info(`✅ All database connections established (${process.uptime().toFixed(1)}s after start)`);
+    logger.info(`✅ Database connected (${process.uptime().toFixed(1)}s after start)`);
     require('./config/scheduledNotifications').startScheduledNotifications();
   })
   .catch((err) => {
@@ -196,17 +198,17 @@ Promise.all([
     process.exit(1);
   });
 
-// Primary connection event listeners
+// Connection event listeners
 mongoose.connection.on('error', (err) => {
-  logger.error('MongoDB (jewellery_stock) error:', err);
+  logger.error('MongoDB error:', err);
 });
 
 mongoose.connection.on('disconnected', () => {
-  logger.warn('MongoDB (jewellery_stock) disconnected');
+  logger.warn('MongoDB disconnected');
 });
 
 mongoose.connection.on('reconnected', () => {
-  logger.info('MongoDB (jewellery_stock) reconnected');
+  logger.info('MongoDB reconnected');
 });
 
 // Initialize Cloudinary
@@ -257,7 +259,6 @@ app.use('/api/test', require('./routes/test.routes'));
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/stock',     stockRoutes);
 app.use('/api/gst',       gstRoutes);
-app.use('/api/invoices',  invoiceRoutes);
 app.use('/api/directory', require('./routes/directory.routes'));
 app.use('/api/billing', require('./routes/billing.routes'));
 app.use('/api/gst-reports', require('./routes/gstReports.routes'));
@@ -267,6 +268,8 @@ app.use('/api/credit-notes', require('./routes/creditNote.routes'));
 app.use('/api/rates', require('./routes/rate.routes'));
 app.use('/api/estimates', require('./routes/estimate.routes'));
 app.use('/api/orders', require('./routes/order.routes'));
+app.use('/api/live', require('./routes/live.routes'));
+app.use('/api/presence', require('./routes/presence.routes'));
 app.use('/api/expenses', require('./routes/expense.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 // Static admin dashboard (its own login; every data call is JWT + admin-role protected)

@@ -1,0 +1,62 @@
+{% extends 'app.twig' %}
+{% block title %}{{ it.name }}{% endblock %}
+{% block heading %}{{ it.barcode }}{% endblock %}
+
+{% block content %}
+{% set st = text[it.status]|default([it.status, 'grey']) %}
+<div class="page-head">
+    <div>
+        <h1>{{ it.name }} <span class="pill pill-{{ st[1] }}">{{ st[0] }}</span></h1>
+        <p class="muted">{{ it.barcode }} · {{ it.metalType|capitalize }} {{ it.purity }} · {{ it.itemType|capitalize }}</p>
+    </div>
+    <div class="actions">
+        {% if it.status in ['active', 'booked'] and can('billing.create') %}<a class="btn btn-primary" href="/billing/new?item={{ it.barcode|url_encode }}">Sell (make a bill)</a>{% endif %}
+        {% if it.status != 'sold' and can('items.edit') %}<a class="btn" href="/stock/{{ it._id }}/edit">Edit</a>{% endif %}
+        <a class="btn" href="/stock">All stock</a>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Details</h2></div>
+        <div class="panel-body kv">
+            <div class="kv-row"><span>Net weight</span><strong>{{ it.netWeight|grams }}</strong></div>
+            {% if it.grossWeight %}<div class="kv-row"><span>Gross weight</span><strong>{{ it.grossWeight|grams }}</strong></div>{% endif %}
+            {% if it.lessWeight %}<div class="kv-row"><span>Less (stone etc.)</span><strong>{{ it.lessWeight|grams }}</strong></div>{% endif %}
+            {% if it.numberOfPieces > 1 %}<div class="kv-row"><span>Pieces</span><strong>{{ it.numberOfPieces }}</strong></div>{% endif %}
+            <div class="kv-row"><span>Hallmark</span><strong>{{ {none: 'Not hallmarked', hallmarked: 'Hallmarked', huid: 'HUID ' ~ it.huidNumber}[it.certificationType]|default('Not hallmarked') }}</strong></div>
+            <div class="kv-row"><span>Box</span><strong>{{ it.containerId.name|default('Not in a box') }}{% if it.slotNumber %} · slot {{ it.slotNumber }}{% endif %}</strong></div>
+            {% if it.makingCharge %}<div class="kv-row"><span>Making charge (for billing)</span><strong>{{ it.makingCharge|inr }}</strong></div>{% endif %}
+            {% if it.stoneValue %}<div class="kv-row"><span>Stone value</span><strong>{{ it.stoneValue|inr }}{% if it.stoneNote %} · {{ it.stoneNote }}{% endif %}</strong></div>{% endif %}
+            {% if it.supplier %}<div class="kv-row"><span>Supplier</span><strong>{{ it.supplier }}</strong></div>{% endif %}
+            {% if it.size %}<div class="kv-row"><span>Size</span><strong>{{ it.size }}</strong></div>{% endif %}
+            {% if it.description %}<div class="kv-row"><span>Note</span><strong>{{ it.description }}</strong></div>{% endif %}
+            {% if it.status == 'sold' %}<div class="kv-row"><span>Sold on bill</span><strong>{{ it.soldInvoice }}{% if it.soldAt %} · {{ it.soldAt|dmy }}{% endif %}</strong></div>{% endif %}
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>Price today</h2>{% if price.rate|default(0) > 0 %}<span class="muted small">at {{ price.rate|inr(0) }} per gram</span>{% endif %}</div>
+        <div class="panel-body">{% include 'stock/price.twig' with {price: price} %}</div>
+    </section>
+</div>
+
+{% if it.images|length %}
+<section class="panel"><div class="panel-head"><h2>Photos</h2></div><div class="panel-body photos">{% for src in it.images %}<a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" alt="" loading="lazy"></a>{% endfor %}</div></section>
+{% endif %}
+
+{% if it.status != 'sold' %}
+<section class="panel">
+    <div class="panel-body row-gap wrap">
+        {% if can('items.edit') %}
+            {% if it.status == 'active' %}
+                <button class="btn" type="button" hx-post="/stock/{{ it._id }}/status" hx-vals='{"to":"no_sell"}' hx-swap="none">Mark not for sale</button>
+                <button class="btn" type="button" hx-post="/stock/{{ it._id }}/status" hx-vals='{"to":"out"}' hx-swap="none">Take out for now</button>
+            {% else %}
+                <button class="btn btn-ok" type="button" hx-post="/stock/{{ it._id }}/status" hx-vals='{"to":"active"}' hx-swap="none">Put back in stock</button>
+            {% endif %}
+        {% endif %}
+        {% if can('items.delete') %}<button class="btn btn-danger" type="button" hx-post="/stock/{{ it._id }}/remove" hx-confirm="Remove this piece from stock?" hx-swap="none">Remove from stock</button>{% endif %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

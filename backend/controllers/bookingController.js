@@ -10,7 +10,7 @@ const Item = require('../models/Item');
 exports.createBooking = async (req, res) => {
     try {
         const { itemId, customerName, mobile, address, expiryDate, advanceAmount, remarks } = req.body;
-        const Customer = require('../models/Customer');
+        const store = require('../services/customerStore');
 
         // Validate required fields
         if (!itemId || !customerName || !mobile) {
@@ -45,19 +45,10 @@ exports.createBooking = async (req, res) => {
             });
         }
 
-        // Find or Create Customer
-        let customer = await Customer.findOne({ mobile });
-        if (!customer) {
-            customer = await Customer.create({
-                mobile,
-                name: customerName,
-                address
-            });
-        } else {
-            // Update address if provided
-            if (address) customer.address = address;
-            await customer.save();
-        }
+        // The website's customer with this number (any of their numbers); made the website's way if new.
+        // An existing customer's details are not changed by a booking: the booking keeps its own name and number.
+        const me = { id: String(req.user._id), name: req.user.name || '', branchId: req.user.branchId, branchName: req.user.branchName };
+        const { customer } = await store.findOrCreate({ name: customerName, mobile, address }, me);
 
         // Create booking
         const booking = await Booking.create({
@@ -71,9 +62,8 @@ exports.createBooking = async (req, res) => {
             status: 'active'
         });
 
-        // Link booking to customer
-        customer.bookings.push(booking._id);
-        await customer.save();
+        // Link booking to customer (on the app's side of the customer, not on the website's record)
+        await store.addBooking(customer, booking._id, me);
 
         // Update item status
         item.status = 'booked';
@@ -160,7 +150,6 @@ exports.updateBooking = async (req, res) => {
         const { customerName, mobile, address, expiryDate, advanceAmount, remarks, status } = req.body;
         const Booking = require('../models/Booking');
         const Item = require('../models/Item');
-        const Customer = require('../models/Customer');
 
         let booking = await Booking.findById(req.params.id);
 
@@ -203,15 +192,7 @@ exports.updateBooking = async (req, res) => {
 
         await booking.save();
 
-        // Update Customer Address/Name if changed
-        if (booking.customerId) {
-            const customer = await Customer.findById(booking.customerId);
-            if (customer) {
-                if (customerName) customer.name = customerName;
-                if (address) customer.address = address;
-                await customer.save();
-            }
-        }
+        // (The customer's own name and address are the website's to keep: a booking edit changes the booking only.)
 
         res.status(200).json({
             success: true,

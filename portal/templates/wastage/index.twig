@@ -1,0 +1,42 @@
+{% extends 'app.twig' %}
+{% block title %}Wastage reports{% endblock %}
+{% block heading %}Wastage reports{% endblock %}
+
+{% block content %}
+{% set tot = d.totals|default({}) %}
+<div class="page-head">
+    <div><h1>Wastage reports <span class="bn-inline">মেটাল ক্ষতির রিপোর্ট</span></h1><p class="muted">Metal lost in making. Only approved reports count in the stock balance; the person who reported it cannot approve it.</p></div>
+    <div class="actions">
+        <a class="btn" href="/stock/summary">Back to the summary</a>
+        {% if can('wastage.report') %}<button class="btn btn-primary" type="button" hx-get="/stock/wastage/new" hx-target="#modal-body">{{ icon('plus', 17) }} Report wastage</button>{% endif %}
+    </div>
+</div>
+
+<div class="stats">
+    {% for st, label in {'approved': 'Approved (counts)', 'pending': 'Waiting for approval', 'rejected': 'Rejected'} %}
+    <div class="stat"><span>{{ label }}</span>
+        <strong>{{ ((tot[st].gold.grams|default(0)) + (tot[st].silver.grams|default(0)))|grams }}</strong>
+        <small>gold {{ (tot[st].gold.grams|default(0))|grams }} · silver {{ (tot[st].silver.grams|default(0))|grams }} · {{ (tot[st].gold.count|default(0)) + (tot[st].silver.count|default(0)) }} reports</small></div>
+    {% endfor %}
+</div>
+
+<form class="filters" method="get" action="/stock/wastage">
+    <label class="field"><span>Status</span><select name="status"><option value="">All</option>{% for v, l in {'pending': 'Waiting', 'approved': 'Approved', 'rejected': 'Rejected'} %}<option value="{{ v }}"{{ status == v ? ' selected' : '' }}>{{ l }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Metal</span><select name="metal"><option value="">Both</option><option value="gold"{{ metal == 'gold' ? ' selected' : '' }}>Gold</option><option value="silver"{{ metal == 'silver' ? ' selected' : '' }}>Silver</option></select></label>
+    <label class="field"><span>Category</span><select name="category"><option value="">All</option>{% for c in categories %}<option value="{{ c }}"{{ category == c ? ' selected' : '' }}>{{ c }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Search</span><input type="search" name="q" value="{{ q }}" placeholder="reason or note"></label>
+    <button class="btn btn-primary" type="submit">Filter</button>
+</form>
+
+<section class="panel" id="wastage-list">
+    {% include 'wastage/table.twig' with {reports: d.reports|default([])} %}
+    {% set pg = d.pagination|default({}) %}
+    {% if (pg.pages|default(1)) > 1 %}
+    <div class="panel-foot">
+        <span class="muted">Page {{ pg.page }} of {{ pg.pages }} · {{ pg.total }} reports</span>
+        {% if pg.page > 1 %}<a class="btn btn-sm" href="/stock/wastage?page={{ pg.page - 1 }}&status={{ status }}&metal={{ metal }}&category={{ category }}&q={{ q }}">Previous</a>{% endif %}
+        {% if pg.page < pg.pages %}<a class="btn btn-sm" href="/stock/wastage?page={{ pg.page + 1 }}&status={{ status }}&metal={{ metal }}&category={{ category }}&q={{ q }}">Next</a>{% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

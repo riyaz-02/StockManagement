@@ -1,0 +1,62 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}{{ u.name }}{% endblock %}
+{% block heading %}Staff &amp; roles{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ u.name }} {% if u.isActive %}<span class="pill pill-green">Login on</span>{% else %}<span class="pill pill-grey">Login off</span>{% endif %}</h1><p class="muted">{{ u.mobile ?: 'no mobile number yet' }}{% if u.username %} · {{ u.username }}{% endif %} · {{ roles[u.role]|default(u.role) }} · {{ u.branchName|default('Main branch') }}</p></div>
+    <div class="actions">
+        {% if can('users.resetPassword') %}<button class="btn" type="button" hx-get="/admin/staff/{{ u._id }}/password" hx-target="#modal-body">Change password</button>{% endif %}
+        <a class="btn" href="/admin/staff">All staff</a>
+    </div>
+</div>
+
+<form method="post" action="/admin/staff/{{ u._id }}" class="panel">
+    {{ csrf_field() }}
+    <div class="panel-head"><h2>Details</h2></div>
+    <div class="panel-body"><div class="form-grid">
+        {{ ui.field('Name', 'name', u.name, {required: true}) }}
+        {{ ui.field('Mobile number', 'mobile', u.mobile, {type: 'tel', inputmode: 'numeric', hint: 'Needed to sign in on the phone app with a number.'}) }}
+        {{ ui.field('Username', 'username', u.username|default(''), {hint: 'The old website signs in with this (or the e-mail).'}) }}
+        {{ ui.field('E-mail', 'email', u.email|default(''), {type: 'email'}) }}
+        <label class="field"><span>Role</span><select name="role"{{ self ? ' disabled' : '' }}>{% for k, label in roles %}<option value="{{ k }}"{{ k == u.role ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% if self %}<small class="hint">You cannot change your own role.</small>{% endif %}</label>
+        <label class="field"><span>Branch</span><select name="branchId">{% for b in branches %}<option value="{{ b._id }}"{{ b._id == u.branchId|default('main') ? ' selected' : '' }}>{{ b.name }}</option>{% endfor %}</select></label>
+        {% if not self %}<label class="check span-2"><input type="checkbox" name="isActive" value="1"{{ u.isActive ? ' checked' : '' }}> <span>Login is on (untick to stop them signing in; nothing is deleted)</span></label>{% endif %}
+    </div></div>
+    <div class="panel-foot"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>
+
+{% if full %}
+    <section class="panel"><div class="panel-body"><p class="muted">{{ roles[u.role] }} accounts can always do everything, so there is nothing to set for them.</p></div></section>
+{% else %}
+<form hx-post="/admin/staff/{{ u._id }}/permissions" hx-swap="none">
+    {{ csrf_field() }}
+    <h2 class="section-title">What {{ u.name }} can do</h2>
+    <p class="muted">By default they can do what a {{ roles[u.role]|default(u.role) }} can. Choose <em>Allowed</em> or <em>Blocked</em> only where this person is different.</p>
+    {% for g in groups %}
+        <section class="panel">
+            <div class="panel-head"><h2>{{ g.group }}</h2></div>
+            <div class="panel-body perm-list">
+                {% for k in g.keys %}
+                    {% set o = u.permissionOverrides[k.key] is defined ? (u.permissionOverrides[k.key] ? 'allow' : 'block') : '' %}
+                    <div class="perm-row">
+                        <span>{{ k.label }} <small class="muted">(role: {{ grid[k.key]|default(false) ? 'allowed' : 'blocked' }})</small></span>
+                        <select name="perm[{{ k.key }}]" class="perm-{{ o ?: 'same' }}">
+                            <option value=""{{ o == '' ? ' selected' : '' }}>As the role</option>
+                            <option value="allow"{{ o == 'allow' ? ' selected' : '' }}>Allowed</option>
+                            <option value="block"{{ o == 'block' ? ' selected' : '' }}>Blocked</option>
+                        </select>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    {% endfor %}
+    <div class="sticky-actions"><button class="btn btn-primary" type="submit">Save permissions</button></div>
+</form>
+{% endif %}
+
+{% if not self and u.isActive %}
+<section class="panel"><div class="panel-body"><button class="btn btn-danger" type="button" hx-post="/admin/staff/{{ u._id }}/deactivate" hx-confirm="Switch off this login? They will not be able to sign in. Nothing is deleted." hx-swap="none">Switch off this login</button></div></section>
+{% endif %}
+{% endblock %}

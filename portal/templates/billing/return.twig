@@ -1,0 +1,28 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/billing/{{ id }}/return" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form modal-wide">
+    {{ csrf_field() }}
+    <input type="hidden" name="rid" value="{{ rid }}">
+    <h2>Return / refund</h2>
+    <p class="muted">Bill {{ st.invoiceNumber }}. Tick what came back and how much (before tax) to take back. A credit note is made; the GST goes down with it.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="return-lines" hx-post="/billing/{{ id }}/return/preview" hx-trigger="input delay:300ms, change" hx-target="#return-total" hx-swap="innerHTML" hx-include="closest form">
+        {% for l in st.lines %}
+            <div class="return-line">
+                <label class="check"><input type="checkbox" name="ret[{{ l.index }}][on]" value="1"{{ (v.ret[l.index].on|default('')) ? ' checked' : '' }}{{ l.left <= 0 ? ' disabled' : '' }}> <span><strong>{{ l.particulars }}</strong><small>{{ l.netWt|grams }} · before tax {{ l.taxable|inr }}{% if l.credited > 0 %} · already credited {{ l.credited|inr }}{% endif %}</small></span></label>
+                <div class="money-input"><input type="number" name="ret[{{ l.index }}][taxable]" step="0.01" min="0" max="{{ l.left }}" value="{{ v.ret[l.index].taxable|default(l.left) }}" inputmode="decimal" aria-label="Amount before tax"{{ l.left <= 0 ? ' disabled' : '' }}></div>
+            </div>
+        {% endfor %}
+    </div>
+    <div id="return-total" class="return-total"></div>
+    <div class="form-grid">
+        {{ ui.field('Reason', 'reason', v.reason|default('sales_return'), {type: 'select', options: ['sales_return', 'price_adjustment', 'quality_issue', 'exchange', 'other']}) }}
+        {{ ui.field('Refund paid by', 'refundMode', v.refundMode|default('Cash'), {type: 'select', options: modes}) }}
+        {{ ui.field('Money given back', 'refundAmount', v.refundAmount|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal', hint: 'Leave empty if no money is returned.'}) }}
+        {{ ui.field('Note (optional)', 'note', v.note|default(''), {}) }}
+    </div>
+    <label class="check"><input type="checkbox" name="restock" value="1" checked> <span>Put the returned pieces back in stock</span></label>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">Save credit note</button>
+    </div>
+</form>

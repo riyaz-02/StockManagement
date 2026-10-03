@@ -1,0 +1,34 @@
+{% extends 'app.twig' %}
+{% block title %}GST Summary{% endblock %}
+{% block heading %}GST Summary{% endblock %}
+
+{% block content %}
+{# what stays in every link: which registration, and the dates or period being looked at #}
+{% set keep = {gstin: gstin} %}
+<div class="page-head">
+    <div><h1>GST Summary</h1><p class="muted">Sales, returns and input credit worked out from your bills. Figures come from the server, the same as in the app.</p></div>
+    <div class="actions">
+        {% if tab in ['summary', 'register'] %}
+            <a class="btn" href="/gst/export?{{ ({gstin: gstin, from: range.from, to: range.to, type: 'register'})|url_encode }}">Download register (CSV)</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="chips gst-tabs">
+    {% for k, label in tabs %}<a class="chip{{ tab == k ? ' is-on' : '' }}" href="/gst?{{ {tab: k, gstin: gstin, period: period, quick: range.quick, from: range.from, to: range.to}|filter(v => v != '')|url_encode }}">{{ label }}</a>{% endfor %}
+</div>
+
+<form class="toolbar gst-controls" method="get" action="/gst">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    {% if multi %}
+        <select name="gstin" aria-label="GST registration" data-autosubmit>
+            {% if tab in ['summary', 'register'] %}<option value="ALL"{{ gstin == 'ALL' ? ' selected' : '' }}>All registrations</option>{% endif %}
+            {% for r in regs %}<option value="{{ r.gstin }}"{{ gstin == r.gstin ? ' selected' : '' }}>{{ r.name }} · {{ r.gstin }}</option>{% endfor %}
+        </select>
+    {% else %}<input type="hidden" name="gstin" value="{{ gstin }}">{% endif %}
+    {% block controls %}{% endblock %}
+</form>
+
+{% if problem is defined %}<div class="notice notice-error" role="alert">{{ problem }}</div>{% endif %}
+{% block tabbody %}{% endblock %}
+{% endblock %}

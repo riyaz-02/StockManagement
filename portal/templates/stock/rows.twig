@@ -1,0 +1,16 @@
+{% for it in rows %}
+    {% set st = text[it.status]|default([it.status, 'grey']) %}
+    <tr class="is-link" data-href="/stock/{{ it._id }}">
+        <td class="thumb-cell">{% if it.images|length %}<img class="thumb" src="{{ it.images[0] }}" alt="" loading="lazy">{% else %}<span class="thumb thumb-none">{{ icon('gem', 18) }}</span>{% endif %}</td>
+        <td><a class="row-link" href="/stock/{{ it._id }}">{{ it.name }}</a><small>{{ it.barcode }}</small></td>
+        <td>{{ it.metalType|capitalize }} {{ it.purity }}{% if it.certificationType|default('none') == 'huid' %} <span class="pill pill-green">HUID</span>{% elseif it.certificationType|default('none') == 'hallmarked' %} <span class="pill pill-blue">Hallmarked</span>{% endif %}<small>{{ it.itemType|capitalize }}</small></td>
+        <td class="num strong">{{ it.netWeight|grams }}</td>
+        <td class="num hide-sm">{{ it.makingCharge|default(0) > 0 ? it.makingCharge|inr : '–' }}</td>
+        <td class="hide-sm">{{ it.containerId.name|default('–') }}{% if it.slotNumber %}<small>slot {{ it.slotNumber }}</small>{% endif %}</td>
+        <td><span class="pill pill-{{ st[1] }}">{{ st[0] }}</span></td>
+    </tr>
+{% endfor %}
+{% if pg.hasMore|default(false) %}
+    <tr id="stock-more"><td colspan="7" class="more-cell"><button class="btn" type="button"
+        hx-get="/stock/list?{{ {tab: tab, metal: metal, q: q, page: page + 1}|filter(v => v != '')|url_encode }}" hx-target="#stock-more" hx-swap="outerHTML">Show more</button></td></tr>
+{% endif %}

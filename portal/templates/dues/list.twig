@@ -1,0 +1,37 @@
+{% set rows = d.rows|default([]) %}
+<div class="hero hero-red">
+    <div>
+        <small>{{ d.customers|default(0) }} customer{{ d.customers|default(0) == 1 ? '' : 's' }} owe you</small>
+        <strong>{{ d.total|default(0)|inr }}</strong>
+    </div>
+</div>
+
+{% if rows|length %}
+<section class="panel">
+    <div class="table-wrap"><table class="t dues-t">
+        <thead><tr><th>Customer</th><th>Bill</th><th>Date</th><th class="num">Bill total</th><th class="num">Due</th><th></th></tr></thead>
+        <tbody>
+        {% for c in rows %}
+            {% for i in c.invoices %}
+            <tr class="{{ loop.last ? 'cust-end' : '' }}">
+                {% if loop.first %}
+                <td class="cust-cell" rowspan="{{ c.invoices|length }}">
+                    <strong>{{ c.name ?: 'Walk-in' }}</strong>
+                    <small class="muted block">{{ c.count }} bill{{ c.count == 1 ? '' : 's' }} · since {{ c.oldest|dmy }}</small>
+                    {% if c.mobile|length >= 10 %}<a class="btn btn-sm" href="tel:{{ c.mobile }}">{{ icon('phone', 14) }} {{ c.mobile }}</a>{% endif %}
+                </td>
+                {% endif %}
+                <td class="strong">{{ i.number }}</td>
+                <td>{{ i.date|dmy }}</td>
+                <td class="num">{{ i.total|inr }}</td>
+                <td class="num strong neg">{{ i.due|inr }}</td>
+                <td class="num">{% if can('billing.receivePayment') %}<button class="btn btn-sm btn-ok" type="button" hx-get="/dues/pay/{{ i.id }}" hx-target="#modal-body">Receive</button>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        {% endfor %}
+        </tbody>
+    </table></div>
+</section>
+{% else %}
+    <div class="panel"><div class="t-empty">{{ q ? 'Nobody matches that.' : 'Nobody owes you anything.' }}</div></div>
+{% endif %}

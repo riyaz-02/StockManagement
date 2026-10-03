@@ -1,0 +1,13 @@
+{% extends 'app.twig' %}
+{% block title %}Purchases{% endblock %}
+{% block heading %}Purchases{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>Purchases</h1><p class="muted">Gold and silver bought from suppliers, with the GST you can claim back.</p></div>
+    <div class="actions">{% if can('purchases.create') %}<a class="btn btn-primary" href="/purchases/new">{{ icon('plus', 17) }} New purchase</a>{% endif %}</div>
+</div>
+<div class="live-block" hx-get="/purchases/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

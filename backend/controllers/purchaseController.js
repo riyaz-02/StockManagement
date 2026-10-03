@@ -1,8 +1,11 @@
 /**
  * purchaseController.js — Supplier purchase entry management
  *
- * Uses shopmanage DB (separate connection from jewellery_stock).
- * On every new purchase, auto-creates a stock_entry credit record.
+ * ONE collection, `purchases`, shared with the PHP website (website field names; see models/Purchase.js). `toApp()` gives the
+ * app and the portal the same JSON as before. A delete removes the record for real (the website has no "deleted" flag) and
+ * keeps a copy in `app_trash`.
+ * Stock is what is present in the shop (items + bulk entries), so a purchase does not write a stock ledger entry: it is the
+ * raw-material record the reconciliation compares the stock with (controllers/stockController.js).
  *
  * Aligned with legacy PHP save_purchase.php / get_purchases.php:
  *  - description field (separate from remarks)
@@ -15,26 +18,21 @@
 
 'use strict';
 
-const { getShopmanageConnection } = require('../config/db');
-const {
-    calculateGST,
-    getNowIST,
-    normalizeToIST,
-} = require('../utils/gstHelpers');
+const { getConnection } = require('../config/db');
+const { calculateGST } = require('../utils/gstHelpers');
+const PurchaseModel = require('../models/Purchase');
+const { toApp, ymdIST, istStamp, websiteMetal, dayAsDate, sumIfSplit, taxableExpr } = PurchaseModel;
+const escapeRx = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ── Lazy model getters ────────────────────────────────────────────────────────
-let _Purchase, _StockEntry, _GstConfig;
+let _Purchase, _GstConfig;
 
 function getPurchaseModel() {
-    if (!_Purchase) _Purchase = require('../models/Purchase')(getShopmanageConnection());
+    if (!_Purchase) _Purchase = PurchaseModel(getConnection());
     return _Purchase;
 }
-function getStockEntryModel() {
-    if (!_StockEntry) _StockEntry = require('../models/StockEntry')(getShopmanageConnection());
-    return _StockEntry;
-}
 function getGstConfigModel() {
-    if (!_GstConfig) _GstConfig = require('../models/GstConfig')(getShopmanageConnection());
+    if (!_GstConfig) _GstConfig = require('../models/GstConfig')(getConnection());
     return _GstConfig;
 }
 
@@ -48,11 +46,11 @@ async function getActiveGstConfig() {
 // ── Helper: build MongoDB sort object from sort param ─────────────────────────
 function buildSort(sort) {
     switch (sort) {
-        case 'date_asc':       return { invoiceDate: 1 };
-        case 'amount_desc':    return { totalAmount: -1 };
-        case 'amount_asc':     return { totalAmount: 1 };
+        case 'date_asc':       return { invoice_date: 1, _id: 1 };
+        case 'amount_desc':    return { total_amount: -1, _id: -1 };
+        case 'amount_asc':     return { total_amount: 1, _id: 1 };
         case 'date_desc':
-        default:               return { invoiceDate: -1 };
+        default:               return { invoice_date: -1, _id: -1 };
     }
 }
 
@@ -69,10 +67,10 @@ exports.getPurchaseSuggestions = async (req, res) => {
         const Purchase = getPurchaseModel();
 
         const [suppliers, descriptions, gstinRows] = await Promise.all([
-            Purchase.distinct('biller',      { isDeleted: false }),
-            Purchase.distinct('description', { isDeleted: false, description: { $ne: '' } }),
+            Purchase.distinct('biller'),
+            Purchase.distinct('description', { description: { $nin: ['', null] } }),
             Purchase.find(
-                { isDeleted: false, billerGstin: { $nin: ['', null] } },
+                { billerGstin: { $nin: ['', null] } },
                 { biller: 1, billerGstin: 1, _id: 0 }
             ).lean(),
         ]);
@@ -107,18 +105,14 @@ exports.getPurchases = async (req, res) => {
         } = req.query;
 
         // Build filter
-        const filter = { isDeleted: false };
-        if (metalType) filter.metalType = metalType.toLowerCase();
+        const filter = {};
+        if (metalType) filter.metal_type = { $regex: `^${escapeRx(metalType)}$`, $options: 'i' };
         if (biller) filter.biller = { $regex: biller, $options: 'i' };
         if (startDate || endDate) {
-            filter.invoiceDate = {};
-            if (startDate) filter.invoiceDate.$gte = new Date(startDate);
-            if (endDate) {
-                // Include the full end day (legacy: $lte end of day)
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                filter.invoiceDate.$lte = end;
-            }
+            // the website keeps the invoice date as 'YYYY-MM-DD' text, so a whole end day is included by comparing days
+            filter.invoice_date = {};
+            if (startDate) filter.invoice_date.$gte = ymdIST(startDate);
+            if (endDate) filter.invoice_date.$lte = ymdIST(endDate);
         }
 
         const safePage  = Math.max(1, parseInt(page));
@@ -126,7 +120,7 @@ exports.getPurchases = async (req, res) => {
         const skip      = (safePage - 1) * safeLimit;
 
         // Run list + count + aggregate totals in parallel
-        const [purchases, total, totals] = await Promise.all([
+        const [rows, total, totals] = await Promise.all([
             Purchase.find(filter)
                 .sort(buildSort(sort))
                 .skip(skip)
@@ -138,14 +132,15 @@ exports.getPurchases = async (req, res) => {
                 { $match: filter },
                 {
                     $group: {
-                        _id: '$metalType',
-                        totalWeight: { $sum: '$quantity' },
-                        totalAmount: { $sum: '$totalAmount' },
+                        _id: { $toLower: '$metal_type' },
+                        totalWeight: { $sum: { $toDouble: '$quantity' } },
+                        totalAmount: { $sum: taxableExpr },
                         count: { $sum: 1 },
                     },
                 },
             ]),
         ]);
+        const purchases = rows.map(toApp);
 
         // Shape aggregate output into a flat map: { gold: {...}, silver: {...} }
         const metalTotals = {};
@@ -181,11 +176,11 @@ exports.getPurchases = async (req, res) => {
 exports.getPurchase = async (req, res) => {
     try {
         const Purchase = getPurchaseModel();
-        const purchase = await Purchase.findById(req.params.id).lean();
-        if (!purchase || purchase.isDeleted) {
+        const doc = await Purchase.findById(req.params.id).lean();
+        if (!doc) {
             return res.status(404).json({ success: false, message: 'Purchase not found' });
         }
-        res.json({ success: true, data: { purchase } });
+        res.json({ success: true, data: { purchase: toApp(doc) } });
     } catch (err) {
         console.error('[Purchase] getPurchase error:', err);
         res.status(500).json({ success: false, message: 'Error fetching purchase', error: err.message });
@@ -231,10 +226,33 @@ function gstFields(gst, hall) {
     };
 }
 
+// POST /api/purchases/calculate : what a purchase would come to (valuation + GST + ITC + TDS), nothing is saved.
+// Body as for create: { quantity, rate, totalAmount? , transactionType?, valuation? }.
+exports.calculate = async (req, res) => {
+    try {
+        const { quantity, rate, totalAmount: totalAmountRaw, transactionType, valuation: valuationIn } = req.body || {};
+        let qty = parseFloat(quantity);
+        let rateVal = parseFloat(rate);
+        let totalAmount = totalAmountRaw != null && totalAmountRaw !== '' ? parseFloat(totalAmountRaw) : parseFloat((qty * rateVal).toFixed(2));
+        const gstConfig = await getActiveGstConfig();
+        const txType = transactionType || gstConfig.defaultTransactionType || 'intra-state';
+        let valuation = null, hall = null;
+        if (valuationIn && typeof valuationIn === 'object') {
+            const v = await priceValuation(valuationIn, txType);
+            if (v.error) return res.status(400).json({ success: false, message: v.error });
+            qty = v.qty; rateVal = v.rate; totalAmount = v.totalAmount; valuation = v.valuation; hall = v.hall;
+        }
+        if (!(totalAmount > 0)) return res.status(400).json({ success: false, message: 'Enter the weight and the rate, or the taxable amount' });
+        const gf = gstFields(calculateGST(totalAmount, gstConfig, txType), hall);
+        res.json({ success: true, data: { quantity: qty, rate: rateVal, totalAmount, valuation: valuation && valuation.result, ...gf } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Error calculating the purchase' });
+    }
+};
+
 exports.createPurchase = async (req, res) => {
     try {
         const Purchase    = getPurchaseModel();
-        const StockEntry  = getStockEntryModel();
 
         const {
             invoiceDate, invoiceNumber, metalType, biller,
@@ -283,10 +301,7 @@ exports.createPurchase = async (req, res) => {
         }
 
         // ── Duplicate invoice check (no self-exclusion needed for create) ──
-        const existing = await Purchase.findOne({
-            invoiceNumber: invoiceNumber.trim().toUpperCase(),
-            isDeleted: false,
-        });
+        const existing = await Purchase.findOne({ invoice_number: invoiceNumber.trim().toUpperCase() }).lean();
         if (existing) {
             return res.status(409).json({
                 success: false,
@@ -299,65 +314,50 @@ exports.createPurchase = async (req, res) => {
         const gst = calculateGST(parseFloat(totalAmount), gstConfig, txType);
         const gf = gstFields(gst, hall);
 
-        // ── Normalize dates to IST ─────────────────────────────────────────
-        const normalizedInvoiceDate = normalizeToIST(invoiceDate);
-        const createdAtIST = getNowIST();
+        // ── The shop's calendar day, in the website's 'YYYY-MM-DD' form ────
+        const invoiceYmd = ymdIST(invoiceDate);
+        if (!invoiceYmd) return res.status(400).json({ success: false, message: 'The invoice date is not a valid date' });
+        const normalizedInvoiceDate = dayAsDate(invoiceYmd);
+        const now = new Date();
+        const byId = String(req.user.id);
+        const byName = req.user.name || req.user.mobile || '';
 
         // ── Derive attachment URLs array from meta (back-compat) ───────────
         const attachments = attachmentMeta.map((a) => a.url);
 
         // ── Create purchase document ───────────────────────────────────────
-        const purchase = await Purchase.create({
-            invoiceDate: normalizedInvoiceDate,
-            invoiceNumber: invoiceNumber.trim().toUpperCase(),
-            metalType: metalType.toLowerCase(),
+        const created = await Purchase.create({
+            // the website's own fields (what the old site reads and shows)
+            invoice_date: invoiceYmd,
+            invoice_number: invoiceNumber.trim().toUpperCase(),
+            metal_type: websiteMetal(metalType),
             biller: biller.trim(),
-            billerGstin: billerGstin.trim().toUpperCase(),
+            description: description.trim(),
             quantity: qty,
             rate: rateVal,
-            totalAmount,
+            total_amount: gf.totalPayable,      // the invoice total, GST included: what the website calls total_amount
+            created_at: now, created_ist: istStamp(now), created_by: byId, created_by_name: byName,
+            updated_at: now, updated_ist: istStamp(now), updated_by: byId, updated_by_name: byName,
+            // what only the app records
+            totalAmount,                        // taxable value
+            billerGstin: billerGstin.trim().toUpperCase(),
+            remarks: remarks.trim(),
             valuation,
             ...gf,      // GST, ITC (input credit), TDS 194Q and net payable, incl. the hallmark fee when there is one
-            description: description.trim(),
-            remarks: remarks.trim(),
             attachments,
             attachmentMeta,
-            invoiceDateIST: normalizedInvoiceDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            createdAtIST,
-            createdBy: req.user.id,
-            createdByName: req.user.name || req.user.mobile || '',
-            updatedBy: req.user.id,
-            updatedByName: req.user.name || req.user.mobile || '',
+            source: 'app',
         });
+        const purchase = toApp(created);
 
 
-        // ── Auto-create credit stock ledger entry ──────────────────────────
-        await StockEntry.create({
-            entryDate: normalizedInvoiceDate,
-            metalType: metalType.toLowerCase(),
-            entryType: 'credit',
-            weightGrams: qty,
-            description: description.trim() ||
-                `Purchase from ${biller} (Invoice: ${invoiceNumber})`,
-            referenceId: purchase._id,
-            referenceType: 'purchase',
-            status: 'active',
-            entryDateIST: normalizedInvoiceDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            createdBy: req.user.id,
-        });
-
+        require('../services/audit').record(req, 'purchase', purchase._id, `${purchase.invoiceNumber} · ${purchase.biller}`, 'created', [{ field: 'metal', to: `${purchase.metalType} ${purchase.quantity}g` }, { field: 'payable', to: String(purchase.totalPayable) }]);
         res.status(201).json({
             success: true,
             message: 'Purchase entry created successfully',
             data: { purchase },
         });
     } catch (err) {
-        if (err.code === 11000 && err.keyPattern?.invoiceNumber) {
-            return res.status(409).json({
-                success: false,
-                message: 'Invoice number already exists. Duplicate entry prevented.',
-            });
-        }
         console.error('[Purchase] createPurchase error:', err);
         res.status(500).json({ success: false, message: 'Error creating purchase', error: err.message });
     }
@@ -367,18 +367,18 @@ exports.createPurchase = async (req, res) => {
 exports.updatePurchase = async (req, res) => {
     try {
         const Purchase = getPurchaseModel();
-        const purchase = await Purchase.findById(req.params.id);
-        if (!purchase || purchase.isDeleted) {
+        const doc = await Purchase.findById(req.params.id);
+        if (!doc) {
             return res.status(404).json({ success: false, message: 'Purchase not found' });
         }
+        const purchase = toApp(doc);   // the API's names; changes are written to the stored (website) fields below
 
         // ── Duplicate invoice check excluding own ID ($ne) — mirrors PHP logic ──
         if (req.body.invoiceNumber) {
             const dup = await Purchase.findOne({
-                invoiceNumber: req.body.invoiceNumber.trim().toUpperCase(),
-                isDeleted: false,
-                _id: { $ne: purchase._id },
-            });
+                invoice_number: req.body.invoiceNumber.trim().toUpperCase(),
+                _id: { $ne: doc._id },
+            }).lean();
             if (dup) {
                 return res.status(409).json({
                     success: false,
@@ -386,41 +386,51 @@ exports.updatePurchase = async (req, res) => {
                     duplicateId: dup._id,
                 });
             }
-            purchase.invoiceNumber = req.body.invoiceNumber.trim().toUpperCase();
+            doc.invoice_number = req.body.invoiceNumber.trim().toUpperCase();
         }
 
         // Fields the user is allowed to update
+        const before = { biller: purchase.biller, rate: purchase.rate, totalAmount: purchase.totalAmount, quantity: purchase.quantity };
         const editable = ['biller', 'description', 'remarks', 'rate', 'attachments', 'attachmentMeta'];
         editable.forEach((field) => {
-            if (req.body[field] !== undefined) purchase[field] = req.body[field];
+            if (req.body[field] !== undefined) doc[field] = req.body[field];   // same name on both sides
         });
 
         // Sync flat URL array if attachmentMeta changed
         if (req.body.attachmentMeta) {
-            purchase.attachments = req.body.attachmentMeta.map((a) => a.url);
+            doc.attachments = req.body.attachmentMeta.map((a) => a.url);
         }
 
-        // Change of the valuation: weights / purity / wastage / labour / rate. Amount, GST, input credit and the stock ledger are
+        // Change of the valuation: weights / purity / wastage / labour / rate. Amount, GST and input credit are
         // worked out again. Refused once the GSTR-3B of that period is filed (it would change a filed return).
         if (req.body.valuation && typeof req.body.valuation === 'object') {
             const GstSvc = require('../services/gstReports');
-            const { GstFiling } = require('../models/AppGst');
-            const ymd = new Date(purchase.invoiceDate.getTime() + 5.5 * 3600000).toISOString().slice(0, 10);
+            const ymd = doc.invoice_date;
             const keys = [GstSvc.periodKey('monthly', ymd), GstSvc.periodKey('quarterly', ymd)];
-            const filed = await GstFiling.findOne({ returnType: 'GSTR-3B', period: { $in: keys } }).lean();
+            const filed = await require('../services/gstFilings').findOne({ type: 'GSTR-3B', periods: keys });
             if (filed) return res.status(409).json({ success: false, message: `The GSTR-3B for ${filed.period} is already filed. Record a correction in the next return instead of changing this purchase.` });
             const gstConfig = await getActiveGstConfig();
             const v = await priceValuation(req.body.valuation, purchase.transactionType || 'intra-state');
             if (v.error) return res.status(400).json({ success: false, message: v.error });
             const gst = calculateGST(v.totalAmount, gstConfig, purchase.transactionType || 'intra-state');
-            Object.assign(purchase, { quantity: v.qty, rate: v.rate, totalAmount: v.totalAmount, valuation: v.valuation }, gstFields(gst, v.hall));
-            await getStockEntryModel().updateMany({ referenceId: purchase._id, referenceType: 'purchase', status: 'active' }, { $set: { weightGrams: v.qty } });
+            const gf2 = gstFields(gst, v.hall);
+            Object.assign(doc, { quantity: v.qty, rate: v.rate, totalAmount: v.totalAmount, valuation: v.valuation }, gf2, { total_amount: gf2.totalPayable });
         }
 
-        purchase.updatedBy = req.user.id;
-        await purchase.save();
+        const nowU = new Date();
+        doc.updated_at = nowU;
+        doc.updated_ist = istStamp(nowU);
+        doc.updated_by = String(req.user.id);
+        doc.updated_by_name = req.user.name || req.user.mobile || '';
+        await doc.save();
+        const after = toApp(doc);
 
-        res.json({ success: true, message: 'Purchase updated', data: { purchase } });
+        const changed = ['biller', 'rate', 'totalAmount', 'quantity']
+            .filter((k) => String(before[k] ?? '') !== String(after[k] ?? ''))
+            .map((k) => ({ field: k, from: before[k], to: after[k] }));
+        if (changed.length) require('../services/audit').record(req, 'purchase', after._id, `${after.invoiceNumber} · ${after.biller}`, 'updated', changed);
+
+        res.json({ success: true, message: 'Purchase updated', data: { purchase: after } });
     } catch (err) {
         console.error('[Purchase] updatePurchase error:', err);
         res.status(500).json({ success: false, message: 'Error updating purchase', error: err.message });
@@ -431,26 +441,20 @@ exports.updatePurchase = async (req, res) => {
 exports.deletePurchase = async (req, res) => {
     try {
         const Purchase   = getPurchaseModel();
-        const StockEntry = getStockEntryModel();
 
-        const purchase = await Purchase.findById(req.params.id);
-        if (!purchase || purchase.isDeleted) {
+        const doc = await Purchase.findById(req.params.id);
+        if (!doc) {
             return res.status(404).json({ success: false, message: 'Purchase not found' });
         }
+        const purchase = toApp(doc);
 
-        // Soft-delete purchase
-        purchase.isDeleted = true;
-        purchase.deletedAt = new Date();
-        purchase.updatedBy = req.user.id;
-        await purchase.save();
+        // The website lists every purchase it finds and has no "deleted" flag, so the record is removed for real
+        // (one list for the app and the website); a full copy is kept in app_trash.
+        await require('../services/trash').keep(req, 'purchases', doc, `${purchase.invoiceNumber} · ${purchase.biller}`);
+        await Purchase.deleteOne({ _id: doc._id });
 
-        // Soft-delete associated stock ledger entry
-        await StockEntry.updateMany(
-            { referenceId: purchase._id, referenceType: 'purchase' },
-            { status: 'deleted' }
-        );
-
-        res.json({ success: true, message: 'Purchase deleted and stock ledger reversed' });
+        require('../services/audit').record(req, 'purchase', purchase._id, `${purchase.invoiceNumber} · ${purchase.biller}`, 'removed', [{ field: 'copy', to: 'kept in app_trash' }]);
+        res.json({ success: true, message: 'Purchase deleted' });
     } catch (err) {
         console.error('[Purchase] deletePurchase error:', err);
         res.status(500).json({ success: false, message: 'Error deleting purchase', error: err.message });
@@ -551,22 +555,20 @@ exports.getItcSummary = async (req, res) => {
         // ── Single aggregate for the full FY, group by (quarter, metal) ────
         const pipeline = [
             {
-                $match: {
-                    isDeleted: false,
-                    invoiceDate: { $gte: fyStart, $lte: fyEnd },
-                },
+                // the website keeps the invoice date as 'YYYY-MM-DD' text: days compare as text
+                $match: { invoice_date: { $gte: `${fyStartYear}-04-01`, $lte: `${fyEndYear}-03-31` } },
             },
+            { $addFields: { month: { $toInt: { $substrBytes: ['$invoice_date', 5, 2] } } } },
             {
                 $addFields: {
                     // Map calendar month to Indian FY quarter number
-                    month: { $month: '$invoiceDate' },
                     quarterNum: {
                         $switch: {
                             branches: [
-                                { case: { $in: [{ $month: '$invoiceDate' }, [4, 5, 6]] },  then: 1 },
-                                { case: { $in: [{ $month: '$invoiceDate' }, [7, 8, 9]] },  then: 2 },
-                                { case: { $in: [{ $month: '$invoiceDate' }, [10, 11, 12]] }, then: 3 },
-                                { case: { $in: [{ $month: '$invoiceDate' }, [1, 2, 3]] },  then: 4 },
+                                { case: { $in: ['$month', [4, 5, 6]] },  then: 1 },
+                                { case: { $in: ['$month', [7, 8, 9]] },  then: 2 },
+                                { case: { $in: ['$month', [10, 11, 12]] }, then: 3 },
+                                { case: { $in: ['$month', [1, 2, 3]] },  then: 4 },
                             ],
                             default: 0,
                         },
@@ -574,16 +576,17 @@ exports.getItcSummary = async (req, res) => {
                 },
             },
             {
+                // GST / input credit only count where the app recorded the split (an old website purchase has none)
                 $group: {
-                    _id: { quarter: '$quarterNum', metal: '$metalType' },
+                    _id: { quarter: '$quarterNum', metal: { $toLower: '$metal_type' } },
                     invoices:    { $sum: 1 },
-                    totalAmount: { $sum: '$totalAmount' },
-                    totalGst:    { $sum: '$totalGst' },
-                    itcCgst:     { $sum: '$itcCgst' },
-                    itcSgst:     { $sum: '$itcSgst' },
-                    itcIgst:     { $sum: '$itcIgst' },
-                    totalItc:    { $sum: '$totalItc' },
-                    totalWeight: { $sum: '$quantity' },
+                    totalAmount: { $sum: taxableExpr },
+                    totalGst:    { $sum: sumIfSplit('totalGst') },
+                    itcCgst:     { $sum: sumIfSplit('itcCgst') },
+                    itcSgst:     { $sum: sumIfSplit('itcSgst') },
+                    itcIgst:     { $sum: sumIfSplit('itcIgst') },
+                    totalItc:    { $sum: sumIfSplit('totalItc') },
+                    totalWeight: { $sum: { $toDouble: '$quantity' } },
                 },
             },
             { $sort: { '_id.quarter': 1, '_id.metal': 1 } },

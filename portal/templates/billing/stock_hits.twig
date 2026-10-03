@@ -1,0 +1,9 @@
+{% for it in rows %}
+    <button type="button" class="stock-hit" hx-get="/billing/stock-row?code={{ it.barcode|url_encode }}" hx-include="[name=goldRate],[name=silverRate]" hx-target="#items" hx-swap="beforeend" data-hit>
+        <span class="hit-name">{{ it.name }}<small>{{ it.barcode }}</small></span>
+        <span class="hit-meta">{{ it.metalType|capitalize }} {{ it.purity }}</span>
+        <span class="hit-wt">{{ '%.3f'|format(it.netWeight) }} g</span>
+    </button>
+{% else %}
+    {% if q|length >= 2 %}<div class="stock-none">No stock piece matches "{{ q }}". Press Enter to try it as an exact barcode.</div>{% endif %}
+{% endfor %}

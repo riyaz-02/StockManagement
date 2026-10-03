@@ -1,0 +1,11 @@
+{% extends 'base.twig' %}
+{% block title %}{{ t('common.forbidden') }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="empty-page">
+    <div class="empty-ico">{{ icon('shield', 40) }}</div>
+    <h1>403</h1>
+    <p class="muted">{{ t('common.forbidden') }}</p>
+    <a class="btn btn-primary" href="/">{{ t('common.back_home') }}</a>
+</div>
+{% endblock %}

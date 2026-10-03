@@ -7,6 +7,7 @@
  */
 'use strict';
 
+const Summary = require('./stockSummary');
 const BASES4 = ['finalFine', 'fine', 'net', 'gross'];
 const YES_NO = [true, false];
 
@@ -52,6 +53,7 @@ function defaults() {
         for (const [k, f] of Object.entries(fields)) out[g][k] = f.def;
     }
     out.hallmark = { ...HALLMARK_DEFAULT };
+    out.reconcile = { ...Summary.DEFAULT_SETTINGS };
     return out;
 }
 
@@ -69,6 +71,7 @@ function resolve(stored) {
         for (const k of HALLMARK_NUMBERS) if (Number.isFinite(Number(h[k])) && Number(h[k]) >= 0 && Number(h[k]) <= 100000) d.hallmark[k] = Number(h[k]);
         if (['perPiece', 'perGram'].includes(h.type)) d.hallmark.type = h.type;
     }
+    d.reconcile = Summary.resolveSettings(stored);   // the Stock check numbers (allowance, tolerance)
     return d;
 }
 
@@ -97,7 +100,25 @@ function validate(body) {
             } else return { error: `Unknown setting hallmark.${k}` };
         }
     }
+    if (body && body.reconcile !== undefined) {
+        if (typeof body.reconcile !== 'object' || body.reconcile === null) return { error: 'reconcile must be an object' };
+        const r = Summary.validateSettings(body.reconcile);
+        if (r.error) return { error: r.error };
+        Object.assign(set, r.set);
+    }
     return { set };
 }
 
-module.exports = { SCHEMA, defaults, resolve, validate };
+/** The allowed values of every rule, for clients that draw the settings screen themselves (the website). */
+function options() {
+    const out = {};
+    for (const [g, fields] of Object.entries(SCHEMA)) {
+        out[g] = {};
+        for (const [k, f] of Object.entries(fields)) out[g][k] = f.allowed;
+    }
+    out.hallmark = { type: ['perPiece', 'perGram'] };
+    out.reconcile = { limits: Summary.SETTING_LIMITS };
+    return out;
+}
+
+module.exports = { SCHEMA, defaults, resolve, validate, options };

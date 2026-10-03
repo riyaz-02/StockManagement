@@ -651,6 +651,7 @@ exports.lockTally = async (req, res) => {
         tallySession.isForceLocked = isForceLock;
 
         await tallySession.save();
+        require('../services/audit').record(req, 'tally', tallySession._id, tallySession.description, isForceLock ? 'locked with items missing' : 'locked complete', [{ field: 'missing', to: String(itemsLeft) }, { field: 'remarks', to: remarks || '' }]);
 
         res.status(200).json({
             success: true,

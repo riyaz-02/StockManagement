@@ -1,0 +1,15 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/orders/{{ o.id }}/advance" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>Take more advance</h2>
+    <p class="muted">{{ o.number }} · {{ o.customerName }}<br>Advance so far <strong>{{ o.advancePaid|default(0)|inr }}</strong>{% if o.estimatedPrice > 0 %} of {{ o.estimatedPrice|inr }}{% endif %}</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="form-grid">
+        <div class="span-2">{{ ui.field('Amount', 'amount', v.amount|default(''), {type: 'number', step: '0.01', min: '0', money: true, required: true, autofocus: true, inputmode: 'decimal'}) }}</div>
+        {{ ui.field('Paid by', 'mode', v.mode|default('Cash'), {type: 'select', options: modes}) }}
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-ok">Save advance</button>
+    </div>
+</form>

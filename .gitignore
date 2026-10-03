@@ -84,3 +84,6 @@ Runner/GeneratedPluginRegistrant.*
 .dart_tool/
 .packages
 pubspec.lock
+
+# local database backups (contain real data)
+backups-local/

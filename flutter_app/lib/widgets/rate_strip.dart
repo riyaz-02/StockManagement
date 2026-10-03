@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
+import '../services/live_service.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -18,6 +20,14 @@ class RateStrip extends StatefulWidget {
 }
 
 class _RateStripState extends State<RateStrip> {
+  StreamSubscription<LiveEvent>? _live;
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
+  }
+
   final _api = ApiService();
   Map<String, dynamic> _r = {};
   bool _loaded = false;
@@ -26,6 +36,10 @@ class _RateStripState extends State<RateStrip> {
   void initState() {
     super.initState();
     _load();
+    // the rate changed on the website or on another phone: show it at once
+    _live = LiveService.instance.events.where((e) => e.type == 'rate.changed' || e.type == 'reset').listen((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {

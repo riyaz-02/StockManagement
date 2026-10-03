@@ -1,0 +1,33 @@
+{% import 'ui.twig' as ui %}
+{{ ui.range_bar('/expenses/list', range) }}
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>{{ rows|length }} expense{{ rows|length == 1 ? '' : 's' }}</h2>
+        <strong class="neg">{{ total|inr }}</strong>
+    </div>
+    {% if rows|length %}
+    <div class="table-wrap">
+        <table class="t">
+            <thead><tr><th>Date</th><th>What for</th><th>Paid by</th><th>Note</th><th>Added by</th><th class="num">Amount</th>{% if can('expenses.delete') %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for r in rows %}
+                <tr>
+                    <td>{{ r.date|dmy }}</td>
+                    <td class="strong">{{ r.category }}</td>
+                    <td>{{ r.mode }}</td>
+                    <td class="muted">{{ r.note }}</td>
+                    <td class="muted">{{ r.createdByName }}</td>
+                    <td class="num strong">{{ r.amount|inr }}</td>
+                    {% if can('expenses.delete') %}
+                    <td class="num"><button class="btn btn-sm btn-danger" type="button" hx-post="/expenses/{{ r.id }}/cancel" hx-confirm="Cancel this expense? It will no longer count in the Day Book." hx-swap="none">Cancel</button></td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="t-empty">No expenses in this period.</div>
+    {% endif %}
+</section>

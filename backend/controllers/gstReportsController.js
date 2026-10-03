@@ -7,17 +7,18 @@
  */
 'use strict';
 
-const { getLgpAdminConnection, getShopmanageConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 const { hasPermission } = require('../middleware/auth');
 const { getSeller } = require('../services/billingSeller');
 const { reportScope, salesFilter, stockFilter, loadRegistrations } = require('../services/registrations');
 const G = require('../services/gstReports');
-const { GstSettings, GstFiling, GstDocument } = require('../models/AppGst');
+const { GstSettings } = require('../models/AppGst');
+const Filings = require('../services/gstFilings');
 const crypto = require('crypto');
 const Notification = require('../models/Notification');
 
-const invoices = () => getLgpAdminConnection().db.collection('invoices');
-const Purchase = () => require('../models/Purchase')(getShopmanageConnection());
+const invoices = () => getConnection().db.collection('invoices');
+const Purchase = () => require('../models/Purchase')(getConnection());
 const fail = (res, code, message, extra = {}) => res.status(code).json({ success: false, message, ...extra });
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v) => (v == null ? '' : String(v).trim());
@@ -30,7 +31,6 @@ const DEFAULTS = { frequency: 'monthly', trackFrom: '', openingItc: { igst: 0, c
 // Settings are kept per registration (GSTIN): key 'main' for the firm's default GSTIN, 'gstin:<GSTIN>' for another one
 const settingsKey = (reg) => (!reg || reg.isDefault ? 'main' : `gstin:${reg.gstin}`);
 const filingKey = (reg) => (!reg || reg.isDefault ? '' : reg.gstin);
-const filingFilter = (reg) => (!reg || reg.isDefault ? { gstin: { $in: ['', null] } } : { gstin: reg.gstin });
 
 async function loadSettings(reg) {
     const key = settingsKey(reg);
@@ -87,8 +87,9 @@ async function fetchCreditNotes(sc, from, to) {
 const netOf = (lia, cn) => ({ igst: G.r2(lia.igst - cn.igst), cgst: G.r2(lia.cgst - cn.cgst), sgst: G.r2(lia.sgst - cn.sgst) });
 
 async function fetchPurchases(sc, from, to) {
-    const a = new Date(`${from}T00:00:00+05:30`), b = new Date(`${to}T23:59:59.999+05:30`);
-    return Purchase().find({ ...stockFilter(sc.branchIds), isDeleted: { $ne: true }, invoiceDate: { $gte: a, $lte: b } }).lean();
+    // the website keeps the invoice date as 'YYYY-MM-DD' text; the reports get the app's usual shape (see models/Purchase.js toApp)
+    const rows = await Purchase().find({ ...stockFilter(sc.branchIds), invoice_date: { $gte: from, $lte: to } }).lean();
+    return rows.map(require('../models/Purchase').toApp);
 }
 
 const validRange = (from, to) => YMD.test(from) && YMD.test(to) && from <= to && G.daysBetween(from, to) <= 366 * 5;
@@ -153,6 +154,7 @@ exports.updateSettings = async (req, res, next) => {
         const key = settingsKey(reg);
         await GstSettings.updateOne({ key }, { $set: { ...set, updatedBy: w.id, updatedByName: w.name }, $setOnInsert: { key } }, { upsert: true });
         const { settings } = await loadSettings(reg);
+        require('../services/audit').record(req, 'settings', key, `GST rules (${reg && reg.gstin ? reg.gstin : 'default'})`, 'changed', Object.keys(set).map((k) => ({ field: k, to: JSON.stringify(set[k]).slice(0, 180) })));
         res.json({ success: true, data: { settings } });
     } catch (e) { next(e); }
 };
@@ -241,7 +243,7 @@ exports.returns = async (req, res, next) => {
         const kind = p.kind === 'quarter' ? 'quarterly' : 'monthly';
         const ctx = { frequency: kind, stateCode: settings.stateCode };
         const months = p.months.map((m) => `${m.y}-${String(m.m).padStart(2, '0')}`);
-        const filings = await GstFiling.find({ ...filingFilter(reg), period: { $in: [key, ...months] } }).lean();
+        const filings = await Filings.list({ gstin: filingKey(reg), periods: [key, ...months] });
         const ITC = row ? row.itcInfo : { claim: G.zeroT(), atRisk: G.zeroT(), count: 0, riskCount: 0, purchaseValue: 0 };
         res.json({
             success: true,
@@ -300,7 +302,7 @@ exports.calendar = async (req, res, next) => {
         const sc = await scopeOf(req, res);
         if (!sc) return;
         const { settings } = await loadSettings(sc.registration);
-        const filings = await GstFiling.find(filingFilter(sc.registration)).lean();
+        const filings = await Filings.list({ gstin: filingKey(sc.registration) });
         const today = todayIST();
         const list = G.statusList(settings, filings, today, { back: 240, ahead: 270 });
         const recent = await Notification.find({ source: 'gst-due' }).sort({ createdAt: -1 }).limit(10).lean();
@@ -339,11 +341,8 @@ exports.listFilings = async (req, res, next) => {
     try {
         const sc = await scopeOf(req, res);
         if (!sc) return;
-        const f = { ...filingFilter(sc.registration) };
-        if (str(req.query.type)) f.returnType = str(req.query.type);
-        if (str(req.query.period)) f.period = str(req.query.period);
-        const rows = await GstFiling.find(f).sort({ filedOn: -1, createdAt: -1 }).limit(500).lean();
-        res.json({ success: true, data: rows });
+        const rows = await Filings.list({ gstin: filingKey(sc.registration), type: str(req.query.type) || undefined, period: str(req.query.period) || undefined });
+        res.json({ success: true, data: rows.slice(0, 500) });
     } catch (e) { next(e); }
 };
 
@@ -355,10 +354,11 @@ exports.createFiling = async (req, res, next) => {
         if (!f) return;
         const w = me(req);
         try {
-            const doc = await GstFiling.create({ ...f, gstin: filingKey(sc.registration), createdBy: w.id, createdByName: w.name });
+            const doc = await Filings.create({ ...f, gstin: filingKey(sc.registration), createdBy: w.id, createdByName: w.name });
+            require('../services/audit').record(req, 'gst_filing', doc._id, `${f.returnType} · ${f.period}`, 'recorded', [{ field: 'filed on', to: f.filedOn }]);
             res.status(201).json({ success: true, data: doc });
         } catch (e) {
-            if (e.code === 11000) return fail(res, 409, `${f.returnType} for this period is already recorded. Edit it instead.`);
+            if (e.code === 'DUPLICATE') return fail(res, 409, `${f.returnType} for this period is already recorded. Edit it instead.`);
             throw e;
         }
     } catch (e) { next(e); }
@@ -366,14 +366,15 @@ exports.createFiling = async (req, res, next) => {
 
 exports.updateFiling = async (req, res, next) => {
     try {
-        const cur = await GstFiling.findById(req.params.id).lean().catch(() => null);
+        const cur = await Filings.get(req.params.id).catch(() => null);
         if (!cur) return fail(res, 404, 'Filing record not found');
         const sc = await reportScope(req, { gstin: cur.gstin || '' });
         if (sc.error) return fail(res, 403, sc.error);
         const f = readFiling({ ...cur, ...(req.body || {}), returnType: cur.returnType, period: cur.period }, res);
         if (!f) return;
         const w = me(req);
-        const doc = await GstFiling.findByIdAndUpdate(req.params.id, { $set: { ...f, updatedBy: w.id, updatedByName: w.name } }, { new: true });
+        const doc = await Filings.update(req.params.id, { ...f, updatedBy: w.id, updatedByName: w.name });
+        require('../services/audit').record(req, 'gst_filing', doc._id, `${f.returnType} · ${f.period}`, 'updated', []);
         res.json({ success: true, data: doc });
     } catch (e) { next(e); }
 };
@@ -433,10 +434,22 @@ exports.monthlyRecord = async (req, res, next) => {
         const documentId = 'GST-' + crypto.createHash('md5').update(`${label}${now.toISOString()}${req.user._id}`).digest('hex').slice(0, 6).toUpperCase();
         const ist = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now).replace(/\//g, '-').replace(',', '');
         const w = me(req);
-        await GstDocument.create({
-            documentId, documentName: `GST_Invoice_Record_${rec.period.monthName}_${year}.pdf`, year, month, totalInvoices: rec.tracking.total, validInvoices: rec.tracking.valid,
-            totalAmount: rec.totals.amount, totalGst: rec.totals.gst, taxableAmount: rec.totals.taxable, partial, generatedBy: w.id, generatedByName: w.name, branchId: (req.branchScope && req.branchScope.branchId) || 'main', gstin: seller.gstin, branchFilter: str(req.query.branch),
-        }).catch(() => {});        // the audit row must never block the report
+        // One log of generated GST records for the app, the new website and the old website: the website's own `outputDoc`
+        // (its field names), plus what only the app knows. The log row must never block the report.
+        const stamp = require('../models/Purchase').istStamp(now);
+        await getConnection().db.collection('outputDoc').insertOne({
+            document_id: documentId, user_id: w.id, user_name: w.name,
+            document_name: `GST_Invoice_Record_${rec.period.monthName}_${year}.pdf`, document_type: 'GST_MONTHLY_REPORT',
+            generation_timestamp: stamp, generation_timestamp_ist: `${ist} IST`,
+            month, year, month_name: rec.period.monthName,
+            total_invoices: rec.tracking.total, valid_invoices_count: rec.tracking.valid,
+            total_amount: rec.totals.amount, total_gst: rec.totals.gst, taxable_amount: rec.totals.taxable,
+            cgst_amount: rec.totals.cgst || 0, sgst_amount: rec.totals.sgst || 0,
+            date_range: { start_date: from, end_date: to },
+            file_size_bytes: null, status: 'generated', ip_address: req.ip || null, user_agent: req.get ? (req.get('user-agent') || null) : null,
+            created_at: stamp, updated_at: stamp,
+            partial, branchId: (req.branchScope && req.branchScope.branchId) || 'main', gstin: seller.gstin, branchFilter: str(req.query.branch), source: 'app',
+        }).catch(() => {});
         res.json({
             success: true,
             data: {
@@ -450,4 +463,4 @@ exports.monthlyRecord = async (req, res, next) => {
 };
 
 exports._loadSettings = loadSettings;
-exports._filingFilter = filingFilter;
+exports._filingKey = filingKey;

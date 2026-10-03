@@ -1,0 +1,40 @@
+{% extends 'app.twig' %}
+{% block title %}{{ e.number }}{% endblock %}
+{% block heading %}{{ e.number }}{% endblock %}
+
+{% block content %}
+{% set tone = {open: 'blue', converted: 'green', expired: 'amber', cancelled: 'grey'}[e.status]|default('grey') %}
+<div class="page-head">
+    <div>
+        <h1>{{ e.customerName }} <span class="pill pill-{{ tone }}">{{ {open: 'Open', converted: 'Billed', expired: 'Expired', cancelled: 'Cancelled'}[e.status]|default(e.status) }}</span></h1>
+        <p class="muted">{{ e.number }} · {{ e.date|dmy }} · valid till {{ e.validTill|dmy }}{% if e.customerMobile %} · {{ e.customerMobile }}{% endif %}{% if e.createdByName %} · by {{ e.createdByName }}{% endif %}</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/estimates/{{ e.id }}/print" target="_blank" rel="noopener">{{ icon('receipt', 17) }} Print</a>
+        {% if e.status in ['open', 'expired'] and can('billing.create') and e.status == 'open' %}<a class="btn btn-primary" href="/billing/new?estimate={{ e.id }}">Make the bill</a>{% endif %}
+        {% if e.status == 'open' and can('estimates.create') %}<button class="btn btn-danger" type="button" hx-delete="/estimates/{{ e.id }}" hx-confirm="Cancel this estimate?" hx-swap="none">Cancel estimate</button>{% endif %}
+        <a class="btn" href="/estimates">All estimates</a>
+    </div>
+</div>
+<section class="panel">
+    <div class="panel-head"><h2>Items</h2><span class="muted small">Gold {{ e.goldRate|inr(0) }} · Silver {{ e.silverRate|inr(0) }} per gram</span></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Item</th><th class="num">Net wt</th><th class="num">Rate</th><th class="num">Making</th><th class="num">Taxable</th><th class="num">Total</th></tr></thead>
+        <tbody>{% for i in e.items %}
+            <tr><td class="strong">{{ i.particulars }}</td><td class="num">{{ i.net_wt|grams }}</td><td class="num">{{ i.rate|inr(0) }}</td><td class="num">{{ i.making_charge|inr }}</td><td class="num">{{ i.taxable_amount|inr }}</td><td class="num strong">{{ i.total|inr }}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+</section>
+<section class="panel">
+    <div class="panel-head"><h2>Amount</h2></div>
+    <div class="panel-body kv">
+        <div class="kv-row"><span>Taxable value</span><strong>{{ e.totals.taxable|inr }}</strong></div>
+        {% if e.totals.igst > 0 %}<div class="kv-row"><span>IGST</span><strong>{{ e.totals.igst|inr }}</strong></div>
+        {% else %}<div class="kv-row"><span>CGST + SGST</span><strong>{{ (e.totals.cgst + e.totals.sgst)|inr }}</strong></div>{% endif %}
+        {% if e.additionalCharges > 0 %}<div class="kv-row"><span>Extra charge</span><strong>{{ e.additionalCharges|inr }}</strong></div>{% endif %}
+        {% if e.totals.discount > 0 %}<div class="kv-row"><span>Discount</span><strong class="neg">− {{ e.totals.discount|inr }}</strong></div>{% endif %}
+        <div class="kv-row total"><span>Estimate total</span><strong>{{ e.totals.payable|inr(0) }}</strong></div>
+    </div>
+    {% if e.note %}<div class="panel-body"><p class="muted">{{ e.note }}</p></div>{% endif %}
+</section>
+{% endblock %}

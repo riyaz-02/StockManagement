@@ -4,7 +4,7 @@
 
 'use strict';
 
-const { getShopmanageConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 const {
     validateGSTIN,
     validatePAN,
@@ -17,7 +17,7 @@ const {
 
 let _GstConfig;
 function getGstConfigModel() {
-    if (!_GstConfig) _GstConfig = require('../models/GstConfig')(getShopmanageConnection());
+    if (!_GstConfig) _GstConfig = require('../models/GstConfig')(getConnection());
     return _GstConfig;
 }
 

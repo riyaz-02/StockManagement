@@ -16,7 +16,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { getLgpAdminConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 const { hasPermission } = require('../middleware/auth');
 const { MAIN_BRANCH, resolveBranch, Branch } = require('../utils/branches');
 const V = require('../utils/directoryValidators');
@@ -24,12 +24,12 @@ const Lookups = require('../services/directoryLookups');
 const AuditLog = require('../models/AuditLog');
 
 const models = {
-    customer: () => require('../models/directory/LgpCustomer')(getLgpAdminConnection()),
-    staffUser: () => require('../models/directory/LgpStaffUser')(getLgpAdminConnection()),
-    staffProfile: () => require('../models/directory/DirectoryStaffProfile')(getLgpAdminConnection()),
-    supplier: () => require('../models/directory/DirectoryParty').supplier(getLgpAdminConnection()),
-    karigar: () => require('../models/directory/DirectoryParty').karigar(getLgpAdminConnection()),
-    customerProfile: () => require('../models/directory/DirectoryCustomerProfile')(getLgpAdminConnection()),
+    customer: () => require('../models/directory/LgpCustomer')(getConnection()),
+    staffUser: () => require('../models/directory/LgpStaffUser')(getConnection()),
+    staffProfile: () => require('../models/directory/DirectoryStaffProfile')(getConnection()),
+    supplier: () => require('../models/directory/DirectoryParty').supplier(getConnection()),
+    karigar: () => require('../models/directory/DirectoryParty').karigar(getConnection()),
+    customerProfile: () => require('../models/directory/DirectoryCustomerProfile')(getConnection()),
 };
 const { SAFE_FIELDS } = require('../models/directory/LgpStaffUser');
 
@@ -196,17 +196,8 @@ const LEGACY_PHONE_FIELDS = ['whatsapp_no', 'mobile_no', 'mobile_no_3', 'mobile_
 const CUSTOMER_LEGACY_AUDIT = ['customer_name', 'customer_name_bengali', 'address', 'whatsapp_no', 'mobile_no', 'mobile_no_3', 'mobile_no_4', 'email', 'nickname', 'reference_customer_id', 'notification_type'];
 const CUSTOMER_PROFILE_AUDIT = ['membershipStatus', 'customerType', 'nicknameBn', 'addressBn', 'fatherName', 'gender', 'dob', 'anniversary', 'contacts', 'city', 'state', 'country', 'pincode', 'referredBy', 'businessName', 'gstNo', 'panNo', 'aadharNo', 'taxNo', 'notes', 'opening'];
 
-// LGPAdmin-format ID: LGP + yymmdd + 3 hex (unique among app profiles).
-async function newCustomerCode() {
-    const d = new Date();
-    const ymd = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    for (let i = 0; i < 20; i++) {
-        const code = `LGP${ymd}${crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3)}`;
-        if (!(await models.customerProfile().exists({ customerCode: code }))) return code;
-    }
-    // Extremely unlikely: fall back to a longer suffix rather than fail.
-    return `LGP${ymd}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-}
+// LGPAdmin-format ID: LGP + yymmdd + 3 hex (unique among app profiles): one generator, shared with the other customer flows.
+const { newCustomerCode, nextSerial } = require('../services/customerStore');
 
 // All phone numbers a legacy customer + its profile carry.
 const phonesOf = (c, profile) => {
@@ -456,7 +447,6 @@ exports.createCustomer = async (req, res, next) => {
         const referral = await resolveReferral(b);
         if (referral.error) return fail(res, 400, referral.error);
 
-        const last = await Customer.findOne({}).select('sl_no').sort({ sl_no: -1 }).lean();
         const now = new Date();
         const me = whoAmI(req);
         const branch = await branchFor(req, b.branchId);
@@ -479,7 +469,7 @@ exports.createCustomer = async (req, res, next) => {
             created_by_name: me.name,
             created_at: now,
             updated_at: now,
-            sl_no: ((last && last.sl_no) || 0) + 1,
+            sl_no: await nextSerial(),   // the website's rule: highest among customers that are not deleted, plus one
         });
 
         const profile = await models.customerProfile().create({
@@ -576,6 +566,34 @@ exports.updateCustomer = async (req, res, next) => {
         ], profAfter && profAfter.branchId);
 
         res.json({ success: true, data: await customerWithProfile(before._id) });
+    } catch (e) { next(e); }
+};
+
+/**
+ * PUT /api/directory/customers/:id/partial  (for clients that only edit a few fields, e.g. the website)
+ * Takes the same body as the full update but only the fields that should change: everything else is filled in from what is
+ * stored, so a partial edit can never clear phone numbers, opening balance, referral or the other details.
+ */
+exports.patchCustomer = async (req, res, next) => {
+    try {
+        const cur = await customerWithProfile(req.params.id);
+        if (!cur) return fail(res, 404, 'Customer not found');
+        const pr = cur.profile || {};
+        const legacy = [[cur.whatsapp_no, 'whatsapp'], [cur.mobile_no, 'mobile'], [cur.mobile_no_3, 'mobile'], [cur.mobile_no_4, 'mobile']].filter((x) => x[0]).map((x) => ({ number: x[0], label: x[1] }));
+        const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : undefined);
+        const base = {
+            name: cur.customer_name, nameBengali: cur.customer_name_bengali, address: cur.address, email: cur.email, nickname: cur.nickname,
+            notificationType: cur.notification_type,
+            contacts: (pr.contacts && pr.contacts.length ? pr.contacts : legacy).map((c) => ({ number: c.number, label: c.label })),
+            gender: pr.gender, membershipStatus: pr.membershipStatus, customerType: pr.customerType, nicknameBengali: pr.nicknameBn, addressBengali: pr.addressBn,
+            fatherName: pr.fatherName, dob: day(pr.dob), anniversary: day(pr.anniversary), city: pr.city, state: pr.state, country: pr.country, pincode: pr.pincode,
+            businessName: pr.businessName, gstNo: pr.gstNo, panNo: pr.panNo, aadharNo: pr.aadharNo, taxNo: pr.taxNo, notes: pr.notes, opening: pr.opening,
+            referredById: pr.referredBy && pr.referredBy.customerId ? String(pr.referredBy.customerId) : undefined,
+            referredByText: pr.referredBy && !pr.referredBy.customerId ? pr.referredBy.text : undefined,
+            expectedUpdatedAt: cur.updated_at,
+        };
+        req.body = { ...base, ...(req.body || {}) };
+        return exports.updateCustomer(req, res, next);
     } catch (e) { next(e); }
 };
 

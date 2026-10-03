@@ -8,7 +8,8 @@ const bookingSchema = new mongoose.Schema({
     },
     customerId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Customer'
+        // the website's customer (customers collection); see services/customerStore.js
+        ref: 'LgpCustomer'
     },
     customerName: {
         type: String,

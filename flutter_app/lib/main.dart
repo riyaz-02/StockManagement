@@ -16,11 +16,16 @@ import 'screens/main_navigation_screen.dart';
 import 'utils/app_colors.dart';
 import 'utils/app_toast.dart';
 import 'services/push_notification_service.dart';
+import 'services/live_reactions.dart';
+import 'services/presence_service.dart';
 
 /// Global route observer — used by scanner screens to stop/start the camera
 /// when navigating away and returning.
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
+
+/// Reports the top-most named screen to PresenceService, for the website's Staff & Roles > Live now.
+final PresenceRouteObserver presenceRouteObserver = PresenceRouteObserver();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +40,7 @@ void main() async {
   // added yet — the rest of the app must keep working regardless.
   await initializeFirebase();
 
+  LiveReactions.attach();
   runApp(const MyApp());
 }
 
@@ -169,7 +175,7 @@ class MyApp extends StatelessWidget {
               );
             },
             home: const SplashScreen(),
-            navigatorObservers: [routeObserver],
+            navigatorObservers: [routeObserver, presenceRouteObserver],
           );
         },
       ),

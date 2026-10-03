@@ -1,0 +1,8 @@
+<div class="chips">
+    {% for q, label in {month: 'This month', last: 'Last month', quarter: 'This quarter', year: 'This financial year'} %}
+        <a class="chip{{ range.quick == q ? ' is-on' : '' }}" href="/gst?{{ {tab: tab, gstin: gstin, quick: q}|url_encode }}">{{ label }}</a>
+    {% endfor %}
+</div>
+<input type="date" name="from" value="{{ range.from }}" aria-label="From" data-autosubmit>
+<span class="muted">to</span>
+<input type="date" name="to" value="{{ range.to }}" aria-label="To" data-autosubmit>

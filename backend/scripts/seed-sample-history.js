@@ -231,16 +231,16 @@ function buildInvoice({ shop, number, date, customer, legacy, cashByDay }) {
 async function main() {
     const client = await MongoClient.connect(URI);
     const mongoose = require('mongoose');
-    await mongoose.connect(`${URI}/jewellery_stock_dev`);
+    await mongoose.connect(`${URI}/lgp_dev`);   // ONE database: the website's, with the app's collections in it
     const Branch = require('../models/Branch');
     const User = require('../models/User');
     const lgp = client.db('lgp_dev');
-    const shopmanage = client.db('shopmanage_dev');
-    const app = client.db('jewellery_stock_dev');
+    const shopmanage = client.db('lgp_dev');
+    const app = client.db('lgp_dev');
 
     // leftovers of the automated tests (api-smoke.js) do not belong in a realistic shop
     await app.collection('app_branches').deleteMany({ name: /^SMOKE/ });
-    await app.collection('users').deleteMany({ name: /^SMOKE/ });
+    await app.collection('users').deleteMany({ full_name: /^SMOKE/ });
 
     // branches + their staff logins
     const staffOf = {};
@@ -254,7 +254,7 @@ async function main() {
     const staffLogins = [['9000000011', 'Bagbazar Staff', SHOPS[1]], ['9000000012', 'Mumbai Staff', SHOPS[2]], ['9000000013', 'Main Counter Staff', SHOPS[0]]];
     for (const [mobile, name, shop] of staffLogins) {
         let u = await User.findOne({ mobile });
-        if (!u) u = await User.create({ name, mobile, password: 'Staff@123', role: 'staff', branchId: shop.id, branchName: shop.name });
+        if (!u) u = await User.create(User.forCreate({ name, mobile, password: 'Staff@123', role: 'staff', branchId: shop.id, branchName: shop.name }));
         else { u.branchId = shop.id; u.branchName = shop.name; await u.save(); }
         shop.staff = [name === 'Main Counter Staff' ? 'Admin' : name, name];
     }
@@ -264,7 +264,7 @@ async function main() {
         await lgp.collection('invoices').deleteMany({});
         await lgp.collection('shop_info').deleteMany({});
         await shopmanage.collection('purchases').deleteMany({ sample_history: true });
-        await app.collection('app_gst_filings').deleteMany({ sample_history: true });
+        await client.db('lgp_dev').collection('gst_data').deleteMany({ sample_history: true });
     }
 
     // invoices, month by month
@@ -329,11 +329,17 @@ async function main() {
                 const gst = Math.round(amt * 0.03 * 100) / 100;
                 const half = Math.round(gst * 50) / 100;
                 pn++;
+                const made = new Date(`${date}T06:00:00Z`);
+                const stamp = `${date} 11:30:00`;
                 purchases.push({
-                    invoiceDate: new Date(`${date}T00:00:00+05:30`), invoiceNumber: `SUP/${y}/${pad(m)}/${pad(pn, 4)}`, metalType: silver ? 'silver' : 'gold', biller: name, quantity: qty, rate,
+                    // the website's own fields (the one shared `purchases` collection: see models/Purchase.js)
+                    invoice_date: date, invoice_number: `SUP/${y}/${pad(m)}/${pad(pn, 4)}`, metal_type: silver ? 'Silver' : 'Gold', biller: name, description: silver ? 'SILVER BAR' : 'GOLD BAR (99.50%)',
+                    quantity: qty, rate, total_amount: Math.round((amt + gst) * 100) / 100,
+                    created_at: made, created_ist: stamp, created_by: 'seed', created_by_name: 'Sample', updated_at: made, updated_ist: stamp, updated_by: 'seed', updated_by_name: 'Sample',
+                    // what only the app records
                     totalAmount: amt, gstRate: 3, cgstAmount: same ? half : 0, sgstAmount: same ? half : 0, igstAmount: same ? 0 : gst, totalGst: gst,
                     transactionType: same ? 'intra-state' : 'inter-state', hsnCode: '7113', billerGstin: gstin, itcCgst: same ? half : 0, itcSgst: same ? half : 0, itcIgst: same ? 0 : gst, totalItc: gst,
-                    effectiveCost: amt, totalPayable: amt + gst, isDeleted: false, createdAt: new Date(`${date}T06:00:00Z`), updatedAt: new Date(`${date}T06:00:00Z`), branchId: shop.id, sample_history: true,
+                    effectiveCost: amt, totalPayable: Math.round((amt + gst) * 100) / 100, branchId: shop.id, source: 'app', sample_history: true,
                 });
             }
         }
@@ -372,8 +378,14 @@ async function main() {
     filings.push({ ...base, returnType: 'GSTR-3B', period: '2026-Q1', filedOn: '2026-07-21', arn: 'AA2707260058113', taxLiability: q1tax, itcUsed: 0, cashPaid: q1tax });
     filings.push({ ...base, returnType: 'PMT-06', period: '2026-07', filedOn: '2026-08-23', arn: 'AA2708260012204', taxLiability: 0, itcUsed: 0, cashPaid: 0 });
     for (const f of filings) f.cashPaid = Math.max(0, Math.round((f.taxLiability - f.itcUsed) * 100) / 100);
-    await app.collection('app_gst_filings').deleteMany({ sample_history: true });
-    if (filings.length) await app.collection('app_gst_filings').insertMany(filings, { ordered: false }).catch((e) => console.log('filings:', e.message));
+    // filed returns are kept in the website's own `gst_data` (one document per quarter), the same way the app records them
+    const Filings = require('../services/gstFilings');
+    const gstDb = client.db('lgp_dev');
+    await gstDb.collection('gst_data').deleteMany({ sample_history: true });
+    for (const f of filings) {
+        const { sample_history, createdAt, updatedAt, ...rest } = f;
+        await Filings.create({ ...rest, createdBy: '', createdByName: 'Admin' }, { db: gstDb, extra: { sample_history: true } }).catch((e) => console.log('filing:', f.returnType, f.period, e.message));
+    }
 
     // settings: follow the year from April 2025, opening credit as carried from the previous year
     await app.collection('app_gst_settings').updateOne({ key: 'main' }, { $set: { key: 'main', frequency: 'monthly', trackFrom: '2025-04', remindersFrom: '2025-04', openingItc: { igst: 0, cgst: 12500, sgst: 12500 } } }, { upsert: true });

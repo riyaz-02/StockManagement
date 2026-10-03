@@ -1,0 +1,15 @@
+{% set gold = rate.gold|default(0) %}
+{% set silver = rate.silver|default(0) %}
+{% set state = (gold <= 0 and silver <= 0) ? 'never' : (rate.updatedToday|default(false) ? 'fresh' : 'old') %}
+<div class="rate rate-{{ state }}">
+    <div class="rate-cell"><small>{{ t('rate.gold') }}</small><strong>{{ gold > 0 ? gold|inr(gold == gold|round ? 0 : 2) : '—' }}</strong></div>
+    <div class="rate-cell"><small>{{ t('rate.silver') }}</small><strong>{{ silver > 0 ? silver|inr(silver == silver|round ? 0 : 2) : '—' }}</strong></div>
+    <div class="rate-note">
+        {% if state == 'never' %}{{ t('rate.never') }}
+        {% elseif state == 'fresh' %}{{ t('rate.set_today') }}{% if rate.updatedByName|default('') %} · {{ rate.updatedByName }}{% endif %}
+        {% else %}{{ t('rate.old') }}{% endif %}
+    </div>
+    {% if can_edit %}
+        <button class="icon-btn" type="button" hx-get="/partials/rate-form" hx-target="#modal-body" hx-swap="innerHTML" title="{{ t('rate.change') }}" aria-label="{{ t('rate.change') }}">{{ icon('edit', 17) }}</button>
+    {% endif %}
+</div>

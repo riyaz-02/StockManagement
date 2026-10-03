@@ -1,0 +1,17 @@
+{% extends 'gst/base.twig' %}
+{% block controls %}<span class="muted small">Filing dates and whether each return is done. Today is {{ cal.today|default(today)|dmy }}.</span>{% endblock %}
+
+{% block tabbody %}
+{% set tones = {filed: 'green', upcoming: 'amber', 'due-soon': 'amber', overdue: 'red'} %}
+<section class="panel">
+    {% if cal.items|default([])|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Return</th><th>For</th><th>Due date</th><th>Status</th></tr></thead>
+        <tbody>{% for it in cal.items|reverse %}
+            <tr><td class="strong">{{ it.title }}</td><td>{{ it.periodLabel }}</td><td>{{ it.due|dmy }}<small>{{ it.status == 'filed' ? '' : (it.daysLeft < 0 ? (-it.daysLeft) ~ ' days late' : (it.daysLeft == 0 ? 'today' : 'in ' ~ it.daysLeft ~ ' days')) }}</small></td>
+                <td><span class="pill pill-{{ tones[it.status]|default('grey') }}">{{ it.status == 'filed' ? 'Filed ' ~ it.filing.filedOn|dmy : (it.status|pretty) }}</span>{% if it.filing.arn|default('') %}<small>{{ it.filing.arn }}</small>{% endif %}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="t-empty">Nothing to show yet.</div>{% endif %}
+</section>
+{% endblock %}

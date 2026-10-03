@@ -1,0 +1,6 @@
+/vendor/
+/.env
+/storage/throttle/*
+/storage/twig/
+/storage/*.json
+!/storage/throttle/.gitkeep

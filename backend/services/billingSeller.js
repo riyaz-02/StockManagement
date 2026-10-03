@@ -28,8 +28,8 @@ async function getSeller() {
         gstin: process.env.SELLER_GSTIN || DEFAULTS.gstin,
     };
     try {
-        const { getShopmanageConnection } = require('../config/db');
-        const cfg = await require('../models/GstConfig')(getShopmanageConnection()).findOne({ isActive: true }).lean();
+        const { getConnection } = require('../config/db');
+        const cfg = await require('../models/GstConfig')(getConnection()).findOne({ isActive: true }).lean();
         if (cfg) {
             if (cfg.firmName) s.firmName = cfg.firmName;
             if (cfg.gstin) { s.gstin = cfg.gstin; s.stateCode = cfg.stateCode || cfg.gstin.slice(0, 2); }

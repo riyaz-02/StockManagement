@@ -1,0 +1,15 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.dues') }}{% endblock %}
+{% block heading %}{{ t('nav.dues') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ t('nav.dues') }}</h1><p class="muted">Who still owes the shop money, biggest first.</p></div>
+</div>
+<form class="toolbar" hx-get="/dues/list" hx-target="#dues-block" hx-trigger="input changed delay:300ms from:find input, submit">
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" placeholder="Search name, mobile or bill number" autocomplete="off"></div>
+</form>
+<div id="dues-block" class="live-block" hx-get="/dues/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

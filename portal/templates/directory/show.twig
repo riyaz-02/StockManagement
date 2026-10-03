@@ -1,0 +1,47 @@
+{% extends 'app.twig' %}
+{% block title %}{{ c.customer_name }}{% endblock %}
+{% block heading %}Customer{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ c.customer_name }}{% if p.membershipStatus == 'VIP' %} <span class="pill pill-amber">VIP</span>{% endif %}</h1>
+        <p class="muted">{% if p.customerCode %}{{ p.customerCode }} · {% endif %}{{ c.whatsapp_no ?: c.mobile_no }}{% if c.customer_name_bengali %} · {{ c.customer_name_bengali }}{% endif %}</p>
+    </div>
+    <div class="actions">
+        {% if can('billing.create') %}<a class="btn btn-primary" href="/billing/new?customer={{ c._id }}">New bill</a>{% endif %}
+        {% if can('directory.edit') %}<a class="btn" href="/directory/customers/{{ c._id }}/edit">Edit</a>{% endif %}
+        <a class="btn" href="/directory">All people</a>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat"><span>Owes you</span><strong class="{{ sum.totalDue|default(0) > 0 ? 'neg' : '' }}">{{ sum.totalDue|default(0)|inr }}</strong></div>
+    <div class="stat"><span>Bought so far</span><strong>{{ sum.totalPurchases|default(0)|inr(0) }}</strong><small>{{ sum.invoices|default(0) }} bills</small></div>
+</div>
+
+<div class="grid grid-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Contact</h2></div>
+        <div class="panel-body kv">
+            {% for k in p.contacts|default([]) %}<div class="kv-row"><span>{{ k.label|capitalize }}</span><strong>{{ k.number }}</strong></div>
+            {% else %}{% if c.whatsapp_no %}<div class="kv-row"><span>Mobile</span><strong>{{ c.whatsapp_no }}</strong></div>{% endif %}{% if c.mobile_no %}<div class="kv-row"><span>Mobile 2</span><strong>{{ c.mobile_no }}</strong></div>{% endif %}{% endfor %}
+            {% if c.email %}<div class="kv-row"><span>Email</span><strong>{{ c.email }}</strong></div>{% endif %}
+            {% if c.address %}<div class="kv-row"><span>Address</span><strong>{{ c.address }}</strong></div>{% endif %}
+            {% if p.city or p.state or p.pincode %}<div class="kv-row"><span>Place</span><strong>{{ [p.city, p.state, p.pincode]|filter(v => v)|join(', ') }}</strong></div>{% endif %}
+            {% if p.gstNo %}<div class="kv-row"><span>GSTIN</span><strong>{{ p.gstNo }}</strong></div>{% endif %}
+            {% if p.panNo %}<div class="kv-row"><span>PAN</span><strong>{{ p.panNo }}</strong></div>{% endif %}
+            {% if p.notes %}<div class="kv-row"><span>Note</span><strong>{{ p.notes }}</strong></div>{% endif %}
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-head"><h2>Recent bills</h2></div>
+        {% if sum.recent|default([])|length %}
+        <div class="table-wrap"><table class="t">
+            <thead><tr><th>Bill</th><th class="num">Total</th><th class="num">Due</th></tr></thead>
+            <tbody>{% for r in sum.recent %}<tr class="is-link" data-href="/billing/{{ r._id }}"><td><a class="row-link" href="/billing/{{ r._id }}">{{ r.invoiceNumber }}</a><small>{{ r.invoiceDate|dmy }}</small></td><td class="num">{{ r.totalPayableAmount|inr(0) }}</td><td class="num">{{ r.dueAmount > 0 ? r.dueAmount|inr : '–' }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}<div class="t-empty">No bills yet.</div>{% endif %}
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% if c %}
+<div class="kv">
+    <div class="kv-row"><span>Weight · rate</span><strong>{{ c.quantity|grams }} · {{ c.rate|inr(0) }}</strong></div>
+    <div class="kv-row"><span>Taxable value</span><strong>{{ c.totalAmount|inr }}</strong></div>
+    {% if c.transactionType == 'inter-state' %}<div class="kv-row"><span>IGST {{ c.gstRate }}%</span><strong>{{ c.igstAmount|inr }}</strong></div>
+    {% else %}<div class="kv-row"><span>CGST</span><strong>{{ c.cgstAmount|inr }}</strong></div><div class="kv-row"><span>SGST</span><strong>{{ c.sgstAmount|inr }}</strong></div>{% endif %}
+    <div class="kv-row total"><span>Total payable</span><strong>{{ c.totalPayable|inr }}</strong></div>
+    <div class="kv-row"><span>GST claimed back</span><strong class="pos">{{ c.totalItc|inr }}</strong></div>
+    {% if c.tdsApplicable %}<div class="kv-row"><span>TDS {{ c.tdsRate }}%</span><strong>{{ c.tdsAmount|inr }}</strong></div><div class="kv-row"><span>Net to pay</span><strong>{{ c.netPayable|inr }}</strong></div>{% endif %}
+</div>
+{% elseif err %}<p class="notice notice-error" role="alert">{{ err }}</p>
+{% else %}<p class="muted">Enter the weight and the rate to see the amount.</p>{% endif %}

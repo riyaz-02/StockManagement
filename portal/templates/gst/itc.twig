@@ -1,0 +1,23 @@
+{% extends 'gst/base.twig' %}
+{% macro tot(o) %}{{ (o.igst + o.cgst + o.sgst)|inr(0) }}{% endmacro %}
+{% block controls %}<span class="muted small">Credit for GST paid on your purchases, and how it is used against the GST on sales, {{ i.frequency|default('monthly') }}.</span>{% endblock %}
+
+{% block tabbody %}
+{% if i.current is defined %}
+<div class="stats">
+    <div class="stat"><span>Carried forward from before</span><strong>{{ i.carriedTotal|inr(0) }}</strong></div>
+    <div class="stat"><span>Available now (with this period's purchases)</span><strong>{{ i.availableNowTotal|inr(0) }}</strong></div>
+    <div class="stat"><span>This period: {{ i.current.label }}</span><strong>{{ (i.current.added.cgst + i.current.added.sgst + i.current.added.igst)|inr(0) }}</strong><small>credit added from purchases</small></div>
+    <div class="stat"><span>Cash tax expected this period</span><strong>{{ (i.current.cash.cgst + i.current.cash.sgst + i.current.cash.igst)|inr(0) }}</strong></div>
+</div>
+{% if i.current.itcInfo.riskCount|default(0) > 0 %}<div class="notice notice-info">{{ i.current.itcInfo.riskCount }} purchase(s) this period are from suppliers without a GSTIN: their GST cannot be claimed.</div>{% endif %}
+<section class="panel"><div class="panel-head"><h2>Credit period by period</h2></div>
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Period</th><th class="num">Brought forward</th><th class="num">Added</th><th class="num">Tax on sales</th><th class="num">Cash paid</th><th class="num">Carried forward</th></tr></thead>
+        <tbody>{% for x in i.rows|reverse %}
+            <tr><td class="strong">{{ x.label }}</td><td class="num">{{ _self.tot(x.opening) }}</td><td class="num">{{ _self.tot(x.added) }}</td><td class="num">{{ _self.tot(x.liability) }}</td><td class="num">{{ _self.tot(x.cash) }}</td><td class="num strong">{{ _self.tot(x.closing) }}</td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
+{% endblock %}

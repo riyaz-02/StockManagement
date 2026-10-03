@@ -16,14 +16,23 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Check if user exists (include password for comparison)
-        const user = await User.findOne({ mobile }).select('+password');
+        // The app signs in with a mobile number; the website's people also have a username / e-mail: all three work
+        const user = await User.findByLogin(mobile, true);
 
         if (!user) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid credentials'
             });
+        }
+
+        // A temporary sign-in gate (Admin Control > App updates); admin/owner can always still get in to turn it off.
+        if (!['admin', 'owner'].includes(user.role)) {
+            const AppVersion = require('../models/AppVersion');
+            const cfg = await AppVersion.findOne({ isActive: true }).select('maintenanceMode').lean();
+            if (cfg && cfg.maintenanceMode && cfg.maintenanceMode.enabled) {
+                return res.status(503).json({ success: false, message: cfg.maintenanceMode.message || 'The app is temporarily unavailable. Please try again shortly.', maintenance: true });
+            }
         }
 
         // Check if user is active
@@ -44,6 +53,9 @@ exports.login = async (req, res) => {
             });
         }
 
+        // The website shows "last login" for everyone: a sign-in from the app counts too
+        User.updateOne({ _id: user._id }, { $set: { last_login: new Date(), last_login_ist: User.istText() } }).catch(() => {});
+
         // Generate token
         const token = generateToken(user._id);
 
@@ -55,7 +67,8 @@ exports.login = async (req, res) => {
                 user: {
                     id: user._id,
                     name: user.name,
-                    mobile: user.mobile,
+                    mobile: user.mobile || '',
+                    username: user.username || '',
                     role: user.role,
                     language: user.language,
                     branchId: user.branchId || 'main',
@@ -87,24 +100,17 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ mobile });
-
-        if (existingUser) {
+        // Check if user already exists (the website's people count too: mobile, username or e-mail)
+        const clash = await User.taken({ mobile, username: mobile });
+        if (clash) {
             return res.status(400).json({
                 success: false,
-                message: 'User with this mobile number already exists'
+                message: `User with this ${clash} already exists`
             });
         }
 
-        // Create user
-        const user = await User.create({
-            name,
-            mobile,
-            password,
-            role: role || 'staff',
-            language: language || 'en'
-        });
+        // Create user (in the website's own format, so the website treats them as one of its own)
+        const user = await User.create(User.forCreate({ name, mobile, password, role: role || 'staff', language: language || 'en' }));
 
         res.status(201).json({
             success: true,

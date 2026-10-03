@@ -1,0 +1,55 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}New purchase{% endblock %}
+{% block heading %}New purchase{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>New purchase</h1><p class="muted">A bill from a supplier. GST, input credit and TDS are worked out for you.</p></div></div>
+<form method="post" action="/purchases" class="bill-layout" data-no-enter novalidate
+      hx-post="/purchases/calc" hx-target="#totals" hx-swap="innerHTML" hx-trigger="input delay:400ms, change delay:200ms" hx-sync="this:replace">
+    {{ csrf_field() }}
+    <div class="bill-main">
+        {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+        <section class="panel"><div class="panel-head"><h2>Supplier and bill</h2></div><div class="panel-body"><div class="form-grid">
+            <label class="field span-2"><span>Supplier *</span>
+                <input type="text" name="biller" value="{{ v.biller|default('') }}" list="suppliers" autocomplete="off" placeholder="Name of the supplier">
+                <datalist id="suppliers">{% for s in sug.suppliers|default([]) %}<option value="{{ s }}">{% endfor %}</datalist>
+            </label>
+            {{ ui.field('Supplier GSTIN', 'billerGstin', v.billerGstin|default(''), {hint: 'Leave empty for an unregistered supplier.'}) }}
+            {{ ui.field('Supplier bill number', 'invoiceNumber', v.invoiceNumber|default(''), {required: true}) }}
+            {{ ui.field('Bill date', 'invoiceDate', v.invoiceDate|default(''), {type: 'date', required: true}) }}
+            {{ ui.field('Metal', 'metalType', v.metalType|default('gold'), {type: 'select', options: ['gold', 'silver']}) }}
+            {{ ui.field('Tax type', 'transactionType', v.transactionType|default('intra-state'), {type: 'select', options: ['intra-state', 'inter-state'], hint: 'Same state: CGST + SGST. Another state: IGST.'}) }}
+            {{ ui.field('What was bought', 'description', v.description|default(''), {span: true, placeholder: 'e.g. Fine gold bars, old ornaments'}) }}
+        </div></div></section>
+
+        <section class="panel"><div class="panel-head"><h2>Weight and rate</h2></div><div class="panel-body"><div class="form-grid">
+            {{ ui.field('Weight (g)', 'quantity', v.quantity|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+            {{ ui.field('Rate per gram', 'rate', v.rate|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+            {{ ui.field('Taxable amount as on the bill (optional)', 'totalAmount', v.totalAmount|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal', span: true, hint: 'Leave empty to use weight × rate.'}) }}
+        </div></div></section>
+
+        <section class="panel"><div class="panel-head"><h2>Or work the amount out from purity and wastage</h2></div><div class="panel-body">
+            <label class="check"><input type="checkbox" name="useValuation" value="1"{{ v.useValuation|default('') ? ' checked' : '' }}> <span>Use the shop's Purchase rules (fine weight, wastage, labour, hallmark). This replaces the weight and rate above.</span></label>
+            <div class="form-grid">
+                {{ ui.field('Gross weight (g)', 'vGross', v.vGross|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+                {{ ui.field('Less (g)', 'vLess', v.vLess|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+                {{ ui.field('Net weight (g)', 'vNet', v.vNet|default(''), {type: 'number', step: '0.001', min: '0', inputmode: 'decimal'}) }}
+                {{ ui.field('Purity', 'purity', v.purity|default('22K'), {type: 'select', options: purities}) }}
+                {{ ui.field('Wastage %', 'vWastage', v.vWastage|default(''), {type: 'number', step: '0.01', min: '0', inputmode: 'decimal'}) }}
+                {{ ui.field('Rate per gram', 'vRate', v.vRate|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+                {{ ui.field('Labour per gram', 'vLabour', v.vLabour|default(''), {type: 'number', step: '0.01', min: '0', money: true, inputmode: 'decimal'}) }}
+                {{ ui.field('Hallmark', 'vCert', v.vCert|default(''), {type: 'select', options: ['', 'hallmarked', 'huid']}) }}
+            </div>
+        </div></section>
+        {{ ui.field('Note (optional)', 'remarks', v.remarks|default(''), {}) }}
+    </div>
+    <aside class="bill-side">
+        <section class="panel sticky-panel">
+            <div class="panel-head"><h2>Amount</h2></div>
+            <div class="panel-body" id="totals"><p class="muted">Enter the weight and the rate to see the amount.</p></div>
+            <div class="panel-foot"><a class="btn" href="/purchases">{{ t('common.cancel') }}</a><button class="btn btn-primary" type="submit">Save purchase</button></div>
+        </section>
+    </aside>
+</form>
+{% endblock %}

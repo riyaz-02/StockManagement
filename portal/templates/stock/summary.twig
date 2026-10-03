@@ -1,0 +1,123 @@
+{% extends 'app.twig' %}
+{% block title %}Stock Summary{% endblock %}
+{% block heading %}Stock Summary{% endblock %}
+
+{% macro sev(s) %}{% if s == 'high' %}<span class="pill pill-red">High</span>{% elseif s == 'moderate' %}<span class="pill pill-amber">Watch</span>{% else %}<span class="pill pill-green">Normal</span>{% endif %}{% endmacro %}
+
+{% macro row(en, bn, val, cls = '') %}
+<tr class="{{ cls }}"><th>{{ en }}<span class="bn">{{ bn }}</span></th><td class="num">{{ val|raw }}</td></tr>
+{% endmacro %}
+
+{% macro metal(key, m, ins) %}
+{% import _self as s %}
+{% set name = key == 'gold' ? 'Gold' : 'Silver' %}
+{% set nameBn = key == 'gold' ? 'স্বর্ণ' : 'রূপা' %}
+<section class="panel metal-card {{ key }}">
+    <div class="panel-head">
+        <div>
+            <h2>{{ name }} <span class="bn-inline">{{ nameBn }}</span></h2>
+            <p class="muted">Stock now · বর্তমান স্টক</p>
+        </div>
+        <strong class="metal-total">{{ m.stock.total|grams }}</strong>
+    </div>
+    <div class="panel-body">
+        <table class="calc-table">
+            <tbody>
+            {{ s.row('Metal bought (purchases)', 'ক্রয় করা ধাতু', m.receipts.purchased|grams) }}
+            {{ s.row('+ Allowance for alloy and process (' ~ m.receipts.allowancePct ~ '%)', 'খাদ ও কাজের জন্য বাড়তি (' ~ m.receipts.allowancePct ~ '%)', m.receipts.allowance|grams) }}
+            {% if m.receipts.oldMetal > 0 or m.receipts.rawMetal > 0 %}{{ s.row('+ Old metal taken in and raw metal bought', 'পুরনো ও কাঁচা ধাতু প্রাপ্তি', (m.receipts.oldMetal + m.receipts.rawMetal)|grams) }}{% endif %}
+            {{ s.row('Total metal received', 'মোট প্রাপ্ত ধাতু', m.receipts.total|grams, 'sub') }}
+            {{ s.row('In the shop (' ~ m.pieces.inShop ~ ' pieces)', 'দোকানে (পিস)', m.stock.inShop|grams) }}
+            {% if m.stock.withOthers > 0 %}{{ s.row('Out for repair / with agent or customer (' ~ m.pieces.withOthers ~ ')', 'বাইরে (মেরামত / এজেন্ট / গ্রাহক)', m.stock.withOthers|grams) }}{% endif %}
+            {{ s.row('Bulk stock (' ~ m.bulkEntries ~ ' entries)', 'বাল্ক স্টক', m.stock.bulk|grams) }}
+            {{ s.row('Stock now', 'বর্তমান স্টক', m.stock.total|grams, 'sub') }}
+            {{ s.row('Expected to have left the shop', 'প্রত্যাশিত বেরিয়ে গেছে', m.expectedOut|grams) }}
+            {{ s.row('Sold on GST bills' ~ (m.out.returned > 0 ? ' (after ' ~ (m.out.returned|grams) ~ ' returned)' : ''), 'বিক্রি (জিএসটি বিল)', m.out.sold|grams) }}
+            {{ s.row('Less: approved wastage', 'বিয়োগ: অনুমোদিত ক্ষতি', m.out.wastage|grams) }}
+            <tr class="diff-row {{ m.severity }}">
+                <th>Difference <span class="bn">গড়মিল / মিলানো বাকি</span></th>
+                <td class="num"><strong>{{ m.variance|grams }}</strong> <small>{{ m.variancePct|abs }}%</small> {{ s.sev(m.severity) }}</td>
+            </tr>
+            </tbody>
+        </table>
+        <p class="diff-note muted">
+            {% if m.direction == 'balanced' %}The records and the stock agree.{% elseif m.direction == 'short' %}Metal received that is not in the stock, the bills or the approved wastage (with workers, not entered, or missing).{% else %}More than the records explain: a purchase may be missing, or something is entered twice.{% endif %}
+        </p>
+        {% if ins.headline is defined %}<p class="headline"><strong>{{ ins.headline.en }}</strong><span class="bn">{{ ins.headline.bn }}</span></p>{% endif %}
+    </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+{% import _self as s %}
+<div class="page-head">
+    <div><h1>Stock Summary</h1><p class="muted">What came in, what is in the shop, what was sold and wasted, and the difference. Worked out by the server: the phone app shows the same numbers. <span class="bn">মেটাল স্টকের হিসাব ও গড়মিল</span></p></div>
+    <div class="actions">
+        <a class="btn" href="/stock/summary/history">{{ icon('chart', 17) }} History</a>
+        {% if can('stock.snapshot') and d.scope.wholeFirm|default(false) %}<button class="btn btn-primary" type="button" hx-post="/stock/summary/snapshot" hx-swap="none" hx-confirm="Save today's snapshot now? (Saving again today updates it.)">{{ icon('check', 17) }} Save today's snapshot</button>{% endif %}
+    </div>
+</div>
+
+{% if d.metals is defined %}
+{% set c = d.confidence %}
+<div class="confidence {{ c.level }}" role="status">
+    <strong>{% if c.level == 'reliable' %}Reliable{% elseif c.level == 'check' %}Check first{% else %}Fix first{% endif %}:</strong> {{ c.en }}
+    <span class="bn">{{ c.bn }}</span>
+</div>
+<p class="muted asof">
+    As of {{ d.asOf|date('d M Y, h:i A') }} ·
+    {% if d.snapshot.savedToday %}today's snapshot is saved{% if d.snapshot.todayInfo.by %} ({{ d.snapshot.todayInfo.by }}){% endif %}{% else %}no snapshot yet today{% endif %}
+    · allowance gold {{ d.settings.goldAllowancePct }}%, silver {{ d.settings.silverAllowancePct }}% · normal below {{ d.settings.okPct }}%, high from {{ d.settings.highPct }}%
+    {% if not d.scope.wholeFirm %}· <strong>your branch only</strong>{% endif %}
+</p>
+
+<div class="metal-cards">
+    {{ s.metal('gold', d.metals.gold, d.insights.gold) }}
+    {{ s.metal('silver', d.metals.silver, d.insights.silver) }}
+</div>
+
+<div class="two-col">
+    <section class="panel">
+        <div class="panel-head"><div><h2>Data checks <span class="bn-inline">তথ্য যাচাই</span></h2><p class="muted">Things that can make the difference wrong, and what to do.</p></div></div>
+        <div class="panel-body">
+            {% if d.checks|length %}
+            <ul class="check-list">
+                {% for k in d.checks %}
+                <li class="chk {{ k.level }}">
+                    <span class="chk-ico">{% if k.level == 'error' %}{{ icon('alert', 18) }}{% elseif k.level == 'warn' %}{{ icon('alert', 18) }}{% else %}{{ icon('list', 18) }}{% endif %}</span>
+                    <span>{{ k.en }}<span class="bn">{{ k.bn }}</span></span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p class="muted">No problems found.</p>{% endif %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div><h2>What it means <span class="bn-inline">বিশ্লেষণ ও করণীয়</span></h2><p class="muted">Built from the findings above, not generic advice.</p></div></div>
+        <div class="panel-body insights">
+            {% for key in ['gold', 'silver'] %}
+            {% set i = d.insights[key] %}
+            <div class="insight {{ i.severity }}">
+                <h3>{{ i.headline.en }}<span class="bn">{{ i.headline.bn }}</span></h3>
+                <ul>{% for a in i.analysis %}<li>{{ a.en }}<span class="bn">{{ a.bn }}</span></li>{% endfor %}</ul>
+                {% if i.recommendations|length %}<h4>What to do · করণীয়</h4><ul>{% for r in i.recommendations %}<li>{{ r.en }}<span class="bn">{{ r.bn }}</span></li>{% endfor %}</ul>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><div><h2>Recent movements <span class="bn-inline">সাম্প্রতিক স্টক মুভমেন্ট</span></h2><p class="muted">Purchases, old metal, bills, wastage and bulk stock, newest first.</p></div>
+        <button class="btn btn-sm" type="button" hx-get="/stock/summary/movements?limit=30" hx-target="#movements" hx-swap="innerHTML">Show more</button></div>
+    <div class="panel-body" id="movements">{% include 'stock/movements.twig' with {rows: d.movements, all: false} %}</div>
+</section>
+
+<div class="live-block" hx-get="/stock/summary/wastage" hx-trigger="load, data-changed from:body" hx-swap="innerHTML" hx-target="this">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% else %}
+<div class="notice notice-error">The summary could not be loaded right now. Try again in a moment.</div>
+{% endif %}
+{% endblock %}

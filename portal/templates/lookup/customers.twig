@@ -1,0 +1,9 @@
+{% for c in rows %}
+    <button type="button" class="picker-item" data-id="{{ c.id }}" data-name="{{ c.name }}" data-mobile="{{ (c.matchedNumber ?: (c.phones|first))|default('') }}">
+        <strong>{{ c.name }}</strong>
+        <small>{{ c.phones|join(' · ') }}{% if c.code %} · {{ c.code }}{% endif %}</small>
+    </button>
+{% endfor %}
+{% if q|length >= 2 %}
+    <button type="button" class="picker-item" data-new="1"><strong>+ New customer: "{{ q }}"</strong></button>
+{% endif %}

@@ -1,0 +1,39 @@
+{% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+{% elseif d %}
+<section class="panel">
+    <div class="panel-head"><h2>2. Choose what to copy</h2><span class="pill pill-green">Connected to {{ d.host }}</span></div>
+    <div class="panel-body">
+        {% if d.databases|length %}
+            {% for db in d.databases %}
+                <label class="check">
+                    <input type="checkbox" name="db[]" value="{{ db.name }}" checked>
+                    <span><strong>{{ db.name }}</strong>{% if db.isDefault %} <span class="pill pill-blue">named in the address</span>{% endif %}
+                        <small>{{ db.collections|length }} collection{{ db.collections|length == 1 ? '' : 's' }} · {{ db.totalDocs|number_format }} documents · about {{ db.totalBytes|bytes }}</small></span>
+                </label>
+                <details class="more">
+                    <summary>See the collections in {{ db.name }}</summary>
+                    <div class="table-wrap"><table class="t">
+                        <thead><tr><th>Collection</th><th class="num">Documents</th><th class="num">Size</th></tr></thead>
+                        <tbody>{% for c in db.collections %}
+                            <tr><td>{{ c.name }}{% if c.type == 'view' %} <span class="pill pill-grey">view</span>{% endif %}</td><td class="num">{{ c.count is null ? '–' : c.count|number_format }}</td><td class="num">{{ c.sizeBytes|bytes }}</td></tr>
+                        {% endfor %}</tbody>
+                    </table></div>
+                </details>
+            {% endfor %}
+            <label class="check" style="margin-top: 12px">
+                <input type="checkbox" name="readable" value="1" checked>
+                <span>Also include a plain-text copy I can open and read<small>Makes the file bigger. The exact copy used for restoring is always included.</small></span>
+            </label>
+        {% else %}
+            <div class="t-empty">This login can connect but cannot see any database. Use a connection string that names the database (…mongodb.net/<strong>databasename</strong>).</div>
+        {% endif %}
+    </div>
+    {% if d.databases|length %}
+    <div class="panel-foot">
+        <span class="muted small">Keep this tab open: the download starts in a moment and a big database can take a few minutes.</span>
+        <button class="btn btn-primary" type="submit">{{ icon('download', 17) }} Download backup (.zip)</button>
+    </div>
+    {% endif %}
+</section>
+{% endif %}

@@ -1,0 +1,12 @@
+{% import 'ui.twig' as ui %}
+<form hx-post="/stock/wastage/{{ r._id }}/reject" hx-target="#modal-body" hx-swap="innerHTML" class="modal-form">
+    {{ csrf_field() }}
+    <h2>{{ r.status == 'approved' ? 'Reverse the approval' : 'Reject this report' }}</h2>
+    <p class="muted">{{ r.metal|capitalize }} · {{ r.amount|grams }} · {{ r.category }}. {{ r.status == 'approved' ? 'It will stop counting in the metal balance.' : 'It will not count in the metal balance.' }}</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    {{ ui.field('Why (required)', 'comment', '', {required: true, autofocus: true, placeholder: 'e.g. entered twice / weight does not match'}) }}
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-danger">{{ r.status == 'approved' ? 'Reverse approval' : 'Reject' }}</button>
+    </div>
+</form>

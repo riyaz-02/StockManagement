@@ -1,0 +1,16 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.daybook') }}{% endblock %}
+{% block heading %}{{ t('nav.daybook') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ t('nav.daybook') }}</h1><p class="muted">Money in and out, by how it was paid.</p></div>
+    <div class="actions">
+        {% if can('expenses.create') %}<button class="btn btn-primary" type="button" hx-get="/expenses/new" hx-target="#modal-body">{{ icon('plus', 17) }} Add expense</button>{% endif %}
+        <button class="btn" type="button" data-print>{{ icon('list', 17) }} Print</button>
+    </div>
+</div>
+<div class="live-block" hx-get="/day-book/body?quick={{ range.quick }}&from={{ range.from }}&to={{ range.to }}" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

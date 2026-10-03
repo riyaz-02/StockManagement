@@ -9,9 +9,7 @@ import 'package:jewellery_stock_app/providers/language_provider.dart';
 import 'package:jewellery_stock_app/screens/login_screen.dart';
 import 'package:jewellery_stock_app/screens/main_navigation_screen.dart';
 import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
-import 'package:jewellery_stock_app/services/api_service.dart';
-import 'package:jewellery_stock_app/models/app_version_model.dart';
-import 'package:jewellery_stock_app/widgets/update_dialog.dart';
+import 'package:jewellery_stock_app/services/live_reactions.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -31,7 +29,10 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
+      // Fading out only needs to be quick, not match the entrance — the old shared duration made every start-up
+      // wait a full extra 1.2s just to leave the splash screen.
+      reverseDuration: const Duration(milliseconds: 250),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -64,26 +65,6 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  /// Checks the backend-controlled app version and shows the update dialog
-  /// if a newer build is available. Never throws — a failed check should
-  /// never block someone from using the app.
-  Future<void> _checkForUpdate() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-
-      final response = await ApiService().getAppVersion();
-      if (response['success'] != true) return;
-
-      final config = AppVersionConfig.fromJson(response['data']['appVersion']);
-      if (config.latestVersionCode > currentBuildNumber && mounted) {
-        await showUpdateDialog(context, config);
-      }
-    } catch (_) {
-      // Ignore — update check is best-effort.
-    }
-  }
-
   Future<void> _initialize() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final languageProvider =
@@ -96,7 +77,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     final results = await Future.wait([
       _isServerOnline(),
-      Future.delayed(const Duration(milliseconds: 1500)),
+      Future.delayed(const Duration(milliseconds: 900)),
     ]);
 
     final serverOnline = results[0] as bool;
@@ -114,10 +95,10 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    // Server is online — check for a mandatory/optional update before
-    // letting the user any further into the app.
-    await _checkForUpdate();
-    if (!mounted) return;
+    // The update check runs in the background from here on: it must never delay sign-in. A forced update still
+    // blocks the app once its popup appears (see update_dialog.dart) — just on the Home/Login screen instead of
+    // stalling here on the splash.
+    unawaited(LiveReactions.checkAppUpdate());
 
     // Server is online — check auth token
     await authProvider.initialize();

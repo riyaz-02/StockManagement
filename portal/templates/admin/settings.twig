@@ -1,0 +1,40 @@
+{% extends 'app.twig' %}
+{% block title %}App settings{% endblock %}
+{% block heading %}App settings{% endblock %}
+
+{% block content %}
+{% set words = {finalFine: 'Final fine weight (fine + wastage)', fine: 'Fine weight (pure metal)', net: 'Net weight', gross: 'Gross weight', byPurity: 'By purity', default: 'One default rate', makingCharges: 'Making charges', custWastage: 'Customer wastage', metalRate: 'Metal rate', addStock: 'As on the piece', lastEntry: 'Last sale of the same piece', userWiseLastEntry: 'Last sale by the same person', blank: 'Leave blank', perPiece: 'Per piece', perGram: 'Per gram'} %}
+{% set groups = {addStock: 'When stock is added', sellStock: 'When a piece is sold', purchase: 'Purchases', oldMetal: 'Old metal', hallmark: 'Hallmark fee'} %}
+<div class="page-head">
+    <div><h1>App settings</h1><p class="muted">How pieces are priced. The app and this website both follow these rules, so a price is the same everywhere. Last changed {{ d.updatedAt ? d.updatedAt|dmy_time ~ ' by ' ~ d.updatedByName : 'never (standard rules)' }}.</p></div>
+    <div class="actions"><button class="btn" type="button" hx-post="/admin/settings/reset" hx-confirm="Put every rule back to the standard ones?" hx-swap="none">Back to standard</button></div>
+</div>
+<form method="post" action="/admin/settings">
+    {{ csrf_field() }}
+    {% for g, title in groups %}
+        <section class="panel">
+            <div class="panel-head"><h2>{{ title }}</h2></div>
+            <div class="panel-body"><div class="form-grid">
+                {% for key, val in d.settings[g] %}
+                    {% set lab = labels[g ~ '.' ~ key]|default([key, '']) %}
+                    {% set isnum = d.options[g][key] is not defined %}
+                    <label class="field"><span>{{ lab[0] }}</span>
+                        {% if isnum %}
+                            <input type="number" name="s[{{ g }}][{{ key }}]" value="{{ val }}" step="0.01" min="0" inputmode="decimal">
+                        {% else %}
+                            <select name="s[{{ g }}][{{ key }}]">
+                                {% for o in d.options[g][key] %}
+                                    {% set ov = o is same as(true) ? 'true' : (o is same as(false) ? 'false' : o) %}
+                                    <option value="{{ ov }}"{{ (val is same as(true) ? 'true' : (val is same as(false) ? 'false' : val)) == ov ? ' selected' : '' }}>{{ ov == 'true' ? 'Yes' : (ov == 'false' ? 'No' : words[ov]|default(ov)) }}</option>
+                                {% endfor %}
+                            </select>
+                        {% endif %}
+                        {% if lab[1] %}<small class="hint">{{ lab[1] }}</small>{% endif %}
+                    </label>
+                {% endfor %}
+            </div></div>
+        </section>
+    {% endfor %}
+    <div class="sticky-actions"><button class="btn btn-primary" type="submit">Save rules</button></div>
+</form>
+{% endblock %}

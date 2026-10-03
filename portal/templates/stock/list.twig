@@ -1,0 +1,25 @@
+{% if more %}{% include 'stock/rows.twig' %}{% else %}
+{% set tabs = [['in', 'In stock'], ['sold', 'Sold'], ['other', 'Other'], ['all', 'All']] %}
+<form class="toolbar" hx-get="/stock/list" hx-target="closest .live-block" hx-swap="innerHTML" hx-trigger="input changed delay:300ms from:find input[type=search], change from:find select, submit">
+    <div class="chips">
+        {% for tb in tabs %}
+            <button type="button" class="chip{{ tab == tb[0] ? ' is-on' : '' }}" hx-get="/stock/list?tab={{ tb[0] }}&metal={{ metal }}" hx-target="closest .live-block" hx-swap="innerHTML">{{ tb[1] }}</button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <select name="metal" aria-label="Metal">
+        <option value="">All metals</option>
+        {% for m in ['gold', 'silver', 'platinum', 'mixed', 'gold-coated'] %}<option value="{{ m }}"{{ metal == m ? ' selected' : '' }}>{{ m|capitalize }}</option>{% endfor %}
+    </select>
+    <div class="search grow">{{ icon('search', 17) }}<input type="search" name="q" value="{{ q }}" placeholder="Search name or barcode" autocomplete="off"></div>
+</form>
+<p class="muted small">{{ totals.count|default(0) }} pieces · {{ totals.netWeight|default(0)|grams }} net weight</p>
+<section class="panel">
+    {% if rows|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th></th><th>Piece</th><th>Metal</th><th class="num">Net wt</th><th class="num hide-sm">Making</th><th class="hide-sm">Box</th><th>Status</th></tr></thead>
+        <tbody>{% include 'stock/rows.twig' %}</tbody>
+    </table></div>
+    {% else %}<div class="t-empty">No stock found.</div>{% endif %}
+</section>
+{% endif %}

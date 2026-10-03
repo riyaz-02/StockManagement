@@ -1,0 +1,14 @@
+{% if price and price.finalPrice is defined %}
+<div class="kv">
+    {% if price.rate|default(0) <= 0 %}<div class="notice notice-info">Today's rate is not set, so the metal is not priced.</div>{% endif %}
+    <div class="kv-row"><span>Fine weight</span><strong>{{ price.fine|grams }}</strong></div>
+    <div class="kv-row"><span>Metal value</span><strong>{{ price.metalValuation|inr }}</strong></div>
+    {% if price.labourTotal > 0 %}<div class="kv-row"><span>Labour</span><strong>{{ price.labourTotal|inr }}</strong></div>{% endif %}
+    {% if price.makingTotal > 0 %}<div class="kv-row"><span>Making</span><strong>{{ price.makingTotal|inr }}</strong></div>{% endif %}
+    {% if price.stoneValuation > 0 %}<div class="kv-row"><span>Stones</span><strong>{{ price.stoneValuation|inr }}</strong></div>{% endif %}
+    {% if price.hallmarkCharge > 0 %}<div class="kv-row"><span>Hallmark fee</span><strong>{{ price.hallmarkCharge|inr }}</strong></div>{% endif %}
+    <div class="kv-row"><span>GST</span><strong>{{ price.totalGst|inr }}</strong></div>
+    <div class="kv-row total"><span>Price with GST</span><strong>{{ price.finalPrice|inr }}</strong></div>
+    {% if price.fixed|default(0) > 0 or price.makingForBilling|default(0) > 0 %}<div class="kv-row"><span>Making kept for billing</span><strong>{{ (price.makingForBilling + price.fixed|default(0))|inr }}</strong></div>{% endif %}
+</div>
+{% else %}<p class="muted">Enter the weight and purity to see the price.</p>{% endif %}

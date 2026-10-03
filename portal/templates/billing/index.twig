@@ -1,0 +1,13 @@
+{% extends 'app.twig' %}
+{% block title %}{{ t('nav.billing') }}{% endblock %}
+{% block heading %}{{ t('nav.billing') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>GST bills</h1><p class="muted">Every tax invoice, newest first. Open one to print it, take a payment or make a return.</p></div>
+    <div class="actions">{% if can('billing.create') %}<a class="btn btn-primary" href="/billing/new">{{ icon('plus', 17) }} New bill</a>{% endif %}</div>
+</div>
+<div class="live-block" hx-get="/billing/list" hx-trigger="load, data-changed from:body" hx-swap="innerHTML">
+    <div class="loading"><span class="spinner"></span></div>
+</div>
+{% endblock %}

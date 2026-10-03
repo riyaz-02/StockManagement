@@ -35,6 +35,12 @@ const appVersionSchema = new mongoose.Schema(
             trim: true,
             default: 'A new version of the app is available.',
         },
+        // A temporary "come back later" gate on sign-in only (app + website share /api/auth/login). Admin/owner can
+        // always still sign in, so whoever turned it on can turn it back off.
+        maintenanceMode: {
+            enabled: { type: Boolean, default: false },
+            message: { type: String, trim: true, default: 'The shop app is briefly unavailable. Please try again shortly.' },
+        },
         updatedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

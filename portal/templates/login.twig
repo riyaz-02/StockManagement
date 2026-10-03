@@ -1,0 +1,37 @@
+{% extends 'base.twig' %}
+{% block title %}{{ t('login.title') }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block body %}
+<div class="auth">
+    <section class="auth-art">
+        <img src="{{ asset('img/logo.png') }}" alt="{{ app_name() }}" class="auth-logo">
+        <p>{{ t('login.tag') }}</p>
+    </section>
+    <section class="auth-panel">
+        <form method="post" action="/login" class="auth-card" x-data="passwordField" autocomplete="on">
+            {{ csrf_field() }}
+            <h1>{{ t('login.welcome') }}</h1>
+            <p class="muted">{{ t('login.sub') }}</p>
+
+            {% if flash %}
+                <div class="notice notice-{{ flash.type }}" role="alert">{{ flash.text }}</div>
+            {% endif %}
+
+            <label class="field">
+                <span>{{ t('login.mobile') }}</span>
+                <input type="text" name="mobile" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="80" value="{{ mobile }}" placeholder="10-digit mobile number, or your username" required autofocus>
+            </label>
+            <label class="field">
+                <span>{{ t('login.password') }}</span>
+                <div class="field-row">
+                    <input :type="type" name="password" autocomplete="current-password" required>
+                    <button type="button" class="link-btn" @click="toggle" x-text="label"></button>
+                </div>
+            </label>
+            <button class="btn btn-primary btn-block" type="submit">{{ t('login.button') }}</button>
+        </form>
+        <p class="auth-foot">{{ app_name() }}{% if is_dev() %} · development{% endif %}</p>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.twig' %}
+{% block title %}{{ t('wake.title') }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block body %}
+<div class="wake" x-data="wake" data-next="{{ next }}" data-csrf="{{ csrf() }}"
+     data-l-checking="{{ t('wake.checking') }}" data-l-starting="{{ t('wake.starting') }}" data-l-ready="{{ t('wake.ready') }}" data-l-slow="{{ t('wake.slow') }}">
+    <div class="wake-card">
+        <img src="{{ asset('img/logo.png') }}" alt="{{ app_name() }}" class="wake-logo">
+        <div class="pulse" :class="pulseClass"><span></span></div>
+        <h1>{{ t('wake.title') }}</h1>
+        <p class="muted">{{ t('wake.sub') }}</p>
+
+        <ol class="steps">
+            <li :class="s1">{{ t('wake.step1') }}</li>
+            <li :class="s2">{{ t('wake.step2') }}</li>
+            <li :class="s3">{{ t('wake.step3') }}</li>
+        </ol>
+        <div class="bar"><i :style="barStyle"></i></div>
+        <p class="status" x-text="message"></p>
+        <p class="muted small">{{ t('wake.wait') }}</p>
+        <button class="btn btn-primary" type="button" x-show="slow" x-cloak @click="retry">{{ t('wake.retry') }}</button>
+    </div>
+</div>
+{% endblock %}

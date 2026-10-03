@@ -1,0 +1,12 @@
+{% if rows|length %}
+    <p class="muted small">Tick to adjust against this bill (counts as payment; GST stays on the full bill).</p>
+    {% for o in rows %}
+        <label class="check om-row">
+            <input type="checkbox" name="oldMetalIds[]" value="{{ o._id }}" data-amount="{{ o.amount }}">
+            <span><strong>{{ o.metalType|capitalize }} {{ o.purity }} · net {{ o.net|grams }} · fine {{ o.fine|grams }}</strong><small>{{ o.date|dmy }} · {{ o.customerName }}</small></span>
+            <b>{{ o.amount|inr }}</b>
+        </label>
+    {% endfor %}
+{% else %}
+    <p class="muted small">No unused old metal. <a href="/old-metal">Receive some</a> first.</p>
+{% endif %}

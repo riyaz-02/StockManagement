@@ -1,0 +1,33 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}Notifications{% endblock %}
+{% block heading %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Notifications</h1><p class="muted">Send a message to the phones. It also pops up on any open screen, in the app and on this website.</p></div></div>
+<div class="grid grid-2">
+    <form method="post" action="/admin/notifications" class="panel">
+        {{ csrf_field() }}
+        <div class="panel-head"><h2>Send a message</h2></div>
+        <div class="panel-body">
+            {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+            <div class="form-grid">
+                {{ ui.field('Title', 'title', v.title|default(''), {required: true, span: true, placeholder: 'e.g. Shop closed on Sunday'}) }}
+                {{ ui.field('Message', 'body', v.body|default(''), {type: 'textarea', rows: 3, required: true, span: true}) }}
+                {{ ui.field('Send to', 'target', v.target|default('all'), {type: 'select', options: ['all', 'manager', 'staff', 'viewer', 'admin'], hint: 'all = everyone who has the app'}) }}
+            </div>
+        </div>
+        <div class="panel-foot"><button class="btn btn-primary" type="submit">Send now</button></div>
+    </form>
+    <section class="panel">
+        <div class="panel-head"><h2>Sent lately</h2></div>
+        {% if rows|length %}
+        <div class="panel-body notif-list">
+            {% for n in rows|slice(0, 12) %}
+                <div class="notif"><strong>{{ n.title }}</strong><span>{{ n.body }}</span><small>{{ n.createdAt|dmy_time }} · {{ n.targetType == 'role' ? 'to ' ~ n.targetRole : 'to everyone' }} · {{ n.successCount|default(0) }} phones{% if n.source != 'manual' %} · automatic{% endif %}</small></div>
+            {% endfor %}
+        </div>
+        {% else %}<div class="t-empty">Nothing sent yet.</div>{% endif %}
+    </section>
+</div>
+{% endblock %}

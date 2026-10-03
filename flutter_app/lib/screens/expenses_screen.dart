@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
 import '../widgets/bill_ui.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -30,7 +31,13 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-class _ExpensesScreenState extends State<ExpensesScreen> {
+class _ExpensesScreenState extends State<ExpensesScreen> with LiveRefresh<ExpensesScreen> {
+  @override
+  List<String> get liveModules => ['expenses'];
+
+  @override
+  void onLiveChange() => _load();
+
   final _api = ApiService();
   String _range = 'today'; // today | yesterday | month
   List<Map<String, dynamic>> _rows = [];
@@ -54,7 +61,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    disposeLive();
+    super.dispose();
   }
 
   Future<void> _load() async {

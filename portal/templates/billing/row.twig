@@ -1,0 +1,49 @@
+{# One item on the bill. k = a unique key for this row; it = its values (empty for a new row). #}
+{% set metal = it.metalType|default('Gold') %}
+{% set plist = metal == 'Gold' ? ['24K', '22K', '20K', '18K', '14K'] : (metal == 'Silver' ? ['999', '925', '800'] : []) %}
+{% set cert = it.certification|default('') %}
+{% set ov = it.taxableOverride|default('') != '' %}
+<div class="item-row{{ ov ? ' has-ov' : '' }}" data-row>
+    <div class="item-line">
+        <span class="item-no" aria-hidden="true"></span>
+        <input type="text" name="items[{{ k }}][particulars]" value="{{ it.particulars|default('') }}" placeholder="Item name, e.g. Gold ring" aria-label="Item" autocomplete="off" data-f="particulars">
+        <select name="items[{{ k }}][metalType]" aria-label="Metal" data-f="metalType">{% for m in ['Gold', 'Silver', 'Other'] %}<option{{ m == metal ? ' selected' : '' }}>{{ m }}</option>{% endfor %}</select>
+        <select name="items[{{ k }}][purity]" aria-label="Purity" data-f="purity">
+            <option value="">–</option>
+            {% set cur = it.purity|default('') %}
+            {% for p in plist %}<option{{ p == cur ? ' selected' : '' }}>{{ p }}</option>{% endfor %}
+            {% if cur != '' and cur not in plist %}<option selected>{{ cur }}</option>{% endif %}
+        </select>
+        <input type="text" inputmode="decimal" name="items[{{ k }}][grossWt]" value="{{ it.grossWt|default('') }}" placeholder="0.000" aria-label="Gross weight (g)" class="r" data-f="grossWt" data-dp="3">
+        <input type="text" inputmode="decimal" name="items[{{ k }}][netWt]" value="{{ it.netWt|default('') }}" placeholder="0.000" aria-label="Net weight (g)" class="r" data-f="netWt" data-dp="3"{{ it.netWt|default('') != '' ? ' data-typed="1"' : '' }}>
+        <input type="text" inputmode="decimal" name="items[{{ k }}][rate]" value="{{ it.rate|default('') }}" placeholder="today" aria-label="Rate per gram" class="r" data-f="rate" data-dp="2">
+        <input type="text" inputmode="decimal" name="items[{{ k }}][makingCharge]" value="{{ it.makingCharge|default('') }}" placeholder="0.00" aria-label="Making charge" class="r" data-f="makingCharge" data-dp="2">
+        <span class="tx-cell">
+            <input type="text" inputmode="decimal" value="{{ it.taxableOverride|default('') }}" placeholder="auto" aria-label="Taxable amount (type to change it)" class="r tx{{ ov ? ' is-ov' : '' }}" data-f="taxable" data-dp="2" title="Taxable amount before GST. It is worked out for you; type a price here to change it.">
+            <input type="hidden" name="items[{{ k }}][taxableOverride]" value="{{ it.taxableOverride|default('') }}" data-f="taxableOverride">
+            <button type="button" class="tx-reset" data-tx-reset title="Go back to the calculated amount" aria-label="Use the calculated taxable amount" hidden>&#8635;</button>
+        </span>
+        <select name="items[{{ k }}][certification]" data-f="certification" aria-label="Hallmark">
+            <option value=""{{ cert == '' ? ' selected' : '' }}>None</option>
+            <option value="hallmark"{{ cert == 'hallmark' ? ' selected' : '' }}>Hallmarked</option>
+            <option value="huid"{{ cert == 'huid' ? ' selected' : '' }}>HUID</option>
+        </select>
+        <input type="text" name="items[{{ k }}][huid]" value="{{ it.huid|default('') }}" maxlength="6" data-f="huid" data-upper autocomplete="off" placeholder="HUID" aria-label="HUID (6 letters or digits)"{{ cert != 'huid' ? ' disabled' : '' }}>
+        <input type="text" inputmode="decimal" name="items[{{ k }}][hallmarkCharge]" value="{{ it.hallmarkCharge|default('') }}" class="r" data-f="hallmarkCharge" data-dp="2" placeholder="Fee ₹" aria-label="Hallmark fee"{{ cert == '' ? ' disabled' : '' }}>
+        <select name="items[{{ k }}][hsnCode]" data-f="hsnCode" aria-label="HSN code">
+            {% for h in meta.hsnCodes|default([{code: '7113', label: '7113'}]) %}<option value="{{ h.code }}" title="{{ h.label }}"{{ h.code == it.hsnCode|default('7113') ? ' selected' : '' }}>{{ h.code }}</option>{% endfor %}
+        </select>
+        <output id="amt-{{ k }}" class="line-amt">–</output>
+        <button type="button" class="icon-btn" data-remove-row title="Remove this item" aria-label="Remove this item">{{ icon('x', 15) }}</button>
+    </div>
+    <div class="item-line item-stone">
+        <span></span>
+        <input type="text" name="items[{{ k }}][stoneName]" value="{{ it.stoneName|default('') }}" data-f="stoneName" autocomplete="off" placeholder="Stone / other note (optional)" aria-label="Stone note" class="st-note">
+        <input type="text" inputmode="decimal" name="items[{{ k }}][stoneWt]" value="{{ it.stoneWt|default('') }}" class="r st-wt" data-f="stoneWt" data-dp="3" placeholder="Stone g" aria-label="Stone weight (g)" title="Stone weight in grams (taken off the gross to get the net)">
+        <input type="text" inputmode="decimal" name="items[{{ k }}][stoneAmount]" value="{{ it.stoneAmount|default('') }}" class="r st-val" data-f="stoneAmount" data-dp="2" placeholder="Stone ₹" aria-label="Stone value" title="Stone value in rupees (added to the taxable amount)">
+    </div>
+    <input type="hidden" name="items[{{ k }}][productCode]" value="{{ it.productCode|default('') }}" data-f="productCode">
+    <input type="hidden" name="items[{{ k }}][itemId]" value="{{ it.itemId|default('') }}" data-f="itemId">
+    <div class="item-err" hidden></div>
+    {% if it.productCode|default('') != '' %}<span class="from-stock">From stock: {{ it.productCode }}</span>{% endif %}
+</div>

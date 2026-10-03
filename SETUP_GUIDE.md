@@ -99,7 +99,7 @@ PORT=5000
 NODE_ENV=development
 
 # MongoDB Connection
-MONGODB_URI=mongodb+srv://riyazjisce:sg4Ua6VfYEztDCVC@companyresearchassistan.rfodcjr.mongodb.net/jewellery_stock?retryWrites=true&w=majority&appName=CompanyResearchAssistant
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/shopmanage?retryWrites=true&w=majority
 
 # JWT Secret (Change in production!)
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
@@ -192,7 +192,7 @@ flutter pub get
 
 #### Using Local MongoDB
 ```env
-MONGODB_URI=mongodb://localhost:27017/jewellery_stock
+MONGODB_URI=mongodb://localhost:27017/shopmanage
 ```
 
 ### File Upload Configuration

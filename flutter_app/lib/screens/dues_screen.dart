@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../widgets/bill_ui.dart';
 import 'invoice_detail_screen.dart';
+import '../widgets/live_refresh.dart';
 
 String _s(dynamic v) => (v ?? '').toString();
 double _n(dynamic v) => (v is num) ? v.toDouble() : double.tryParse(_s(v)) ?? 0;
@@ -16,7 +17,13 @@ class PendingDuesScreen extends StatefulWidget {
   State<PendingDuesScreen> createState() => _PendingDuesScreenState();
 }
 
-class _PendingDuesScreenState extends State<PendingDuesScreen> {
+class _PendingDuesScreenState extends State<PendingDuesScreen> with LiveRefresh<PendingDuesScreen> {
+  @override
+  List<String> get liveModules => ['billing'];
+
+  @override
+  void onLiveChange() => _load();
+
   final _api = ApiService();
   final _q = TextEditingController();
   Timer? _debounce;
@@ -28,6 +35,7 @@ class _PendingDuesScreenState extends State<PendingDuesScreen> {
   @override
   void initState() {
     super.initState();
+    initLive();
     _load();
   }
 
@@ -35,6 +43,7 @@ class _PendingDuesScreenState extends State<PendingDuesScreen> {
   void dispose() {
     _debounce?.cancel();
     _q.dispose();
+    disposeLive();
     super.dispose();
   }
 

@@ -142,15 +142,18 @@ function toView(d) {
     };
 }
 
-/** Row for the list screen (a small subset of toView). */
+/** Row for the list screen (a small subset of toView), plus a cheap summary of what's on the bill (items were already parsed by toView). */
 function toRow(d) {
     const v = toView(d);
+    const weight = {};
+    for (const it of v.items) { const m = it.metalType || 'Other'; weight[m] = Math.round(((weight[m] || 0) + (it.netWt || 0)) * 1000) / 1000; }
     return {
         _id: v._id, invoiceNumber: v.invoiceNumber, invoiceDate: v.invoiceDate, customerName: v.customerName,
         customerNameBn: v.customerNameBn, customerMobile: v.customerMobile, Customer_ID: v.Customer_ID, walkIn: v.walkIn,
         totalPayableAmount: v.totalPayableAmount, paidAmount: v.paidAmount, dueAmount: v.dueAmount, advanceAmount: v.advanceAmount,
         branchName: v.branchName, createdBy: v.createdBy, createdAt: v.createdAt, paymentMode: v.paymentMode,
         status: v.status, revisionId: v.revisionId,
+        itemsSummary: { count: v.items.length, first: v.items[0] ? v.items[0].particular : '', weight },
     };
 }
 

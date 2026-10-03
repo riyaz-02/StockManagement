@@ -11,7 +11,7 @@
 'use strict';
 const mongoose = require('mongoose');
 const logger = require('../config/logger');
-const { getLgpAdminConnection } = require('../config/db');
+const { getConnection } = require('../config/db');
 
 const HIDDEN = ['cancelled', 'void', 'deleted'];
 const Release = () => mongoose.connection.collection('app_stock_release');
@@ -33,7 +33,7 @@ async function restorePiece(number, itemId) {
 
 async function reconcileCancelled() {
     const OldMetal = require('../models/OldMetal');
-    const invoices = getLgpAdminConnection().db.collection('invoices');
+    const invoices = getConnection().db.collection('invoices');
     const rows = await invoices.find({
         status: { $in: HIDDEN },
         $or: [{ 'items.item_id': { $exists: true, $ne: '' } }, { old_metal: { $exists: true, $ne: [] } }],

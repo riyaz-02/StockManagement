@@ -1,0 +1,24 @@
+{% extends 'app.twig' %}
+{% block title %}Server status{% endblock %}
+{% block heading %}Server status{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Server status</h1><p class="muted">Is everything behind the app healthy? Useful when something looks wrong.</p></div></div>
+{% if problem %}<div class="notice notice-error" role="alert">{{ problem }}</div>{% endif %}
+{% if st.app is defined %}
+<div class="stats">
+    <div class="stat"><span>Server</span><strong class="pos">Running</strong><small>{{ st.app.environment }} · up {{ (st.app.uptimeSec / 3600)|round(1) }} hours</small></div>
+    <div class="stat"><span>Version deployed</span><strong>{{ st.app.commit|default('unknown') }}</strong><small>{{ st.app.message|default('') }}</small></div>
+    <div class="stat"><span>Permissions</span><strong>{{ st.permissionCount }}</strong><small>fingerprint {{ st.permissionsHash }}</small></div>
+</div>
+<div class="grid grid-2">
+    <section class="panel"><div class="panel-head"><h2>Databases</h2></div><div class="panel-body kv">
+        {% for d in st.databases %}<div class="kv-row"><span>{{ d.label }}</span><strong class="{{ d.state == 'connected' ? 'pos' : 'neg' }}">{{ d.state == 'connected' ? 'Connected' : d.state|pretty }}{% if d.pingMs is defined and d.pingMs is not null %} · {{ d.pingMs }} ms{% endif %}</strong></div>{% endfor %}
+    </div></section>
+    <section class="panel"><div class="panel-head"><h2>Settings the server needs</h2></div><div class="panel-body kv">
+        {% for e in st.env %}<div class="kv-row"><span>{{ e.key }}{% if e.required %} <small class="muted">(needed)</small>{% endif %}</span><strong class="{{ e.set ? 'pos' : (e.required ? 'neg' : 'muted') }}">{{ e.set ? 'Set' : 'Not set' }}</strong></div>{% endfor %}
+    </div></section>
+</div>
+<p class="muted small">Only whether a setting exists is shown, never its value. Checked {{ st.generatedAt|dmy_time }}.</p>
+{% endif %}
+{% endblock %}

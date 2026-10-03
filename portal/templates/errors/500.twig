@@ -1,0 +1,12 @@
+{% extends 'base.twig' %}
+{% block title %}{{ t('common.error') }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="empty-page">
+    <div class="empty-ico">{{ icon('alert', 40) }}</div>
+    <h1>{{ t('common.error') }}</h1>
+    <p class="muted">{{ message|default('') }}</p>
+    {% if detail|default('') %}<pre class="detail">{{ detail }}</pre>{% endif %}
+    <a class="btn btn-primary" href="/">{{ t('common.back_home') }}</a>
+</div>
+{% endblock %}

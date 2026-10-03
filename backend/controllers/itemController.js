@@ -40,6 +40,20 @@ function pickExtras(body) {
     return out;
 }
 
+
+// For clients that do not hold the price rules (the website): `autoMaking: true` makes the server work out the making charge
+// billing pre-fills = labour + making (Stock Setting rules) + an optional fixed making (`fixedMaking`).
+async function applyAutoMaking(body, extra) {
+    if (!(body.autoMaking === true || body.autoMaking === 'true' || body.autoMaking === '1')) return;
+    const Rules = require('../services/stockRules');
+    const stored = await require('../models/AppStockSettings').findOne({ key: 'main' }).lean();
+    const price = require('../services/stockValuation').computeStock({
+        net: body.netWeight, gross: body.grossWeight, less: body.lessWeight, purity: body.purity, wastage: body.wastage, labourRate: body.labourRate, makingRate: body.makingRate,
+    }, Rules.resolve(stored));
+    const total = Math.round((price.makingForBilling + (Number(body.fixedMaking) || 0)) * 100) / 100;
+    extra.makingCharge = total > 0 ? total : null;
+}
+
 // Free the box slot an item occupies (used when it moves)
 async function freeItemSlot(item) {
     if (!item.containerId || !item.slotNumber) return;
@@ -70,6 +84,7 @@ exports.createItem = async (req, res) => {
             status
         } = req.body;
         const extra = pickExtras(req.body);
+        await applyAutoMaking(req.body, extra);
 
         // Helper to extract images
         let imagePaths = [];
@@ -100,6 +115,9 @@ exports.createItem = async (req, res) => {
                 message: 'Please provide all required fields'
             });
         }
+
+        // weight class from the net weight when the client did not choose one
+        const wClass = weightCategory || (Number(netWeight) > 10 ? 'Heavy' : Number(netWeight) > 5 ? 'Medium' : 'Light');
 
         // Generate barcode if not provided
         const itemBarcode = barcode || await generateBarcode();
@@ -171,7 +189,7 @@ exports.createItem = async (req, res) => {
             purity,
             netWeight,
             numberOfPieces: numberOfPieces || 1,
-            weightCategory: weightCategory || 'Light',
+            weightCategory: wClass,
             weightAccuracy: weightAccuracy || 'exact',
             certificationType: certificationType || 'none',
             huidNumber: huidNumber || null,
@@ -194,6 +212,7 @@ exports.createItem = async (req, res) => {
             }
         }
 
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'created', [{ field: 'metal', to: `${item.metalType} ${item.purity}` }, { field: 'net weight', to: String(item.netWeight) }]);
         res.status(201).json({
             success: true,
             message: 'Item created successfully',
@@ -297,6 +316,22 @@ exports.getItems = async (req, res) => {
             console.log(`[GET ITEMS] Search query: "${search}"`);
         }
 
+        // optional paging (the website): ?limit=&page= returns one page plus the totals of the whole filter
+        const limit = Math.min(200, parseInt(req.query.limit, 10) || 0);
+        if (limit > 0) {
+            const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+            const [items, total, sums] = await Promise.all([
+                Item.find(filter).populate({ path: 'containerId', select: 'name type qrCode', strictPopulate: false })
+                    .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+                Item.countDocuments(filter),
+                Item.find(filter).select('netWeight').lean(),
+            ]);
+            return res.status(200).json({
+                success: true, count: items.length, data: { items },
+                pagination: { page, limit, total, hasMore: page * limit < total }, totals: { count: total, netWeight: Math.round(sums.reduce((a, x) => a + (Number(x.netWeight) || 0), 0) * 1000) / 1000 },
+            });
+        }
+
         const items = await Item.find(filter)
             .populate({
                 path: 'containerId',
@@ -390,6 +425,7 @@ exports.updateItem = async (req, res) => {
                 message: 'Item not found'
             });
         }
+        const before = { name: item.name, metalType: item.metalType, purity: item.purity, netWeight: item.netWeight, status: item.status, makingCharge: item.makingCharge };
 
         const {
             name,
@@ -411,6 +447,7 @@ exports.updateItem = async (req, res) => {
             slotNumber: newSlotNumber
         } = req.body;
         const extra = pickExtras(req.body);
+        await applyAutoMaking(req.body, extra);
 
 
 
@@ -545,6 +582,11 @@ exports.updateItem = async (req, res) => {
 
         await item.save();
 
+        const changed = ['name', 'metalType', 'purity', 'netWeight', 'status', 'makingCharge']
+            .filter((k) => String(before[k] ?? '') !== String(item[k] ?? ''))
+            .map((k) => ({ field: k, from: before[k], to: item[k] }));
+        if (changed.length) require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'updated', changed);
+
         res.status(200).json({
             success: true,
             message: 'Item updated successfully',
@@ -600,6 +642,7 @@ exports.deleteItem = async (req, res) => {
         }
 
         await softDeleteItemDoc(item);
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'removed', []);
 
         res.status(200).json({
             success: true,
@@ -614,78 +657,8 @@ exports.deleteItem = async (req, res) => {
     }
 };
 
-// @desc    Mark item as sold
-// @route   PUT /api/items/:id/sell
-// @access  Private
-exports.sellItem = async (req, res) => {
-    try {
-        const { mobile, customerName, address, amount } = req.body;
-        const item = await Item.findById(req.params.id);
-        const Customer = require('../models/Customer');
-        const Sale = require('../models/Sale');
-
-        if (!item) {
-            return res.status(404).json({
-                success: false,
-                message: 'Item not found'
-            });
-        }
-
-        // Find or Create Customer
-        let customer = await Customer.findOne({ mobile });
-        if (!customer && mobile && customerName) {
-            customer = await Customer.create({
-                mobile,
-                name: customerName,
-                address
-            });
-        }
-
-        // Create Sale Record
-        const sale = await Sale.create({
-            itemId: item._id,
-            customerId: customer ? customer._id : null,
-            customerName: customerName || (customer ? customer.name : 'Unknown'),
-            mobile: mobile || (customer ? customer.mobile : 'Unknown'),
-            address: address || (customer ? customer.address : ''),
-            amount: amount || 0,
-            saleDate: Date.now()
-        });
-
-        // Update status to sold
-        item.status = 'sold';
-
-        // Free up container slot
-        if (item.containerId && item.slotNumber) {
-            const container = await Container.findById(item.containerId);
-            if (container) {
-                const slot = container.slots.find(s => s.slotNumber === item.slotNumber);
-                if (slot) {
-                    slot.itemId = null;
-                    slot.reserved = false;
-                    await container.save();
-                }
-            }
-        }
-
-        item.containerId = null;
-        item.slotNumber = null;
-
-        await item.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Item marked as sold',
-            data: { item, sale }
-        });
-    } catch (error) {
-        console.error('Sell item error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while selling item'
-        });
-    }
-};
+// Selling a piece is done on a GST bill (POST /api/billing/invoices): saving the bill marks the piece sold. There is no separate
+// "quick sale" record any more (it duplicated the invoice).
 
 // @desc    Temporarily remove item
 // @route   PUT /api/items/:id/remove-temporarily
@@ -721,6 +694,7 @@ exports.removeTemporarily = async (req, res) => {
         item.slotNumber = null;
 
         await item.save();
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'taken out temporarily', []);
 
         res.status(200).json({
             success: true,
@@ -760,6 +734,7 @@ exports.restoreItem = async (req, res) => {
         // Restore item to active status
         item.status = 'active';
         await item.save();
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'restored', [{ field: 'status', from: 'deleted', to: 'active' }]);
 
         res.status(200).json({
             success: true,
@@ -797,6 +772,7 @@ exports.permanentDeleteItem = async (req, res) => {
         }
 
         // Permanently delete the item from database
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'permanently deleted', []);
         await Item.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
@@ -834,8 +810,10 @@ exports.markAsNoSell = async (req, res) => {
             });
         }
 
+        const wasStatus = item.status;
         item.status = 'no_sell';
         await item.save();
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'marked not for sale', [{ field: 'status', from: wasStatus, to: 'no_sell' }]);
 
         console.log(`✓ Item ${item.barcode} marked as no sell`);
 
@@ -867,8 +845,10 @@ exports.markAsActive = async (req, res) => {
             });
         }
 
+        const wasStatus2 = item.status;
         item.status = 'active';
         await item.save();
+        require('../services/audit').record(req, 'stock_item', item._id, `${item.name} (${item.barcode})`, 'put back in stock', [{ field: 'status', from: wasStatus2, to: 'active' }]);
 
         console.log(`✓ Item ${item.barcode} marked as active`);
 

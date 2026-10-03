@@ -1,0 +1,13 @@
+{% set labels = {purchase: 'Purchase', old_metal: 'Old metal in', raw_metal: 'Raw metal in', sale: 'Sold', wastage: 'Wastage', bulk: 'Bulk stock'} %}
+{% if rows|length %}
+<ul class="movements">
+    {% for m in rows %}
+    <li class="mv {{ m.direction }}">
+        <span class="mv-ico">{% if m.direction == 'in' %}&darr;{% elseif m.direction == 'out' %}&uarr;{% else %}&bull;{% endif %}</span>
+        <span class="mv-main"><strong>{{ labels[m.type]|default(m.type) }}</strong> · {{ m.metal|capitalize }}<small class="muted"> {{ m.at|date('d M Y') }} · {{ m.title }}{% if m.note %} · {{ m.note }}{% endif %}</small></span>
+        <span class="mv-g">{% if m.direction == 'in' %}+{% elseif m.direction == 'out' %}&minus;{% endif %}{{ m.grams|grams }}</span>
+    </li>
+    {% endfor %}
+</ul>
+{% if not all %}<p class="muted">Showing the latest few. Use "Show more" for more.</p>{% endif %}
+{% else %}<p class="muted">No movements yet.</p>{% endif %}

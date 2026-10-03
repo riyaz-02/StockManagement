@@ -1,0 +1,43 @@
+{% if running %}
+<section class="panel">
+    <div class="panel-head"><h2>Running now</h2><span class="pill pill-blue">In progress</span></div>
+    <div class="panel-body">
+        <p><strong>{{ running.description }}</strong></p>
+        <p class="muted">{{ running.scannedItemsCount|default(0) }} of {{ running.expectedItems }} pieces checked · started {{ running.createdAt|dmy_time }}</p>
+        <div class="bar"><span style="width: {{ running.expectedItems > 0 ? (running.scannedItemsCount / running.expectedItems * 100)|round : 0 }}%"></span></div>
+        <div class="row-gap" style="margin-top: 14px"><a class="btn btn-primary" href="/tally/{{ running._id }}">Continue counting</a></div>
+    </div>
+</section>
+{% elseif can('tally.create') %}
+<section class="panel">
+    <div class="panel-head"><h2>Start a new tally</h2></div>
+    <div class="panel-body">
+        {% if preview %}
+            <p class="muted">It will count <strong>{{ preview.items }}</strong> pieces{% if preview.containers %} in {{ preview.containers }} boxes{% endif %}:
+                {% for m in preview.metals %}{{ m.metalType|capitalize }} {{ m.items }} pieces ({{ m.weight|grams }}){{ loop.last ? '' : ' · ' }}{% endfor %}.</p>
+        {% endif %}
+        <form hx-post="/tally" hx-swap="none" class="row-gap wrap">
+            {{ csrf_field() }}
+            <input type="text" name="description" placeholder="Name (optional), e.g. Diwali count" class="grow" style="min-width: 220px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font: inherit">
+            <button class="btn btn-primary" type="submit">Start tally</button>
+        </form>
+    </div>
+</section>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-head"><h2>Earlier tallies</h2></div>
+    {% if past|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Tally</th><th>Date</th><th>Checked</th><th>Result</th></tr></thead>
+        <tbody>{% for s in past %}
+            <tr class="is-link" data-href="/tally/{{ s._id }}">
+                <td><a class="row-link" href="/tally/{{ s._id }}">{{ s.description }}</a><small>{{ s.createdBy.name|default('') }}</small></td>
+                <td>{{ s.date|dmy }}</td>
+                <td class="num">{{ s.scannedItemsCount|default(0) }} / {{ s.expectedItems }}</td>
+                <td>{% if s.status == 'force_locked' %}<span class="pill pill-amber">Locked · {{ s.missingAtLock|default([])|length }} missing</span>{% elseif s.status == 'locked' %}<span class="pill pill-green">Complete</span>{% else %}<span class="pill pill-grey">{{ s.status }}</span>{% endif %}{% if s.mismatchDetected %} <span class="pill pill-red">Weight differs</span>{% endif %}</td>
+            </tr>
+        {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="t-empty">No earlier tallies.</div>{% endif %}
+</section>

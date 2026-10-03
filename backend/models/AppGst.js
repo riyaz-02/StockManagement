@@ -3,8 +3,9 @@
  * `invoices` / `purchases` data is only ever read for reports).
  *
  *   app_gst_settings       one document: filing frequency, reminder lead times, opening ITC balance ...
- *   app_gst_filings        a record per return that was filed (date, ARN, amounts). Insert + edit, never deleted.
+ * (Filed returns are in the website's own `gst_data`, one document per quarter: see services/gstFilings.js.)
  *   app_gst_reminder_log   which reminders were already sent, so each is sent once
+ * (The generated monthly records go to the website's own `outputDoc`; see gstReportsController.)
  */
 'use strict';
 const mongoose = require('mongoose');
@@ -37,63 +38,13 @@ const settingsSchema = new mongoose.Schema(
     { collection: 'app_gst_settings', timestamps: true, versionKey: false }
 );
 
-const filingSchema = new mongoose.Schema(
-    {
-        // the registration (GSTIN) the return belongs to; '' = the firm's default GSTIN (see services/registrations.js)
-        gstin: { type: String, default: '', trim: true, uppercase: true },
-        returnType: { type: String, enum: ['GSTR-1', 'GSTR-3B', 'PMT-06', 'GSTR-9'], required: true },
-        period: { type: String, required: true },             // "2026-08", "2026-Q2", or "FY2026" for GSTR-9
-        filedOn: { type: String, required: true },            // YYYY-MM-DD
-        arn: { type: String, trim: true, default: '' },
-        taxLiability: money,                                   // total tax on the return
-        itcUsed: money,
-        cashPaid: money,
-        lateFee: money,
-        interest: money,
-        nil: { type: Boolean, default: false },
-        note: { type: String, trim: true, default: '' },
-        createdBy: String,
-        createdByName: String,
-        updatedBy: String,
-        updatedByName: String,
-    },
-    { collection: 'app_gst_filings', timestamps: true, versionKey: false }
-);
-filingSchema.index({ gstin: 1, returnType: 1, period: 1 }, { unique: true });
-// the first version of this collection was unique on (returnType, period) only: drop that index once
-mongoose.connection.once('connected', () => { mongoose.connection.collection('app_gst_filings').dropIndex('returnType_1_period_1').catch(() => {}); });
-
 const reminderLogSchema = new mongoose.Schema(
     { key: { type: String, required: true, unique: true }, sentAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 500 } },
     { collection: 'app_gst_reminder_log', versionKey: false }
 );
 
 // one row per generated PDF record (the website keeps the same audit trail in `outputDoc`)
-const documentSchema = new mongoose.Schema(
-    {
-        documentId: { type: String, required: true, unique: true },
-        documentType: { type: String, default: 'GST_MONTHLY_RECORD' },
-        documentName: String,
-        year: Number,
-        month: Number,
-        totalInvoices: Number,
-        validInvoices: Number,
-        totalAmount: Number,
-        totalGst: Number,
-        taxableAmount: Number,
-        partial: { type: Boolean, default: false },
-        generatedBy: String,
-        generatedByName: String,
-        branchId: String,
-        gstin: String,
-        branchFilter: String,
-    },
-    { collection: 'app_gst_documents', timestamps: true, versionKey: false }
-);
-
 module.exports = {
-    GstDocument: mongoose.models.AppGstDocument || mongoose.model('AppGstDocument', documentSchema),
     GstSettings: mongoose.models.AppGstSettings || mongoose.model('AppGstSettings', settingsSchema),
-    GstFiling: mongoose.models.AppGstFiling || mongoose.model('AppGstFiling', filingSchema),
     GstReminderLog: mongoose.models.AppGstReminderLog || mongoose.model('AppGstReminderLog', reminderLogSchema),
 };

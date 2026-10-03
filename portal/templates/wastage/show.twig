@@ -1,0 +1,33 @@
+{% if r._id is defined %}
+<div class="modal-form">
+    <h2>{{ r.metal|capitalize }} wastage: {{ r.amount|grams }}</h2>
+    <p>
+        {% if r.status == 'approved' %}<span class="pill pill-green">Approved: counts in the balance</span>{% elseif r.status == 'rejected' %}<span class="pill pill-red">Rejected: does not count</span>{% else %}<span class="pill pill-amber">Waiting for approval: not counted yet</span>{% endif %}
+    </p>
+    <div class="kv">
+        <div class="kv-row"><span>Date</span><strong>{{ r.date|date('d M Y') }}</strong></div>
+        <div class="kv-row"><span>Category</span><strong>{{ r.category }}</strong></div>
+        <div class="kv-row"><span>What happened</span><strong>{{ r.reason|default('–') }}</strong></div>
+        {% if r.remarks %}<div class="kv-row"><span>Note</span><strong>{{ r.remarks }}</strong></div>{% endif %}
+        <div class="kv-row"><span>Reported by</span><strong>{{ r.reportedBy.name|default('–') }}{% if r.createdAt %} · {{ r.createdAt|date('d M Y, h:i A') }}{% endif %}</strong></div>
+        {% if r.status == 'approved' and r.approvedBy %}<div class="kv-row"><span>Approved by</span><strong>{{ r.approvedBy.name }}{% if r.approvedAt %} · {{ r.approvedAt|date('d M Y, h:i A') }}{% endif %}</strong></div>{% endif %}
+        {% if r.status == 'rejected' %}<div class="kv-row"><span>Rejected</span><strong>{% if r.rejectedAt %}{{ r.rejectedAt|date('d M Y, h:i A') }}{% endif %}</strong></div>{% endif %}
+        {% if r.comment %}<div class="kv-row"><span>Comment</span><strong>{{ r.comment }}</strong></div>{% endif %}
+        {% if r.attachment %}<div class="kv-row"><span>Document</span><strong>{{ r.attachment.name }}{% if r.attachment.onWebsite %} <small class="muted">(kept on the old website)</small>{% endif %}</strong></div>{% endif %}
+    </div>
+    {% set mine = r.reportedBy.id == me %}
+    <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal>Close</button>
+        {% if r.status == 'pending' and mine and can('wastage.report') %}<button type="button" class="btn" hx-get="/stock/wastage/{{ r._id }}/edit" hx-target="#modal-body">Change</button>{% endif %}
+        {% if can('wastage.approve') %}
+            {% if r.status == 'pending' or r.status == 'approved' %}<button type="button" class="btn btn-danger" hx-get="/stock/wastage/{{ r._id }}/reject" hx-target="#modal-body">{{ r.status == 'approved' ? 'Reverse approval' : 'Reject' }}</button>{% endif %}
+            {% if r.status == 'pending' %}
+                {% if mine and not is_admin() %}<span class="muted">You reported this: someone else must approve it.</span>
+                {% else %}<button type="button" class="btn btn-primary" hx-post="/stock/wastage/{{ r._id }}/approve" hx-swap="none" hx-confirm="Approve this wastage? It will then count in the metal balance.">Approve</button>{% endif %}
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="notice notice-error">That wastage report was not found.</div>
+{% endif %}
