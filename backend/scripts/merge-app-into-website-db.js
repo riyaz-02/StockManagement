@@ -83,8 +83,17 @@ async function copyCollections(sdb, tdb, apply, report) {
             const need = new Set((await missingIds(dst, ids)).map(String));
             row.alreadyInTarget += ids.length - need.size;
             const fresh = batch.filter((d) => need.has(String(d._id)));
-            if (fresh.length && apply) await dst.insertMany(fresh, { ordered: false });
-            row.added += fresh.length;
+            let skipped = 0;
+            if (fresh.length && apply) {
+                try { await dst.insertMany(fresh, { ordered: false }); } catch (e) {
+                    // a document whose unique key (not its _id) is already in the target is the same record under another id: leave it
+                    const errs = e.writeErrors || [];
+                    if (e.code !== 11000 || !errs.length || errs.some((w) => w.code !== 11000)) throw e;
+                    skipped = errs.length;
+                    (row.duplicateKeySkipped = row.duplicateKeySkipped || []).push(...errs.map((w) => String(fresh[w.index] && fresh[w.index]._id)));
+                }
+            }
+            row.added += fresh.length - skipped;
             batch = [];
         };
         for await (const buf of src.find({}, { raw: true, batchSize: 500 })) {

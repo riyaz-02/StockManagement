@@ -14,8 +14,8 @@ param([switch]$Yes)
 $KeyFile      = "$env:USERPROFILE\OneDrive\Desktop\lgp-stock-key.pem"   # or stock-key-2.pem - whichever your EC2 uses
 $SshUser      = 'ubuntu'
 $Host_        = 'api.laltuguineapalace.com'                             # DNS follows the EC2 public IP after wake
-$RemoteRepo   = '/var/www/laltu-api'                                    # folder on EC2 that holds the git clone
-$BackendSub   = ''                                                       # '' if that folder IS backend/, else e.g. 'backend'
+$RemoteRepo   = '/home/ubuntu/StockManagement'                         # folder on EC2 that holds the git clone (confirmed from pm2 on 4 Oct 2026)
+$BackendSub   = 'backend'                                              # the API (and its .env) lives in backend/ inside the clone
 $Pm2Name      = 'laltu-api'
 $Branch       = 'main'
 $WakeUrl      = 'https://45skg376c6xml6yifrzyct75rm0isktv.lambda-url.ap-south-1.on.aws/'

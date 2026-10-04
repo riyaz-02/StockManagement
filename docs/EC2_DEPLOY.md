@@ -23,7 +23,7 @@ You run these yourself; nothing here has been run by Claude. The release that is
    ```bash
    node -v                      # must be v18.17 or newer (v20 is better)
    pm2 status                   # the process 'laltu-api' should be online
-   cd /var/www/laltu-api && ls  # the git clone (if your folder differs, fix $RemoteRepo in deploy-prod.ps1)
+   cd /home/ubuntu/StockManagement/backend && ls  # the git clone (if your folder differs, fix $RemoteRepo in deploy-prod.ps1)
    grep -o '^[A-Z_0-9]*=' .env  # the NAMES of the settings (not the values)
    ```
    If `node -v` is older than 18.17, stop and tell me (Node must be upgraded first).
@@ -72,11 +72,11 @@ You run these yourself; nothing here has been run by Claude. The release that is
     ```bash
     pm2 logs laltu-api --lines 60 --nostream
     ```
-    You should see the database connect to `shopmanage` and no "S3" or "sharp" errors. If `sharp` failed to install: `cd /var/www/laltu-api && npm install --omit=dev` and read the error.
+    You should see the database connect to `shopmanage` and no "S3" or "sharp" errors. If `sharp` failed to install: `cd /home/ubuntu/StockManagement/backend && npm install --omit=dev` and read the error.
 13. **Test**, signed in as admin on the website and the app: Home, a bill, the Summary; add an item with a photo: its link must start with `https://laltu-guinea-palace-media.s3.ap-south-1.amazonaws.com/media/items/` and open in a browser; delete the test item.
 14. **Sign-in gate OFF.**
 
 ## If something goes wrong
 - The server will not start: `pm2 logs laltu-api`. Most likely `MONGODB_URI` (must end with the database name) or a missing package.
-- Go back: `cd /var/www/laltu-api && git log --oneline -3` (note the older commit), `git checkout <older commit>`, `cp .env.backup-before-cutover .env`, `npm install --omit=dev`, `pm2 restart laltu-api --update-env`. (Within the first day this works; after that new data exists only in `shopmanage`.)
+- Go back: `cd /home/ubuntu/StockManagement/backend && git log --oneline -3` (note the older commit), `git checkout <older commit>`, `cp .env.backup-before-cutover .env`, `npm install --omit=dev`, `pm2 restart laltu-api --update-env`. (Within the first day this works; after that new data exists only in `shopmanage`.)
 - Photos do not upload: `S3_BUCKET` typo, the role not attached (step 7), or the bucket policy; `pm2 logs` shows the AWS message. With no `S3_BUCKET` set, uploads go to Cloudinary as before.
