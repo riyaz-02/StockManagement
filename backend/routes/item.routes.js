@@ -15,7 +15,8 @@ const {
     markAsActive
 } = require('../controllers/itemController');
 const { protect, requirePermission } = require('../middleware/auth');
-const cloudinaryUpload = require('../middleware/cloudinaryUpload');
+const { mediaUpload, MB } = require('../middleware/mediaUpload');
+const cloudinaryUpload = mediaUpload({ allow: ['image'], maxBytes: 12 * MB, folder: () => 'items' });
 
 // All routes require authentication
 router.use(protect);

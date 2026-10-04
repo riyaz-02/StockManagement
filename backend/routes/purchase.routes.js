@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { protect, requirePermission } = require('../middleware/auth');
-const purchaseBillUpload = require('../middleware/purchaseBillUpload');
-const cloudinary = require('../config/cloudinary');
+const { mediaUpload, MB } = require('../middleware/mediaUpload');
+const purchaseBillUpload = mediaUpload({ allow: ['image', 'pdf'], maxBytes: 15 * MB, folder: () => 'purchase-bills', maxSide: 2000, thumb: false });
+const store = require('../services/mediaStore');
 const ctrl = require('../controllers/purchaseController');
 
 // All purchase routes require authentication
@@ -36,12 +37,16 @@ router.post('/upload-bill', requirePermission('purchases.create'), purchaseBillU
     }
 });
 
-// ── Delete a bill attachment from Cloudinary ──────────────────────────────────
-// DELETE /api/purchases/attachment/:publicId
+// ── Delete a bill attachment (S3 or Cloudinary) ───────────────────────────────
+// DELETE /api/purchases/attachment/:publicId   (the id uses -- for /)
 router.delete('/attachment/:publicId', requirePermission('purchases.edit'), async (req, res) => {
     try {
-        // publicId uses -- for / (same convention as main upload routes)
         const publicId = req.params.publicId.replace(/--/g, '/');
+        if (publicId.startsWith(store.PREFIX)) {
+            const ok = await store.removeByUrl(publicId);
+            return res.json({ success: ok, message: ok ? 'ok' : 'not found' });
+        }
+        const cloudinary = require('../config/cloudinary');
         const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' })
             .catch(() => cloudinary.uploader.destroy(publicId)); // fallback: try image type
         res.json({ success: result.result === 'ok', message: result.result });

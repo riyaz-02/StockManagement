@@ -5,7 +5,7 @@ const cloudinary = require('../config/cloudinary');
  * @param {string} imageUrl - Full Cloudinary URL
  * @returns {Promise<boolean>} - Success status
  */
-const deleteCloudinaryImage = async (imageUrl) => {
+const destroyCloudinaryUrl = async (imageUrl) => {
     try {
         // Extract public_id from Cloudinary URL
         // URL format: https://res.cloudinary.com/cloud-name/image/upload/v1234567/folder/filename.jpg
@@ -38,7 +38,13 @@ const deleteCloudinaryImage = async (imageUrl) => {
 };
 
 /**
- * Delete multiple images from Cloudinary
+ * Delete one stored file by its link, wherever it lives: an S3 link is deleted from S3, a Cloudinary link from Cloudinary
+ * (the old name is kept so every caller keeps working).
+ */
+const deleteCloudinaryImage = (imageUrl) => require('../services/mediaStore').removeByUrl(imageUrl);
+
+/**
+ * Delete multiple images (S3 or Cloudinary)
  * @param {string[]} imageUrls - Array of Cloudinary URLs
  * @returns {Promise<number>} - Number of successfully deleted images
  */
@@ -95,6 +101,7 @@ const getMediumUrl = (imageUrl) => {
 };
 
 module.exports = {
+    destroyCloudinaryUrl,
     deleteCloudinaryImage,
     deleteCloudinaryImages,
     getOptimizedImageUrl,

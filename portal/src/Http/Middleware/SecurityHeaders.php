@@ -15,7 +15,9 @@ final class SecurityHeaders implements MiddlewareInterface
     public function process(Request $request, Handler $handler): Response
     {
         $r = $handler->handle($request);
-        $csp = "default-src 'self'; img-src 'self' data: https://res.cloudinary.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' " . Config::publicApiBase() . "; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        // pictures may come from Cloudinary (the old ones) and from the shop's S3 bucket / CloudFront address (the new ones)
+        $imgHosts = trim('https://res.cloudinary.com https://*.s3.ap-south-1.amazonaws.com ' . (string) Config::get('PORTAL_IMG_HOSTS', ''));
+        $csp = "default-src 'self'; img-src 'self' data: " . $imgHosts . "; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' " . Config::publicApiBase() . "; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         $r = $r->withHeader('Content-Security-Policy', $csp)
             ->withHeader('X-Frame-Options', 'DENY')
             ->withHeader('X-Content-Type-Options', 'nosniff')

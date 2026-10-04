@@ -10,7 +10,8 @@ const {
     uploadImage
 } = require('../controllers/containerController');
 const { protect, requirePermission } = require('../middleware/auth');
-const cloudinaryUpload = require('../middleware/cloudinaryUpload');
+const { mediaUpload, MB } = require('../middleware/mediaUpload');
+const cloudinaryUpload = mediaUpload({ allow: ['image'], maxBytes: 12 * MB, folder: () => 'containers' });
 
 // All routes require authentication
 router.use(protect);

@@ -347,11 +347,12 @@ exports.uploadImage = (req, res) => {
         });
     }
 
-    // Return URL path (assuming /uploads is served statically)
+    // the full link of the stored picture (S3, or Cloudinary while no bucket is set)
     res.status(200).json({
         success: true,
         message: 'Image uploaded successfully',
-        url: `/uploads/${req.file.filename}`
+        url: req.file.path,
+        thumbUrl: req.file.thumbUrl || ''
     });
 };
 

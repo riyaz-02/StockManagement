@@ -860,37 +860,19 @@ class ApiService {
     }
   }
 
-  /// Delete image from Cloudinary
-  /// imageUrl: Full Cloudinary URL
+  /// Delete a stored picture / file by its link. The server works out where it lives (S3 or Cloudinary).
   /// Returns: true if deleted successfully
   Future<bool> deleteImage(String imageUrl) async {
     try {
-      // Extract public_id from URL
-      // URL format: https://res.cloudinary.com/cloud-name/image/upload/v1234/folder/filename.jpg
-      final urlParts = imageUrl.split('/');
-      final uploadIndex = urlParts.indexOf('upload');
-
-      if (uploadIndex == -1) {
-        print('[API] Not a Cloudinary URL, skipping deletion');
-        return false;
-      }
-
-      // Get everything after 'upload/v123456/'
-      final publicIdWithExt = urlParts.sublist(uploadIndex + 2).join('/');
-      // Remove file extension
-      final publicId =
-          publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
-
-      // Replace / with -- for URL encoding
-      final encodedPublicId = publicId.replaceAll('/', '--');
-
-      final response = await http.delete(
-        Uri.parse('${AppConstants.baseUrl}/upload/$encodedPublicId'),
+      if (imageUrl.trim().isEmpty) return false;
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/upload/delete'),
         headers: await _getHeaders(),
+        body: json.encode({'url': imageUrl}),
       );
 
       if (response.statusCode == 200) {
-        print('[API] ✅ Image deleted from Cloudinary: $publicId');
+        print('[API] Image deleted: $imageUrl');
         return true;
       } else {
         print('[API] ⚠️ Failed to delete image: ${response.body}');
