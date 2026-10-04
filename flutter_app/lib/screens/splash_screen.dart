@@ -98,7 +98,6 @@ class _SplashScreenState extends State<SplashScreen>
     // The update check runs in the background from here on: it must never delay sign-in. A forced update still
     // blocks the app once its popup appears (see update_dialog.dart) — just on the Home/Login screen instead of
     // stalling here on the splash.
-    unawaited(LiveReactions.checkAppUpdate());
 
     // Server is online — check auth token
     await authProvider.initialize();
@@ -113,6 +112,10 @@ class _SplashScreenState extends State<SplashScreen>
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
+
+    // Only now, once the first real screen is in place: a pop-up opened while the splash was still being replaced was
+    // swapped out with it, which is why "Update available" showed only sometimes.
+    Future.delayed(const Duration(milliseconds: 1200), () => unawaited(LiveReactions.checkAppUpdate()));
   }
 
   @override

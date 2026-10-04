@@ -21,9 +21,11 @@
  *              round_off    = payable - (itemsTotal + additional - discount)
  *              due_advance  = paid - payable    (negative = customer owes us)
  *   TDS        payable > Rs 2,00,000  ->  1% of payable, customer PAN required
- *   hallmark / an item may be Hallmarked or carry a HUID; the hallmarking charge is a pre-tax
- *   HUID       charge (added to the taxable amount) and the invoice name reads
- *              "Ring (Hallmarked)" or "Ring (HUID: AB12CD)".
+ *   hallmark / an item may be Hallmarked or carry a HUID. The hallmarking centre has ALREADY charged GST on its
+ *   HUID       fee, so the charge is passed on as it is: it is NOT part of the taxable value and carries no GST
+ *              (rule v3). It is added to the line AFTER the tax, so line total = taxable + GST + hallmark charge,
+ *              and it is never discounted. Bills made before v3 (rule v2) had it inside the taxable amount.
+ *              The invoice name reads "Ring (Hallmarked)" or "Ring (HUID: AB12CD)".
  *   stones /   an item may carry extras (stone, diamond, another metal) with a weight and a
  *   other      value; the value is added to the taxable amount of that line.
  *   metals     (the website has no such field: it only ever stored the resulting taxable amount)
@@ -43,7 +45,7 @@
  */
 'use strict';
 
-const RULE = 'lgpmanagement-v2';               // discount before GST (this app)
+const RULE = 'lgpmanagement-v3';               // discount before GST + hallmark charge outside the taxable value (this app)
 const RULE_LEGACY = 'lgpmanagement-v1';        // the website's old rule: discount after GST
 const GST_HALF = 0.015;
 const GST_FULL = 0.03;
@@ -131,21 +133,22 @@ function computeInvoice(input) {
         }
         const extrasAmount = r2(extras.reduce((a, e) => a + e.amount, 0));
 
-        // hallmark / HUID: a pre-tax charge, and part of the name printed on the invoice
+        // hallmark / HUID: the centre's fee already carries its GST, so it is passed on after tax (never taxed again);
+        // the certification is also part of the name printed on the invoice
         const huid = String(it.huid || '').trim().toUpperCase().slice(0, 20);
         const certification = it.certification === 'hallmark' || it.certification === 'huid' ? it.certification : (huid ? 'huid' : '');
         if (certification === 'huid' && !/^[A-Z0-9]{6}$/.test(huid)) return { ok: false, error: `Item ${n}: HUID must be 6 letters or digits` };
         const hallmarkCharge = certification ? r2(Math.max(0, num(it.hallmarkCharge))) : 0;
 
         const metalRaw = netWt * rate;                                   // what the metal itself is worth today
-        const preTax = extrasAmount + hallmarkCharge;                    // stones + hallmark: never discounted
+        const preTax = extrasAmount;                                     // stones: taxable, never discounted (the hallmark charge sits outside the taxable value)
         const overridden = it.taxableOverride !== undefined && it.taxableOverride !== null && String(it.taxableOverride).trim() !== '';
         const taxable0 = overridden ? r2(it.taxableOverride) : metalRaw + makingCharge + preTax;
         if (overridden && !(taxable0 > 0)) return { ok: false, error: `Item ${n}: taxable amount must be more than 0` };
         if (!legacy && overridden && Math.round(taxable0 * 100) < Math.round(metalRaw * 100)) {
             return { ok: false, error: `Item ${n}: taxable amount cannot be below the metal value (₹${r2(metalRaw).toFixed(2)})` };
         }
-        // how much of this line can ever be discounted: only what is above metal + stones + hallmark
+        // how much of this line can ever be discounted: only what is above metal + stones
         // (the making charge, or the making charge hidden inside a typed taxable amount)
         // With no making charge on the line (and no typed taxable amount) the discount comes off the total, but never
         // below the metal value; with a making charge, only that making charge can be discounted.
@@ -169,7 +172,7 @@ function computeInvoice(input) {
         const cgstRaw = interstate ? 0 : taxableRaw * GST_HALF;
         const sgstRaw = interstate ? 0 : taxableRaw * GST_HALF;
         const igstRaw = interstate ? taxableRaw * GST_FULL : 0;
-        const total = r2(taxableRaw + cgstRaw + sgstRaw + igstRaw);
+        const total = r2(taxableRaw + cgstRaw + sgstRaw + igstRaw + b.hallmarkCharge);   // hallmark charge: after tax, no GST on it
         // typed taxable amount: the making charge lives inside it, so the making column is 0 and the name says so
         const making = legacy ? b.makingCharge : (b.overridden ? 0 : r2(Math.max(0, b.makingCharge - dPaise / 100)));
         const hiddenMaking = !legacy && b.overridden && Math.round(taxableRaw * 100) > Math.round(b.floorRaw * 100);
@@ -195,7 +198,7 @@ function computeInvoice(input) {
         if (b.certification) {
             line.certification = b.certification;
             if (b.huid) line.huid = b.huid;
-            if (b.hallmarkCharge > 0) line.hallmark_charge = b.hallmarkCharge;
+            if (b.hallmarkCharge > 0) { line.hallmark_charge = b.hallmarkCharge; line.hallmark_in_taxable = false; }
         }
         if (b.certification || hiddenMaking) line.item_name = b.particulars;
         if (b.extras.length) { line.extras = b.extras; line.stone_charge = b.extrasAmount; }
@@ -238,6 +241,7 @@ function computeInvoice(input) {
     const bill0 = Math.round(before0);                              // what the customer would pay with no discount
     const ro0 = bill0 - before0;
     const metalValue = r2(sum(base, (b) => b.metalRaw));
+    const hallmarkTotal = r2(sum(base, (b) => b.hallmarkCharge));   // passed-on hallmark / HUID fees: inside the total, outside the taxable value
     // the most that can be taken off what the customer pays, leaving metal + stones + hallmark untouched
     const maxDiscount = legacy ? 0 : Math.max(0, Math.floor((sumHp / 100) * (1 + GST_FULL) + ro0 - 0.02));
 
@@ -306,7 +310,7 @@ function computeInvoice(input) {
         discountBeforeGst,                                          // the part taken off the taxable value
         billBeforeDiscount: bill0,
         grossTaxable,                                               // goods value before the discount
-        metalValue, maxDiscount,
+        metalValue, hallmarkTotal, maxDiscount,
         roundOff,
         totalPayableAmount,
         paidAmount, dueAdvance,

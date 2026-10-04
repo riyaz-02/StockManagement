@@ -47,7 +47,13 @@
     <aside class="bill-side">
         <section class="panel sticky-panel">
             <div class="panel-head"><h2>Amount</h2></div>
-            <div class="panel-body" id="totals"><p class="muted">Enter the weight and the rate to see the amount.</p></div>
+            <div class="panel-body">
+                <div id="totals"><p class="muted">Enter the weight and the rate to see the amount.</p></div>
+                <label class="field" style="margin-top:12px"><span>Invoice total as printed on the bill (optional)</span>
+                    <input type="number" step="0.01" min="0" inputmode="decimal" name="invoiceTotal" value="{{ v.invoiceTotal|default('') }}" placeholder="same as calculated">
+                    <small class="hint" id="inv-total-hint">Type it when the supplier rounded the total. Only a small round-off is accepted; GST stays as calculated.</small>
+                </label>
+            </div>
             <div class="panel-foot"><a class="btn" href="/purchases">{{ t('common.cancel') }}</a><button class="btn btn-primary" type="submit">Save purchase</button></div>
         </section>
     </aside>

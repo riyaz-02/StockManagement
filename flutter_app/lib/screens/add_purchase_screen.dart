@@ -34,6 +34,9 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
   final _taxableCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  // The invoice total as printed on the supplier's bill: follows the calculated total until the user types it (round-off).
+  final _invoiceTotalCtl = TextEditingController();
+  bool _totalTouched = false;
 
   // ── Purchase valuation (Stock Setting > Purchase rules) ──
   bool _useValuation = false;
@@ -136,6 +139,10 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       _metalType = p.metalType;
       _transactionType = p.transactionType;
       _taxableOverride = true; // don't auto-overwrite on init
+      if (p.roundOff != 0) {
+        _totalTouched = true;
+        _invoiceTotalCtl.text = p.totalPayable.toStringAsFixed(2);
+      }
       final vi = p.valuation?['input'];
       if (vi is Map) {
         _useValuation = true;
@@ -193,6 +200,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       _vLabour,
       _descCtrl,
       _remarksCtrl,
+      _invoiceTotalCtl,
     ]) {
       c.dispose();
     }
@@ -234,8 +242,16 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
   }
 
   void _debounceGst() {
+    _syncTotal();
     setState(() {}); // update computed display immediately
     _recalcGst();
+  }
+
+  /// Until the user types the supplier's invoice total, the field simply shows the calculated total.
+  void _syncTotal() {
+    if (_totalTouched) return;
+    final c = _calcTotal;
+    _invoiceTotalCtl.text = c > 0 ? c.toStringAsFixed(2) : '';
   }
 
   Future<void> _recalcGst() async {
@@ -248,24 +264,37 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
     final store = Provider.of<StoreProvider>(context, listen: false);
     final calc = await store.calculateGst(
         baseAmount: taxable, transactionType: _transactionType);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _gst = calc;
         _isCalcLoading = false;
       });
+      _syncTotal();
+    }
   }
 
   // The hallmark fee of the valuation and the GST on it: added on top of the 3% goods amount (also by the server on save).
   double get _hallFee => _useValuation ? (_val['hallmarkCharge'] ?? 0) : 0;
   double get _hallGst => _useValuation ? (_val['hallmarkGst'] ?? 0) : 0;
 
-  // ── Invoice total (rounded) ───────────────────────────────────────────────
-  double get _invoiceTotal {
+  // ── Invoice total ─────────────────────────────────────────────────────────
+  static const double _maxRoundOff = 50; // the server accepts a supplier round-off up to this much
+  double _round2(double v) => (v * 100).round() / 100;
+
+  /// What the rules work out: taxable + GST (+ hallmark fee and its GST), to the paisa. (Estimated at 3% until the server answers.)
+  double get _calcTotal {
     final taxable = double.tryParse(_taxableCtrl.text) ?? 0;
-    if (_gst != null) return _hallFee > 0 ? _gst!.totalPayable + _hallFee + _hallGst : (_gst!.totalPayable).roundToDouble();
-    // Estimated before GST loads (3%)
-    return (taxable * 1.03).roundToDouble();
+    if (_gst != null) return _round2(_gst!.totalPayable + _hallFee + _hallGst);
+    return _round2(taxable * 1.03 + _hallFee + _hallGst);
   }
+
+  /// The total as printed on the supplier's bill when the user typed one, else the calculated total.
+  double get _invoiceTotal {
+    final typed = _totalTouched ? double.tryParse(_invoiceTotalCtl.text) : null;
+    return typed != null && typed > 0 ? _round2(typed) : _calcTotal;
+  }
+
+  double get _roundOff => _round2(_invoiceTotal - _calcTotal);
 
   // ── File upload ───────────────────────────────────────────────────────────
   Future<void> _upload({required bool camera}) async {
@@ -325,6 +354,10 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       _snack('Please fill weight, rate and verify amount');
       return;
     }
+    if (_roundOff.abs() > _maxRoundOff) {
+      _snack('The invoice total can differ from the calculated ₹${_fmtN(_calcTotal)} by at most ₹${_maxRoundOff.toStringAsFixed(0)} (the supplier\'s round-off)');
+      return;
+    }
     setState(() {
       _isSaving = true;
       _isDuplicate = false;
@@ -344,6 +377,8 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
       'description': _descCtrl.text.trim(),
       'remarks': _remarksCtrl.text.trim(),
       'attachmentMeta': _attachmentMeta,
+      // the supplier's printed total, only when it differs from the calculated one; an edit also clears an old round-off
+      if (_roundOff != 0) 'invoiceTotal': _invoiceTotal else if (_isEdit && widget.purchase!.gstRecorded) 'invoiceTotal': '',
       if (_useValuation)
         'valuation': {'gross': _vGross.text, 'less': _vLess.text, 'net': _vNet.text.trim(), 'purity': _vPurity, 'wastage': _vWastage.text, 'rate': _rateCtrl.text, 'labourRate': _vLabour.text, 'pieces': int.tryParse(_vPieces.text) ?? 1, 'certification': _vCert},
     };
@@ -786,40 +821,72 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
     );
   }
 
-  // ── Invoice Total (taxable + GST, rounded) — stacked to avoid overflow ──
+  // ── Invoice total: what the rules work out, and the supplier's printed total (editable: round-off) ──
   Widget _invoiceTotalRow() {
     final taxable = double.tryParse(_taxableCtrl.text) ?? 0;
     final gstAmt = (_gst?.totalGst ?? (taxable * 0.03)) + _hallGst;
-    final total = _hallFee > 0 ? taxable + gstAmt + _hallFee : (taxable + gstAmt).roundToDouble();
+    final calc = _calcTotal;
+    final ro = _roundOff;
+    final tooBig = ro.abs() > _maxRoundOff;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: AppColors.primary.withAlpha(10),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.primary.withAlpha(30)),
       ),
-      child: Row(children: [
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_hallFee > 0 ? 'Taxable + GST + hallmark fee' : 'Taxable + GST',
-                style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_hallFee > 0 ? 'Taxable + GST + hallmark fee' : 'Taxable + GST', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+              const SizedBox(height: 1),
+              Text('₹${_fmtN(taxable)} + ₹${_fmtN(gstAmt)}${_hallFee > 0 ? ' + ₹${_fmtN(_hallFee)}' : ''}', style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text('Calculated total', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
             const SizedBox(height: 1),
-            Text('₹${_fmtN(taxable)} + ₹${_fmtN(gstAmt)}${_hallFee > 0 ? ' + ₹${_fmtN(_hallFee)}' : ''}',
-                style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+            Text('₹${_fmtN(calc)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey[800])),
           ]),
-        ),
-        const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('Invoice Total',
-              style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-          const SizedBox(height: 1),
-          Text('₹${_fmtN(total)}',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary)),
         ]),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _invoiceTotalCtl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+          decoration: _dec(
+            'Invoice total as on the bill (₹)',
+            Icons.receipt_long_outlined,
+            suffix: _totalTouched
+                ? GestureDetector(
+                    onTap: () => setState(() {
+                      _totalTouched = false;
+                      _syncTotal();
+                    }),
+                    child: const Padding(padding: EdgeInsets.only(right: 10), child: Icon(Icons.refresh_rounded, size: 18, color: Colors.orange)),
+                  )
+                : const Padding(padding: EdgeInsets.only(right: 10), child: Icon(Icons.auto_awesome, size: 15, color: Colors.green)),
+          ),
+          onChanged: (v) => setState(() => _totalTouched = true), // an empty box simply means "use the calculated total"
+        ),
+        if (ro != 0) ...[
+          const SizedBox(height: 6),
+          Row(children: [
+            Icon(tooBig ? Icons.error_outline_rounded : Icons.swap_vert_rounded, size: 15, color: tooBig ? Colors.red.shade700 : Colors.amber.shade800),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                tooBig
+                    ? 'Differs by ₹${_fmtN(ro.abs())}: more than ₹${_maxRoundOff.toStringAsFixed(0)} cannot be a round-off. Check the weight, rate or tax type.'
+                    : "Supplier's round-off ${ro > 0 ? '+' : '−'}₹${_fmtN(ro.abs())} · GST stays as calculated",
+                style: TextStyle(fontSize: 11, color: tooBig ? Colors.red.shade700 : Colors.amber.shade900, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ]),
+        ],
       ]),
     );
   }
@@ -879,13 +946,19 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
             ],
             const Divider(height: 14),
 
+            if (_roundOff != 0) ...[
+              _r2('Calculated total', '₹${_fmtN(_calcTotal)}', Colors.grey[800]!),
+              const SizedBox(height: 2),
+              _r2("Supplier's round-off", '${_roundOff > 0 ? '+' : '−'}₹${_fmtN(_roundOff.abs())}', Colors.amber.shade900),
+              const SizedBox(height: 4),
+            ],
             // Invoice Total
             Row(children: [
               const Text('Invoice Total',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const Spacer(),
               Text(
-                '₹${_fmtN(_hallFee > 0 ? g.totalPayable + _hallFee + _hallGst : g.totalPayable.roundToDouble())}',
+                '₹${_fmtN(_invoiceTotal)}',
                 style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -896,7 +969,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
               const SizedBox(height: 4),
               _r2('TDS ${g.tdsRate.toStringAsFixed(0)}% (194Q)',
                   '−₹${_fmtN(g.tdsAmount)}', Colors.orange),
-              _r2('Net Payable', '₹${_fmtN(g.netPayable + _hallFee + _hallGst)}', Colors.grey[900]!,
+              _r2('Net Payable', '₹${_fmtN(g.netPayable + _hallFee + _hallGst + _roundOff)}', Colors.grey[900]!,
                   bold: true),
             ],
             const Divider(height: 14),
@@ -932,7 +1005,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
               Icon(Icons.check_circle_outline,
                   size: 12, color: Colors.green.shade600),
               const SizedBox(width: 5),
-              Text('Effective inventory cost: ₹${_fmtN(g.effectiveCost + _hallFee)}',
+              Text('Effective inventory cost: ₹${_fmtN(g.effectiveCost + _hallFee + _roundOff)}',
                   style: TextStyle(fontSize: 10, color: Colors.green.shade700)),
             ]),
           ]),

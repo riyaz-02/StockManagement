@@ -201,6 +201,23 @@ async function priceValuation(valuationIn, txType) {
     return { qty: out.net, rate: Number(inp.rate), totalAmount: out.goodsTaxable, valuation: { input: inp, result: out }, hall };
 }
 
+// The invoice total printed on the supplier's bill can differ from the worked-out total by a round-off (suppliers round to
+// the rupee, or to the nearest 5 / 10). The total is then taken as typed and the difference is recorded as `roundOff`.
+// GST, input credit and TDS stay as calculated (they are worked out from the taxable value); only what is paid moves.
+const MAX_ROUND_OFF = 50;
+function applyInvoiceTotal(gf, invoiceTotalRaw) {
+    const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+    const calc = gf.totalPayable;
+    if (invoiceTotalRaw === undefined || invoiceTotalRaw === null || String(invoiceTotalRaw).trim() === '') return { gf: { ...gf, roundOff: 0, calculatedPayable: calc } };
+    const t = r2(parseFloat(invoiceTotalRaw));
+    if (!(t > 0)) return { error: "Enter the invoice total as printed on the supplier's bill" };
+    const ro = r2(t - calc);
+    if (Math.abs(ro) > MAX_ROUND_OFF) {
+        return { error: `The invoice total can differ from the calculated ₹${calc.toFixed(2)} by at most ₹${MAX_ROUND_OFF} (the supplier's round-off). Check the weight, rate or tax type instead.` };
+    }
+    return { gf: { ...gf, totalPayable: t, netPayable: r2(gf.netPayable + ro), effectiveCost: r2(gf.effectiveCost + ro), roundOff: ro, calculatedPayable: calc } };
+}
+
 // The GST fields of a purchase: the goods at the purchase rate plus (if any) the hallmark fee and its GST (input credit too).
 function gstFields(gst, hall) {
     const h = hall || { charge: 0, gst: 0, cgst: 0, sgst: 0, igst: 0 };
@@ -230,7 +247,7 @@ function gstFields(gst, hall) {
 // Body as for create: { quantity, rate, totalAmount? , transactionType?, valuation? }.
 exports.calculate = async (req, res) => {
     try {
-        const { quantity, rate, totalAmount: totalAmountRaw, transactionType, valuation: valuationIn } = req.body || {};
+        const { quantity, rate, totalAmount: totalAmountRaw, transactionType, valuation: valuationIn, invoiceTotal } = req.body || {};
         let qty = parseFloat(quantity);
         let rateVal = parseFloat(rate);
         let totalAmount = totalAmountRaw != null && totalAmountRaw !== '' ? parseFloat(totalAmountRaw) : parseFloat((qty * rateVal).toFixed(2));
@@ -243,8 +260,9 @@ exports.calculate = async (req, res) => {
             qty = v.qty; rateVal = v.rate; totalAmount = v.totalAmount; valuation = v.valuation; hall = v.hall;
         }
         if (!(totalAmount > 0)) return res.status(400).json({ success: false, message: 'Enter the weight and the rate, or the taxable amount' });
-        const gf = gstFields(calculateGST(totalAmount, gstConfig, txType), hall);
-        res.json({ success: true, data: { quantity: qty, rate: rateVal, totalAmount, valuation: valuation && valuation.result, ...gf } });
+        const adj = applyInvoiceTotal(gstFields(calculateGST(totalAmount, gstConfig, txType), hall), invoiceTotal);
+        if (adj.error) return res.status(400).json({ success: false, message: adj.error });
+        res.json({ success: true, data: { quantity: qty, rate: rateVal, totalAmount, valuation: valuation && valuation.result, ...adj.gf } });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Error calculating the purchase' });
     }
@@ -266,6 +284,7 @@ exports.createPurchase = async (req, res) => {
             remarks = '',
             attachmentMeta = [],
             valuation: valuationIn,
+            invoiceTotal,
         } = req.body;
 
         // ── Mandatory field validation ─────────────────────────────────────
@@ -312,7 +331,9 @@ exports.createPurchase = async (req, res) => {
 
         // ── GST calculation ────────────────────────────────────────────────
         const gst = calculateGST(parseFloat(totalAmount), gstConfig, txType);
-        const gf = gstFields(gst, hall);
+        const adj = applyInvoiceTotal(gstFields(gst, hall), invoiceTotal);
+        if (adj.error) return res.status(400).json({ success: false, message: adj.error });
+        const gf = adj.gf;
 
         // ── The shop's calendar day, in the website's 'YYYY-MM-DD' form ────
         const invoiceYmd = ymdIST(invoiceDate);
@@ -390,7 +411,7 @@ exports.updatePurchase = async (req, res) => {
         }
 
         // Fields the user is allowed to update
-        const before = { biller: purchase.biller, rate: purchase.rate, totalAmount: purchase.totalAmount, quantity: purchase.quantity };
+        const before = { biller: purchase.biller, rate: purchase.rate, totalAmount: purchase.totalAmount, quantity: purchase.quantity, totalPayable: purchase.totalPayable };
         const editable = ['biller', 'description', 'remarks', 'rate', 'attachments', 'attachmentMeta'];
         editable.forEach((field) => {
             if (req.body[field] !== undefined) doc[field] = req.body[field];   // same name on both sides
@@ -413,8 +434,18 @@ exports.updatePurchase = async (req, res) => {
             const v = await priceValuation(req.body.valuation, purchase.transactionType || 'intra-state');
             if (v.error) return res.status(400).json({ success: false, message: v.error });
             const gst = calculateGST(v.totalAmount, gstConfig, purchase.transactionType || 'intra-state');
-            const gf2 = gstFields(gst, v.hall);
+            const adj2 = applyInvoiceTotal(gstFields(gst, v.hall), req.body.invoiceTotal);
+            if (adj2.error) return res.status(400).json({ success: false, message: adj2.error });
+            const gf2 = adj2.gf;
             Object.assign(doc, { quantity: v.qty, rate: v.rate, totalAmount: v.totalAmount, valuation: v.valuation }, gf2, { total_amount: gf2.totalPayable });
+        } else if (req.body.invoiceTotal !== undefined) {
+            // only the invoice total (the supplier's round-off): GST and input credit do not change, so this is allowed even
+            // after the return is filed
+            if (!purchase.gstRecorded) return res.status(400).json({ success: false, message: 'This purchase came from the old website without a GST split: change its total there.' });
+            const base = Math.round((purchase.totalPayable - (purchase.roundOff || 0) + Number.EPSILON) * 100) / 100;
+            const adj3 = applyInvoiceTotal({ totalPayable: base, netPayable: Math.round((purchase.netPayable - (purchase.roundOff || 0) + Number.EPSILON) * 100) / 100, effectiveCost: Math.round((purchase.effectiveCost - (purchase.roundOff || 0) + Number.EPSILON) * 100) / 100 }, req.body.invoiceTotal);
+            if (adj3.error) return res.status(400).json({ success: false, message: adj3.error });
+            Object.assign(doc, { totalPayable: adj3.gf.totalPayable, netPayable: adj3.gf.netPayable, effectiveCost: adj3.gf.effectiveCost, roundOff: adj3.gf.roundOff, calculatedPayable: base, total_amount: adj3.gf.totalPayable });
         }
 
         const nowU = new Date();
@@ -425,7 +456,7 @@ exports.updatePurchase = async (req, res) => {
         await doc.save();
         const after = toApp(doc);
 
-        const changed = ['biller', 'rate', 'totalAmount', 'quantity']
+        const changed = ['biller', 'rate', 'totalAmount', 'quantity', 'totalPayable']
             .filter((k) => String(before[k] ?? '') !== String(after[k] ?? ''))
             .map((k) => ({ field: k, from: before[k], to: after[k] }));
         if (changed.length) require('../services/audit').record(req, 'purchase', after._id, `${after.invoiceNumber} · ${after.biller}`, 'updated', changed);

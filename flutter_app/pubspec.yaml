@@ -1,7 +1,7 @@
 name: jewellery_stock_app
 description: Jewellery Stock & Container Management Mobile Application
 publish_to: 'none'
-version: 1.4.0+4
+version: 1.5.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -78,6 +78,7 @@ dependencies:
   # Biometric / fingerprint login
   local_auth: ^2.3.0
   flutter_secure_storage: ^9.2.2
+  ota_update: ^7.1.0
 
 dev_dependencies:
   flutter_test:

@@ -71,7 +71,7 @@ exports.create = async (req, res, next) => {
             goldRate: calc.goldRate, silverRate: calc.silverRate,
             inputItems: JSON.parse(JSON.stringify(b.items)), items: calc.items,
             additionalCharges: calc.additionalCharges, discount: calc.discountGiven,
-            totals: { taxable: calc.gstSummary.total_taxable_amount, cgst: calc.gstSummary.total_cgst || 0, sgst: calc.gstSummary.total_sgst || 0, igst: calc.gstSummary.total_igst || 0, gst: calc.gstSummary.total_gst, total: calc.totalAmount, payable: calc.totalPayableAmount, roundOff: calc.roundOff, discount: calc.discountGiven },
+            totals: { hallmark: calc.hallmarkTotal, taxable: calc.gstSummary.total_taxable_amount, cgst: calc.gstSummary.total_cgst || 0, sgst: calc.gstSummary.total_sgst || 0, igst: calc.gstSummary.total_igst || 0, gst: calc.gstSummary.total_gst, total: calc.totalAmount, payable: calc.totalPayableAmount, roundOff: calc.roundOff, discount: calc.discountGiven },
             note: str(b.note).slice(0, 300), createdBy: String(req.user._id), createdByName: req.user.name || '',
         });
         require('../services/events').changed('estimates', doc.branchId, { id: req.user._id, name: req.user.name });

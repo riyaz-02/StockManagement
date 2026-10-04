@@ -276,14 +276,21 @@ class _BillingScreenState extends State<BillingScreen> with LiveRefresh<BillingS
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             child: Row(children: [
-              Container(
-                width: 46,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: BoxDecoration(color: kBillAccent.withOpacity(0.10), borderRadius: BorderRadius.circular(10)),
-                child: Column(children: [
-                  const Icon(Icons.receipt_long, size: 16, color: kBillAccent),
-                  Text('#${_s(r['invoiceNumber'])}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kBillAccent), overflow: TextOverflow.ellipsis),
-                ]),
+              // The whole bill number must show, however long (BGB-0094, MUM-0030, 2045 ...): the badge grows to fit it
+              // (up to a limit) and a very long one shrinks instead of being cut.
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 46, maxWidth: 96),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                  decoration: BoxDecoration(color: kBillAccent.withOpacity(0.10), borderRadius: BorderRadius.circular(10)),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.receipt_long, size: 16, color: kBillAccent),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(_s(r['invoiceNumber']), maxLines: 1, softWrap: false, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kBillAccent)),
+                    ),
+                  ]),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(

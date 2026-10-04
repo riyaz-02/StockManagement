@@ -12,4 +12,5 @@ try { $ok = (Invoke-WebRequest 'http://localhost:5000/health' -UseBasicParsing -
 if (-not $ok) { Write-Host 'The local API is not running on :5000. Start it first (.\dev-local.ps1 or cd backend; node server.js).' -ForegroundColor Yellow }
 Write-Host "Portal: http://localhost:$Port  (dev)" -ForegroundColor Green
 Set-Location $portal
-php -S "localhost:$Port" -t public router.php
+# the PHP limits are raised so an app (an APK, 40 MB or more) can be uploaded on Admin > App updates
+php -d upload_max_filesize=300M -d post_max_size=310M -d memory_limit=512M -d max_execution_time=0 -S "localhost:$Port" -t public router.php

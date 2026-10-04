@@ -104,7 +104,13 @@ class _WastageScreenState extends State<WastageScreen> {
   Widget _totalsLine(bool bn) {
     final a = _totals['approved'];
     final p = _totals['pending'];
-    String g(dynamic m) => m is Map ? '${(m['gold'] is num ? (m['gold'] as num).toDouble() : 0).toStringAsFixed(3)} g ${bn ? 'স্বর্ণ' : 'gold'} · ${(m['silver'] is num ? (m['silver'] as num).toDouble() : 0).toStringAsFixed(3)} g ${bn ? 'রূপা' : 'silver'}' : '';
+    // The server sends {status: {gold: {grams, count}, silver: {grams, count}}}.
+    double grams(dynamic m, String metal) {
+      final v = m is Map ? m[metal] : null;
+      final g = v is Map ? v['grams'] : v;
+      return g is num ? g.toDouble() : 0;
+    }
+    String g(dynamic m) => '${grams(m, 'gold').toStringAsFixed(3)} g ${bn ? 'স্বর্ণ' : 'gold'} · ${grams(m, 'silver').toStringAsFixed(3)} g ${bn ? 'রূপা' : 'silver'}';
     if (a == null && p == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

@@ -1491,6 +1491,24 @@ class ApiService {
 
   // ── App Version (update nudge) ─────────────────────────────────────────────
   // Public endpoint — checked at splash, before login is guaranteed.
+  // ── The bell: notices that were sent + reminders that are open right now ──
+  Future<Map<String, dynamic>> getNotificationFeed({int limit = 40, String lang = 'en'}) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/notifications/feed?limit=$limit&lang=$lang'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<void> markNotificationsSeen() async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/notifications/feed/seen'),
+      headers: await _getHeaders(),
+      body: json.encode({}),
+    );
+    _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> getAppVersion() async {
     final response = await http.get(
       Uri.parse('${AppConstants.baseUrl}/app-version'),

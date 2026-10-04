@@ -31,6 +31,9 @@ The website is PHP files only. It has no database. Every action goes to the same
 - **Assets**: CSS/JS load with a version tag (`?v=<file time>`) and are told to cache for a year, gzip is on for text/CSS/JS/JSON (`public/.htaccess`) — a browser only re-downloads a file after it actually changes.
 - **The rate limiter**: the API counts failed logins and general traffic per visitor address, using the `PORTAL_SHARED_KEY` forwarding from step 2. In production every real visitor already has their own address, so this needs no attention; it only needed a workaround (see `CLAUDE.md`) when running the test suite over and over from one developer machine.
 
+## Uploading the app (Admin Control > App updates)
+The new app (an APK, about 45 MB) is uploaded on the website and passed on to the API, so the PHP limits must allow it. On Hostinger (hPanel > PHP Configuration) set `upload_max_filesize = 150M`, `post_max_size = 160M`, `max_execution_time = 300` (and `memory_limit` 256M is plenty: the file is streamed, not held in memory). If the page says "this website refuses a file that big", these are the numbers to raise. The API server keeps the published file in `backend/storage/apk/` (not in git; do not delete it on a redeploy). If a web server sits in front of the API (nginx), it needs `client_max_body_size 300m;` for `/api/app-version/upload`. The whole procedure: `docs/APP_RELEASE.md`.
+
 ## Check it works (5 minutes)
 - Sign in with the admin mobile number. The green **Live** dot shows in the top bar.
 - Change today's rate on the website: the app's rate strip changes at once (phone open, foreground).

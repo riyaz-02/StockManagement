@@ -45,6 +45,31 @@ final class ApiClient
     }
 
     /**
+     * POST one file (and a few plain fields) to the API as multipart/form-data. Used to hand an uploaded APK from the
+     * browser to the API: the file is streamed from PHP's temp file, never held in memory.
+     * @return array the decoded JSON envelope
+     */
+    public function upload(string $path, string $field, string $filePath, string $fileName, array $fields = [], int $timeout = 3600): array
+    {
+        $ch = curl_init(Config::apiBase() . '/api/' . ltrim($path, '/'));
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $fields + [$field => new \CURLFile($filePath, 'application/vnd.android.package-archive', $fileName)],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => $this->baseHeaders(),
+        ]);
+        $raw = curl_exec($ch);
+        try {
+            return $this->finish($ch, is_string($raw) ? $raw : '', true);
+        } finally {
+            curl_close($ch);
+        }
+    }
+
+    /**
      * Several GETs at once: a dashboard needs 4-5 numbers, this makes it as slow as the slowest call, not the sum.
      * @param array<string,array{0:string,1?:array}> $calls key => [path, query]
      * @return array<string,array|ApiException> each result, or the exception of that call

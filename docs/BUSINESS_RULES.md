@@ -1,10 +1,11 @@
 # Business rules (source of truth is the engines; this is the spec)
 
-## Billing v2 — rule id `lgpmanagement-v2` (`services/billingCalc.js`; legacy v1 = discount after GST, kept for old invoices)
-- Line taxable = netWt × rate + making + stones + hallmark. A typed taxable override is allowed but never below metal value.
+## Billing v3 — rule id `lgpmanagement-v3` (`services/billingCalc.js`; legacy v1 = discount after GST, kept for old invoices)
+- Line taxable = netWt × rate + making + stones. A typed taxable override is allowed but never below metal value.
+- **Hallmark / HUID fee (v3)**: the hallmarking centre has already charged GST on it, so the fee is passed on as it is: NOT part of the taxable value, no GST on it (also not under IGST), added to the line AFTER the tax (line total = taxable + GST + fee), never discounted, shown on its own row ("Hallmark / HUID fee (no GST)") and left out of the GST summary and the HSN value. Bills made under v2 (before 3 Oct 2026) had it inside the taxable amount and are left as they were (`hallmark_in_taxable` absent/true on their lines). A typed taxable amount is the taxable value only.
 - GST 3%: CGST 1.5% + SGST 1.5% (intra-state) or IGST 3% (place of supply ≠ supplier state). Default place: West Bengal, changeable to any state (codes in `services/gstStates.js`).
 - Extra charges (packing, courier…) are taxed at the same rate (CGST Act s.15(2)(c)).
-- **Discount before GST**: taken from making (or hidden making inside a typed taxable), never from metal/stones/hallmark → exact payable = bill − discount. Max via `maxDiscount`. Payable rounded to rupee.
+- **Discount before GST**: taken from making (or hidden making inside a typed taxable), never from metal/stones, and the hallmark fee is outside it → exact payable = bill − discount. Max via `maxDiscount`. Payable rounded to rupee.
 - TDS 1% flag when payable > ₹2,00,000 (PAN required). Rule 46(f): buyer address required at ≥ ₹50,000 (`ADDRESS_LIMIT`).
 - **Cash limit s.269ST**: < ₹2,00,000 cash per person per day (server `CASH_LIMIT` 200000, "≥" blocked; app shows 1,99,999). Split `payments[]` (cash + UPI/card/etc.) is the legal way to take more.
 - Numbering: atomic via `shop_info`; requestId makes creates idempotent.

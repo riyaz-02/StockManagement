@@ -29,7 +29,7 @@ while (out.length < 400) {
     items.forEach((it) => {
         if (rnd() < 0.3) {
             const r = it.rate || (it.metalType === 'Gold' ? goldRate : it.metalType === 'Silver' ? silverRate : 0);
-            it.taxableOverride = Math.round((it.netWt * r + pick(0, 5000) + (it.extras ? it.extras[0].amount : 0) + (it.certification ? it.hallmarkCharge : 0)) * 100) / 100;
+            it.taxableOverride = Math.round((it.netWt * r + pick(0, 5000) + (it.extras ? it.extras[0].amount : 0)) * 100) / 100;
         }
     });
     const additionalCharges = rnd() < 0.3 ? Math.round(pick(0, 500)) : 0;

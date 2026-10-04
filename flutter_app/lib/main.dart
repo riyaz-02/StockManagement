@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'providers/notification_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/item_provider.dart';
@@ -59,6 +60,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider(create: (_) => StoreProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, child) {
@@ -95,6 +97,16 @@ class MyApp extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 systemOverlayStyle: SystemUiOverlayStyle.light,
+              ),
+              // Every remaining AlertDialog gets the same soft, rounded look as the modern dialogs.
+              dialogTheme: DialogTheme(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 12,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                titleTextStyle: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A1A)),
+                contentTextStyle: GoogleFonts.poppins(fontSize: 13.5, height: 1.45, color: Colors.grey.shade800),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               ),
               cardTheme: CardTheme(
                 elevation: 1,

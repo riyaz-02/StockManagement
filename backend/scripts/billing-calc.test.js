@@ -127,22 +127,28 @@ t('a typed taxable amount below the metal value is refused', () => {
     assert.ok(computeInvoice({ items: [one({ netWt: 10, rate: 6000, taxableOverride: 50000 })], discountMode: 'after_gst' }).ok);
 });
 
-t('hallmarked: charge is pre-tax, name gets "(Hallmarked)"', () => {
+t('hallmarked: the fee is passed on after tax (no GST on it), name gets "(Hallmarked)"', () => {
     const r = computeInvoice({ items: [one({ particulars: 'Earring', netWt: 2, rate: 1000, makingCharge: 100, certification: 'hallmark', hallmarkCharge: 45 })] });
     const l = r.items[0];
     assert.strictEqual(l.particulars, 'Earring (Hallmarked)');
     assert.strictEqual(l.item_name, 'Earring');
-    assert.strictEqual(l.taxable_amount, 2145);                         // 2000 + 100 + 45, before GST
-    assert.deepStrictEqual([l.cgst, l.sgst, l.total], [32.17, 32.17, 2209.35]);
+    assert.strictEqual(l.taxable_amount, 2100);                         // 2000 + 100: the hallmark fee already carries its own GST
+    assert.deepStrictEqual([l.cgst, l.sgst, l.total], [31.5, 31.5, 2208]);   // 2100 + 63 GST + 45 hallmark fee, added after tax
     assert.strictEqual(l.hallmark_charge, 45);
+    assert.strictEqual(l.hallmark_in_taxable, false);
+    assert.strictEqual(r.hallmarkTotal, 45);
+    assert.strictEqual(r.gstSummary.total_taxable_amount, 2100);       // the GST summary never sees the fee
+    assert.strictEqual(r.gstSummary.total_gst, 63);
+    assert.strictEqual(r.totalPayableAmount, 2208);
+    assert.strictEqual(r.rule, 'lgpmanagement-v3');
     assert.strictEqual(l.certification, 'hallmark');
 });
 
-t('HUID: code goes into the name, charge is pre-tax, code must be 6 letters/digits', () => {
+t('HUID: code goes into the name, the fee is outside the taxable value, code must be 6 letters/digits', () => {
     const r = computeInvoice({ items: [one({ particulars: 'Earring', certification: 'huid', huid: 'ab12cd', hallmarkCharge: 45 })] });
     assert.strictEqual(r.items[0].particulars, 'Earring (HUID: AB12CD)');
     assert.strictEqual(r.items[0].huid, 'AB12CD');
-    assert.strictEqual(r.items[0].taxable_amount, 1045);
+    assert.deepStrictEqual([r.items[0].taxable_amount, r.items[0].total], [1000, 1075]);   // 1000 + 30 GST + 45 fee
     assert.match(computeInvoice({ items: [one({ certification: 'huid', huid: 'AB1' })] }).error, /HUID must be 6/);
     assert.match(computeInvoice({ items: [one({ certification: 'huid' })] }).error, /HUID must be 6/);
     // a HUID with no certification given still counts as HUID
@@ -152,6 +158,30 @@ t('HUID: code goes into the name, charge is pre-tax, code must be 6 letters/digi
     assert.deepStrictEqual([plain.particulars, plain.taxable_amount, plain.certification], ['Ring', 1000, undefined]);
 });
 
+
+t('hallmark fee: not taxed on an inter-state bill either, never discounted, and a typed taxable amount does not include it', () => {
+    const it = (extra = {}) => one({ particulars: 'Chain', netWt: 2, rate: 10000, makingCharge: 1000, certification: 'huid', huid: 'AB12CD', hallmarkCharge: 60, ...extra });
+    const inter = computeInvoice({ items: [it()], interstate: true });
+    assert.deepStrictEqual([inter.items[0].taxable_amount, inter.items[0].igst, inter.items[0].total], [21000, 630, 21690]);
+    assert.strictEqual(inter.gstSummary.total_igst, 630);
+    // a typed taxable amount is the taxable value only: the fee is added on top
+    const typed = computeInvoice({ items: [it({ makingCharge: 0, taxableOverride: 21000 })] });
+    assert.deepStrictEqual([typed.items[0].taxable_amount, typed.items[0].total], [21000, 21690]);
+    // the discount comes off the making charge: the fee stays whole and untaxed
+    const full = computeInvoice({ items: [it()] });
+    const d = computeInvoice({ items: [it()], discount: 500 });
+    assert.ok(d.ok, d.error);
+    assert.strictEqual(d.totalPayableAmount, full.totalPayableAmount - 500);
+    assert.strictEqual(d.items[0].hallmark_charge, 60);
+    assert.ok(d.items[0].taxable_amount < full.items[0].taxable_amount);
+    // the lowest price allowed is metal + stones + GST on them + the fee
+    const max = computeInvoice({ items: [it()], discount: full.maxDiscount });
+    assert.ok(max.ok, max.error);
+    assert.ok(max.totalPayableAmount >= Math.round(20000 * 1.03 + 60) - 1, String(max.totalPayableAmount));
+    assert.ok(computeInvoice({ items: [it()], discount: full.maxDiscount + 1 }).error);
+    // no fee: nothing changes
+    assert.strictEqual(computeInvoice({ items: [it({ certification: '', huid: '', hallmarkCharge: 0 })] }).hallmarkTotal, 0);
+});
 
 // ─────────────────────────── discount BEFORE GST (rule v2) ───────────────────────────
 const bill = (extra = {}, item = {}) => computeInvoice({ items: [one({ particulars: 'Gold Ring', netWt: 2, rate: 10000, makingCharge: 3636.5, ...item })], ...extra });
@@ -211,14 +241,14 @@ t('no making charge and no typed amount: nothing to discount, said clearly', () 
     assert.strictEqual(computeInvoice({ items: [one({ netWt: 5, rate: 6000 })] }).maxDiscount, 0);
 });
 
-t('stones and hallmark are protected like the metal', () => {
+t('stones and the hallmark fee are protected like the metal (the fee sits outside the taxable value)', () => {
     const it = () => one({ netWt: 2, rate: 10000, makingCharge: 500, certification: 'hallmark', hallmarkCharge: 45, extras: [{ name: 'Ruby', amount: 2000 }] });
     const r = computeInvoice({ items: [it()] });
-    assert.strictEqual(r.grossTaxable, 22545);
+    assert.strictEqual(r.grossTaxable, 22500);                                                  // metal + making + stones: the fee is not taxable
     assert.ok(r.maxDiscount <= 515 && r.maxDiscount >= 505, `max ${r.maxDiscount}`);           // only the 500 making charge
     const d = computeInvoice({ items: [it()], discount: r.maxDiscount });
     assert.ok(d.ok, d.error);
-    assert.ok(d.items[0].taxable_amount >= 22045 - 0.005);
+    assert.ok(d.items[0].taxable_amount >= 22000 - 0.005);
     assert.strictEqual(d.items[0].hallmark_charge, 45);
     assert.strictEqual(d.items[0].stone_charge, 2000);
 });
@@ -278,7 +308,7 @@ t('FUZZ: 3000 random bills with random discounts up to the maximum: payable exac
             const it = { particulars: `Item ${i}`, metalType: 'Gold', netWt, rate, makingCharge: rnd() < 0.3 ? 0 : Math.round(pick(0, 6000) * 100) / 100 };
             if (rnd() < 0.25) it.extras = [{ name: 'Stone', amount: Math.round(pick(50, 4000)) }];
             if (rnd() < 0.2) { it.certification = 'hallmark'; it.hallmarkCharge = Math.round(pick(20, 120)); }
-            if (rnd() < 0.3) it.taxableOverride = Math.round((netWt * rate + pick(0, 5000) + (it.extras ? it.extras[0].amount : 0) + (it.hallmarkCharge || 0)) * 100) / 100;
+            if (rnd() < 0.3) it.taxableOverride = Math.round((netWt * rate + pick(0, 5000) + (it.extras ? it.extras[0].amount : 0)) * 100) / 100;
             return it;
         });
         const additionalCharges = rnd() < 0.3 ? Math.round(pick(0, 500)) : 0;
@@ -294,12 +324,12 @@ t('FUZZ: 3000 random bills with random discounts up to the maximum: payable exac
         r.items.forEach((l, i) => {
             const it = its[i];
             const noMaking = it.taxableOverride === undefined && !(it.makingCharge > 0);
-            const floor = it.netWt * it.rate + (noMaking ? 0 : ((it.extras || []).reduce((a, e) => a + e.amount, 0)) + (it.certification ? (it.hallmarkCharge || 0) : 0));
-            assert.ok(l.taxable_amount >= floor - 0.006, `case ${c}: line ${i} went below metal+stones+hallmark (${l.taxable_amount} < ${floor})`);
+            const floor = it.netWt * it.rate + (noMaking ? 0 : ((it.extras || []).reduce((a, e) => a + e.amount, 0)));
+            assert.ok(l.taxable_amount >= floor - 0.006, `case ${c}: line ${i} went below metal+stones (${l.taxable_amount} < ${floor})`);
             assert.ok(l.making_charge >= 0);
             const tax = inter ? (l.igst || 0) : l.cgst + l.sgst;
             assert.ok(Math.abs(tax - l.taxable_amount * 0.03) <= 0.011, `case ${c}: tax`);
-            assert.ok(Math.abs(l.total - (l.taxable_amount + tax)) <= 0.011, `case ${c}: line total`);
+            assert.ok(Math.abs(l.total - (l.taxable_amount + tax + (l.hallmark_charge || 0))) <= 0.011, `case ${c}: line total = taxable + GST + the hallmark fee (added after tax)`);
             sumD += l.discount || 0;
         });
         assert.ok(Math.abs(sumD - r.discountBeforeGst) <= 0.0051, `case ${c}: shares`);

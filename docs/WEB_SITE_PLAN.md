@@ -21,6 +21,11 @@ Notes for the PHP client: send `Authorization: Bearer <jwt>` (+ optional `X-Bran
 | Branch switcher (admins) + per-branch stock | done | header `X-Branch`, `/directory/branches` | dropdown in the site header |
 | GST registrations (per-GSTIN returns/ITC/filings) | done | `?gstin=` on `/gst-reports/*` | selector on the GST page |
 | Item & box add/edit wizards (3 steps, Cloudinary photos) | done | `POST/PUT /items`, `POST/PUT /containers` | same steps as a PHP form wizard; `PUT /items/:id` with `containerId`/`slotNumber` moves the item |
+| Hallmark / HUID fee on a bill: passed on after tax, no GST on it (rule v3), own row on totals / invoice / PDF / GST record | done (app + web) | `POST /billing/invoices`, `POST /billing/calculate` (`hallmarkTotal`, line `hallmarkTaxed`) | engine `billingCalc.js` + Dart mirror + portal JS; older bills unchanged |
+| Purchase invoice total editable (supplier's round-off), fixed later, GST unchanged | done (app + web) | `invoiceTotal` on `/purchases/calculate`, `/purchases`, `PUT /purchases/:id` | web: field + round-off rows + "Change the invoice total"; app: Add/Edit Purchase |
+| Camera scanners: fast, zoom, torch, queued tally scans | done (app) | `POST /tally/:id/scan` | `widgets/fast_scanner.dart` |
+| Notification bell: sent notices + live reminders (rate, GST due, stock tally, app update), unread number, opens a list | done (app + web) | `/notifications/feed`, `/feed/seen` | web: top bar, `/partials/bell/*`; app: Home header sheet |
+| App updates by upload: upload the APK, checked + staged, publish, push to every phone, in-app download + install, release history | done (app + web) | `/app-version/upload|publish|admin|download` | web: Admin > App updates; procedure `docs/APP_RELEASE.md` |
 | Purchase with valuation (weights, purity, wastage, labour, hallmark fee + its GST), edit valuation until GSTR-3B filed | done | `POST/PUT /purchases` (`valuation`) | server computes; the site only sends the inputs |
 | Long-press invoice menu (open, share, print, receive payment, credit note) | done | `/billing/invoices/:id`, `/credit-notes` | row action menu on the invoice list |
 | Today's rate, Expenses, Day Book, Pending dues | done | `/rates`, `/expenses`, `/billing/daybook`, `/billing/dues` | simple pages; rate strip in the header |

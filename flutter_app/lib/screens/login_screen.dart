@@ -1,3 +1,5 @@
+import '../widgets/app_dialog.dart';
+import '../widgets/app_version_text.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -85,26 +87,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final available = await authProvider.isBiometricAvailable();
     if (!available || !mounted) return;
 
-    final enable = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Enable fingerprint login?'),
-        content: const Text(
-          'Log in faster next time using your fingerprint or face instead of typing your password.',
+    final bn = Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
+    final enable = await showModernDialog<bool>(
+      context,
+      child: Builder(
+        builder: (ctx) => ModernDialogCard(
+          icon: Icons.fingerprint_rounded,
+          accent: const Color(0xFFE94560),
+          title: bn ? 'আঙুলের ছাপ দিয়ে লগইন করবেন?' : 'Use fingerprint to sign in?',
+          primary: ModernDialogButton.primary(bn ? 'চালু করুন' : 'Enable', icon: Icons.fingerprint_rounded, color: const Color(0xFFE94560), onPressed: () => Navigator.of(ctx).pop(true)),
+          secondary: ModernDialogButton.text(bn ? 'এখন নয়' : 'Not now', onPressed: () => Navigator.of(ctx).pop(false)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Not now'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE94560),
-            ),
-            child: const Text('Enable', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
 
@@ -234,7 +227,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Glassmorphism Login Card
                   Expanded(
                     child: Center(
-                      child: ClipRRect(
+                      child: SingleChildScrollView(
+                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
@@ -548,6 +542,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+                       ),
                       ),
                     ),
                   ),
@@ -558,9 +553,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                   ),
-                  Text(
-                    'Version 1.2.0',
-                    textAlign: TextAlign.center,
+                  AppVersionText(
                     style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                   ),
                   const SizedBox(height: 8),

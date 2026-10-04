@@ -384,7 +384,7 @@ t('monthly record: totals equal the sum of the counted invoices (taxable, CGST/S
     for (const i of c) {
         const lines = i.items.reduce((a, l) => a + l.amount, 0);
         const afterGstDiscount = i.discountBeforeGst ? 0 : i.discount;          // old website rule: taken off the total, after GST
-        assert.ok(Math.abs(lines + i.additionalCharges + i.totalGst + i.roundOff - afterGstDiscount - i.totalPayable) < 0.06, `invoice ${i.number}: ${lines}+${i.additionalCharges}+${i.totalGst}+${i.roundOff}-${afterGstDiscount} vs ${i.totalPayable}`);
+        assert.ok(Math.abs(lines + i.additionalCharges + i.totalGst + i.roundOff + i.hallmarkPassedOn - afterGstDiscount - i.totalPayable) < 0.06, `invoice ${i.number}: ${lines}+${i.additionalCharges}+${i.totalGst}+${i.roundOff}+${i.hallmarkPassedOn}-${afterGstDiscount} vs ${i.totalPayable}`);
     }
 });
 
@@ -409,6 +409,28 @@ t('monthly record: carries the audit detail (purity, gross/net, code, HUID, ston
     assert.deepStrictEqual(r.breakdown.metals.map((m) => [m.metal, m.purity, m.pieces]), [['Gold', '22K', 3]]);
     assert.deepStrictEqual(r.breakdown.payments.map((p) => p.mode), ['Cash', 'Online']);        // 12,000 cash / 8,000 online / the others paid nothing
     assert.strictEqual(r.breakdown.branches.length, 2);
+});
+
+t('hallmark fee: bills made before rule v3 (fee inside the taxable amount) and since (fee added after tax) both read right', () => {
+    const base = (taxable, total, flag) => {
+        const d = doc('5001', '2026-08-08', [gold({ netWt: 2, rate: 1000, makingCharge: 0, taxableOverride: 2100 })], {}, {});
+        Object.assign(d.items[0], { taxable_amount: taxable, cgst: Math.round(taxable * 1.5) / 100, sgst: Math.round(taxable * 1.5) / 100, total, making_charge: 0, certification: 'hallmark', hallmark_charge: 45 });
+        if (flag) d.items[0].hallmark_in_taxable = false;
+        return d;
+    };
+    const oldInv = base(2145, 2209.35, false);                 // 2000 metal + 100 making + 45 fee, all taxed
+    const newInv = base(2100, 2208, true);                     // 2000 + 100 taxed; 45 added after the tax
+    const r = G.monthlyRecord([oldInv, newInv], 2026, 8);
+    assert.strictEqual(r.invoices[0].items[0].making, 100);    // taxable - metal - hallmark
+    assert.strictEqual(r.invoices[1].items[0].making, 100);    // taxable - metal (the fee is not in it)
+    assert.strictEqual(r.invoices[0].items[0].hallmarkTaxed, true);
+    assert.strictEqual(r.invoices[1].items[0].hallmarkTaxed, false);
+    assert.strictEqual(r.invoices[0].hallmarkPassedOn, 0);
+    assert.strictEqual(r.invoices[1].hallmarkPassedOn, 45);
+    assert.strictEqual(r.totals.hallmarkPassedOn, 45);
+    // the HSN table: value = goods + tax, so a passed-on fee is not in it
+    const hs = G.summarise([newInv], { from: '2026-08-01', to: '2026-08-31' });
+    assert.strictEqual(Math.round(hs.gstr1.hsn[0].value * 100) / 100, 2163);   // 2100 + 63 GST, without the 45
 });
 
 t('monthly record: an empty month, a leap-year February and December are handled', () => {

@@ -26,7 +26,19 @@
             {% endif %}
             {% if not p.gstRecorded|default(true) %}{% elseif p.transactionType == 'inter-state' %}<div class="kv-row"><span>IGST {{ p.gstRate }}%</span><strong>{{ p.igstAmount|inr }}</strong></div>
             {% else %}<div class="kv-row"><span>CGST</span><strong>{{ p.cgstAmount|inr }}</strong></div><div class="kv-row"><span>SGST</span><strong>{{ p.sgstAmount|inr }}</strong></div>{% endif %}
-            <div class="kv-row total"><span>Total payable</span><strong>{{ p.totalPayable|inr }}</strong></div>
+            {% if p.roundOff|default(0) != 0 %}<div class="kv-row"><span>Calculated total</span><strong>{{ p.calculatedPayable|inr }}</strong></div>
+            <div class="kv-row"><span>Supplier's round-off</span><strong>{{ p.roundOff > 0 ? '+ ' : '− ' }}{{ p.roundOff|abs|inr }}</strong></div>{% endif %}
+            <div class="kv-row total"><span>{{ p.roundOff|default(0) != 0 ? 'Invoice total' : 'Total payable' }}</span><strong>{{ p.totalPayable|inr }}</strong></div>
+            {% if p.gstRecorded|default(true) and can('purchases.edit') %}
+            <form class="inline-edit" hx-post="/purchases/{{ p._id }}/total" hx-swap="none" style="margin-top:10px">
+                {{ csrf_field() }}
+                <label class="field"><span>Change the invoice total (supplier's round-off)</span>
+                    <input type="number" step="0.01" min="0" inputmode="decimal" name="invoiceTotal" value="{{ p.roundOff|default(0) != 0 ? p.totalPayable : '' }}" placeholder="{{ p.calculatedPayable|default(p.totalPayable) }}">
+                </label>
+                <button class="btn btn-sm" type="submit">Save total</button>
+                <small class="muted">Leave empty to go back to the calculated total.</small>
+            </form>
+            {% endif %}
             {% if p.description|default('') %}<div class="kv-row"><span>What</span><strong>{{ p.description }}</strong></div>{% endif %}
             {% if p.remarks|default('') %}<div class="kv-row"><span>Note</span><strong>{{ p.remarks }}</strong></div>{% endif %}
         </div>

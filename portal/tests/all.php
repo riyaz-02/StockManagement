@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Runs every portal test in turn:  php tests/all.php
  * Needs the portal (http://localhost:8080) and the DEV API (http://localhost:5000) running. Never run against production.
  */
-$suites = ['run.php', 'smoke.php', 'pages.php', 'billing.php', 'stock.php', 'purchases.php', 'tally.php', 'directory.php', 'gst.php', 'admin.php', 'backup.php', 'summary.php'];
+$suites = ['run.php', 'smoke.php', 'pages.php', 'billing.php', 'stock.php', 'purchases.php', 'tally.php', 'directory.php', 'gst.php', 'admin.php', 'backup.php', 'summary.php', 'updates.php'];
 $bad = 0;
 foreach ($suites as $s) {
     echo "\n===== $s =====\n";

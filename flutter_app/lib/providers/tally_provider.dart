@@ -138,7 +138,9 @@ class TallyProvider with ChangeNotifier {
 
 
   // Scan item in tally
-  Future<Map<String, dynamic>?> scanItem(String tallyId, String barcode) async {
+  /// [refresh]: reload the whole tally after the scan (the camera scanner passes false and refreshes once when it is idle,
+  /// so a scan costs one request, not two).
+  Future<Map<String, dynamic>?> scanItem(String tallyId, String barcode, {bool refresh = true}) async {
     _error = null;
     notifyListeners();
 
@@ -160,7 +162,7 @@ class TallyProvider with ChangeNotifier {
         
         print('[PROVIDER] ✅ Normal scan - refreshing tally');
         // For normal scans, refresh tally to get updated counts
-        await fetchTallySession(tallyId);
+        if (refresh) await fetchTallySession(tallyId);
         return response;
       } else {
         print('[PROVIDER] ❌ API returned success=false');

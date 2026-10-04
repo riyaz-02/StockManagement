@@ -24,13 +24,20 @@ android {
         coreLibraryDesugaringEnabled = true
     }
 
+    // Android 6+ would otherwise store the native libraries uncompressed (an APK twice as big to download for an update)
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     kotlinOptions {
         jvmTarget = "1.8"
     }
 
     defaultConfig {
         applicationId = "com.laltuguineapalace.stock"
-        minSdk = 21
+        minSdk = 23   // the in-app updater (ota_update) needs Android 6.0+
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName

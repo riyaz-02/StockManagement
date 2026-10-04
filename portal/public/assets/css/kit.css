@@ -29,7 +29,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
 .t tbody tr:hover td { background: #fafbfc; }
 .t .num, .t th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .t .strong { font-weight: 650; }
-.t a.row-link { color: var(--ink); font-weight: 650; }
+.t a.row-link { color: var(--ink); font-weight: 650; white-space: nowrap; }
 .t a.row-link:hover { color: var(--brand); }
 .t small { display: block; color: var(--muted); font-size: 12px; }
 .t-empty { padding: 44px 18px; text-align: center; color: var(--muted); }
@@ -284,3 +284,9 @@ form + .grid, form + .panel { margin-top: 16px; }
 .hist td.diff small { color: #64748b; }
 .hist tr.method-change td { border-top: 2px solid #94a3b8; }
 @media print { .no-print, .sidebar, .topbar { display: none !important; } .metal-card, .panel { break-inside: avoid; } }
+
+/* Summary: the explanation is folded away until someone wants it */
+.advice > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.advice > summary::-webkit-details-marker { display: none; }
+.advice .adv-open { display: none; } .advice[open] .adv-open { display: inline; } .advice[open] .adv-closed { display: none; }
+.advice-toggle { white-space: nowrap; }

@@ -47,7 +47,7 @@
         {% for i in inv.items %}
             <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ i.particular }}{% if i.purity %} ({{ i.purity }}){% endif %}{% if i.huid %}<br><small>HUID {{ i.huid }}</small>{% endif %}</td>
+                <td>{{ i.particular }}{% if i.purity %} ({{ i.purity }}){% endif %}{% if i.huid %}<br><small>HUID {{ i.huid }}</small>{% endif %}{% if i.hallmarkCharge > 0 and not i.hallmarkTaxed %}<br><small>Hallmark fee {{ i.hallmarkCharge|inr }} (no GST, added after tax)</small>{% endif %}</td>
                 <td>{{ i.hsnCode }}</td>
                 <td class="n">{{ '%.3f'|format(i.netWt) }}</td>
                 <td class="n">{{ i.rate|inr }}</td>
@@ -70,6 +70,7 @@
             <tr><td>Taxable value</td><td class="n">{{ inv.gstSummary.taxableValue|inr }}</td></tr>
             {% if inv.gstType == 'IGST' %}<tr><td>IGST 3%</td><td class="n">{{ inv.gstSummary.igst|inr }}</td></tr>
             {% else %}<tr><td>CGST 1.5%</td><td class="n">{{ inv.gstSummary.cgst|inr }}</td></tr><tr><td>SGST 1.5%</td><td class="n">{{ inv.gstSummary.sgst|inr }}</td></tr>{% endif %}
+            {% if inv.hallmarkTotal > 0 %}<tr><td>Hallmark / HUID fee (no GST)</td><td class="n">{{ inv.hallmarkTotal|inr }}</td></tr>{% endif %}
             {% if inv.additionalCharges > 0 %}<tr><td>Extra charges</td><td class="n">{{ inv.additionalCharges|inr }}</td></tr>{% endif %}
             {% if inv.discountGiven > 0 %}<tr><td>Discount</td><td class="n">− {{ inv.discountGiven|inr }}</td></tr>{% endif %}
             {% if inv.roundOff != 0 %}<tr><td>Round off</td><td class="n">{{ inv.roundOff|inr }}</td></tr>{% endif %}

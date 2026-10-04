@@ -518,11 +518,15 @@ class _ItemSheetState extends State<_ItemSheet> {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  Expanded(flex: 2, child: _num2(_hall, 'Hallmark charge', const Color(0xFF0F766E), (_) => _changed(), prefix: '₹ ')),
+                  Expanded(flex: 2, child: _num2(_hall, 'Hallmark fee (no GST)', const Color(0xFF0F766E), (_) => _changed(), prefix: '₹ ')),
                 ]),
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 2),
                   child: Text('On the invoice: $shownName', style: const TextStyle(fontSize: 11.5, color: Color(0xFF0F766E), fontWeight: FontWeight.w600)),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 2, left: 2),
+                  child: Text('The centre already charged GST on this fee: it is added after the tax and never taxed again.', style: TextStyle(fontSize: 11, color: Colors.black54)),
                 ),
               ],
               if (_cert.isEmpty && line.hiddenMaking)

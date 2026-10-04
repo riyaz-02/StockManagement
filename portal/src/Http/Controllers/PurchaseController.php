@@ -115,7 +115,25 @@ final class PurchaseController extends BaseController
                 $out['totalAmount'] = (string) $b['totalAmount'];
             }
         }
+        // the supplier's invoice total as printed (it can differ from the worked-out total by a round-off)
+        if (trim((string) ($b['invoiceTotal'] ?? '')) !== '') {
+            $out['invoiceTotal'] = (string) $b['invoiceTotal'];
+        }
         return $out;
+    }
+
+    /** Correct the invoice total of a saved purchase (the supplier's round-off). GST and input credit do not change. */
+    public function total(Request $rq, Response $rs, array $args): Response
+    {
+        $b = $this->input($rq);
+        try {
+            $this->api()->put('purchases/' . rawurlencode($args['id']), ['invoiceTotal' => trim((string) ($b['invoiceTotal'] ?? ''))]);
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+            return $this->toast($rs, 'error', $e->getMessage());
+        }
+        $this->flash('success', 'Invoice total updated');
+        return $rs->withStatus(204)->withHeader('HX-Redirect', '/purchases/' . rawurlencode($args['id']));
     }
 
     private function form(Request $rq, Response $rs, array $v, ?string $error): Response

@@ -29,7 +29,7 @@
             <option value="huid"{{ cert == 'huid' ? ' selected' : '' }}>HUID</option>
         </select>
         <input type="text" name="items[{{ k }}][huid]" value="{{ it.huid|default('') }}" maxlength="6" data-f="huid" data-upper autocomplete="off" placeholder="HUID" aria-label="HUID (6 letters or digits)"{{ cert != 'huid' ? ' disabled' : '' }}>
-        <input type="text" inputmode="decimal" name="items[{{ k }}][hallmarkCharge]" value="{{ it.hallmarkCharge|default('') }}" class="r" data-f="hallmarkCharge" data-dp="2" placeholder="Fee ₹" aria-label="Hallmark fee"{{ cert == '' ? ' disabled' : '' }}>
+        <input type="text" inputmode="decimal" name="items[{{ k }}][hallmarkCharge]" value="{{ it.hallmarkCharge|default('') }}" class="r" data-f="hallmarkCharge" data-dp="2" placeholder="Fee ₹" aria-label="Hallmark fee (no GST)" title="The hallmarking centre already charged GST on this fee: it is added after the tax and never taxed again."{{ cert == '' ? ' disabled' : '' }}>
         <select name="items[{{ k }}][hsnCode]" data-f="hsnCode" aria-label="HSN code">
             {% for h in meta.hsnCodes|default([{code: '7113', label: '7113'}]) %}<option value="{{ h.code }}" title="{{ h.label }}"{{ h.code == it.hsnCode|default('7113') ? ' selected' : '' }}>{{ h.code }}</option>{% endfor %}
         </select>

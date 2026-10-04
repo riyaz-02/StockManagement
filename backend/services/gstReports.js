@@ -272,7 +272,7 @@ const baseName = (line) => {
 /** What part of a line's taxable value is making charge: the making column, or (typed taxable amount) what is left after metal, stones and hallmark. */
 function lineMaking(l) {
     const metal = num(l.netWt) * num(l.rate);
-    return r2(Math.max(0, num(l.taxableAmount) - metal - num(l.stoneCharge) - num(l.hallmarkCharge)));
+    return r2(Math.max(0, num(l.taxableAmount) - metal - num(l.stoneCharge) - (l.hallmarkTaxed === false ? 0 : num(l.hallmarkCharge))));   // since rule v3 the hallmark fee is outside the taxable amount
 }
 
 const isHidden = (v) => !v.counts;
@@ -361,7 +361,8 @@ function summarise(docs, opts = {}) {
             const pu = bump(byPurity, pk, () => ({ metal: l.metalType || 'Other', purity: l.purity || 'Not recorded', pieces: 0, weight: 0, taxable: 0 }));
             pu.pieces++; pu.weight += l.netWt; pu.taxable += l.taxableAmount;
             const hs = bump(byHsn, l.hsnCode || '7113', () => ({ hsn: l.hsnCode || '7113', qty: 0, value: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0 }));
-            hs.qty += l.netWt; hs.value += l.total; hs.taxable += l.taxableAmount; hs.cgst += l.cgst; hs.sgst += l.sgst; hs.igst += l.igst;
+            hs.qty += l.netWt; hs.value += l.total - (l.hallmarkTaxed === false ? num(l.hallmarkCharge) : 0);   // HSN value = goods + tax: a passed-on hallmark fee is not part of it
+            hs.taxable += l.taxableAmount; hs.cgst += l.cgst; hs.sgst += l.sgst; hs.igst += l.igst;
         }
         // extra charges are part of the supply: file them under the first line's HSN so the HSN table reconciles
         if (!lineBased && (extraTaxable || extraGst) && v.items.length) {
@@ -576,7 +577,7 @@ function monthlyRecord(docs, year, month) {
     }
     list.sort((a, b) => a.date.localeCompare(b.date) || invNo(a.v.invoiceNumber) - invNo(b.v.invoiceNumber) || String(a.v.invoiceNumber).localeCompare(String(b.v.invoiceNumber)));
 
-    const T = { count: 0, taxable: 0, additional: 0, cgst: 0, sgst: 0, igst: 0, gst: 0, amount: 0, goldWeight: 0, silverWeight: 0, discount: 0, making: 0, intraTaxable: 0, interTaxable: 0, grossWeight: 0, metalValue: 0, stone: 0, hallmark: 0 };
+    const T = { count: 0, taxable: 0, additional: 0, cgst: 0, sgst: 0, igst: 0, gst: 0, amount: 0, goldWeight: 0, silverWeight: 0, discount: 0, making: 0, intraTaxable: 0, interTaxable: 0, grossWeight: 0, metalValue: 0, stone: 0, hallmark: 0, hallmarkPassedOn: 0 };
     const byMetal = new Map(), byPay = new Map(), byBranch = new Map();
     const bump = (map, key, add) => { const e = map.get(key) || { key, invoices: 0, pieces: 0, grossWt: 0, netWt: 0, taxable: 0, gst: 0, amount: 0, count: 0 }; for (const [k, v] of Object.entries(add)) e[k] += v; map.set(key, e); };
     const statusCounts = Object.fromEntries(RECORD_STATUSES.map((s) => [s, 0]));
@@ -593,7 +594,7 @@ function monthlyRecord(docs, year, month) {
                 T.making += lineMaking(l);
                 const m = String(l.metalType).toLowerCase();
                 if (m === 'gold') T.goldWeight += l.netWt; else if (m === 'silver') T.silverWeight += l.netWt;
-                T.grossWeight += l.grossWt; T.metalValue += l.netWt * l.rate; T.stone += l.stoneCharge; T.hallmark += l.hallmarkCharge;
+                T.grossWeight += l.grossWt; T.metalValue += l.netWt * l.rate; T.stone += l.stoneCharge; T.hallmark += l.hallmarkCharge; if (l.hallmarkTaxed === false) T.hallmarkPassedOn += l.hallmarkCharge;
                 bump(byMetal, `${l.metalType || 'Other'}|${l.purity || ''}`, { pieces: 1, grossWt: l.grossWt, netWt: l.netWt, taxable: l.taxableAmount });
             }
             // payments: what each mode brought in (falls back to the invoice's mode when no history was kept)
@@ -612,10 +613,11 @@ function monthlyRecord(docs, year, month) {
                 name: l.particular, itemName: l.itemName, hsn: l.hsnCode || '7113', metal: l.metalType, purity: l.purity, code: l.productCode, huid: l.huid, certification: l.certification,
                 grossWt: l.grossWt, netWt: l.netWt, rate: l.rate, metalValue: r2(l.netWt * l.rate),
                 making: l.makingCharge > 0 ? l.makingCharge : lineMaking(l), makingDerived: !(l.makingCharge > 0) && lineMaking(l) > 0,
-                stone: l.stoneCharge, hallmark: l.hallmarkCharge, extras: l.extras, discount: l.discount, amount: l.taxableAmount,
+                stone: l.stoneCharge, hallmark: l.hallmarkCharge, hallmarkTaxed: l.hallmarkTaxed, extras: l.extras, discount: l.discount, amount: l.taxableAmount,
             })),
             cgst: v.gstSummary.cgst, sgst: v.gstSummary.sgst, igst: v.gstSummary.igst, taxable: v.gstSummary.taxableValue, totalGst: v.gstSummary.totalTax,
             additionalCharges: v.additionalCharges, additionalChargesGst: v.additionalChargesGst,
+            hallmarkPassedOn: r2(v.items.reduce((a, l) => a + (l.hallmarkTaxed === false ? l.hallmarkCharge : 0), 0)),   // hallmark / HUID fees added after tax (rule v3): in the payable, not in the taxable value
             discount: v.discountGiven, discountBeforeGst: v.discountMode === 'before_gst', roundOff: v.roundOff, totalPayable: v.totalPayableAmount, amountInWords: v.amountInWords,
         };
     });

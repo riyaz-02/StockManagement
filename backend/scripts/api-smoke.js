@@ -453,9 +453,12 @@ const section = (t) => console.log(`\n${t}`);
         raw0 && raw0.total_payable_amount === 850 && Math.abs(raw0.round_off) < 0.006 && near(raw0.total_amount, 850, 0.006) && raw0.due_advance === 0 && raw0.print_status === 0
         && near(raw0.gst_summary?.total_gst, 24.76, 0.02) && near(raw0.gst_summary?.total_taxable_amount, 825.24, 0.02) && near(raw0.additional_charges_gst, 1.65, 0.006) && near(raw0.items?.[0]?.making_charge, 35.04) && raw0.items?.[0]?.hsn_code === '7113' && raw0.place_of_supply === '19-West Bengal'
         && raw0.reverse_charge === 'No' && raw0.terms_of_delivery === 'Customer Pickup' && typeof raw0.invoice_date === 'string' && raw0.created_at instanceof Date, JSON.stringify(raw0).slice(0, 160));
-    check('discount is recorded the new way: website `discount` stays 0, details kept beside it', raw0?.discount === 0 && raw0?.discount_mode === 'before_gst' && raw0?.discount_given === 30 && near(raw0?.discount_before_gst, 28.96) && raw0?.gross_taxable === 799.2 && raw0?.bill_before_discount === 880 && raw0?.calc_rule === 'lgpmanagement-v2');
+    check('discount is recorded the new way: website `discount` stays 0, details kept beside it', raw0?.discount === 0 && raw0?.discount_mode === 'before_gst' && raw0?.discount_given === 30 && near(raw0?.discount_before_gst, 28.96) && raw0?.gross_taxable === 799.2 && raw0?.bill_before_discount === 880 && raw0?.calc_rule === 'lgpmanagement-v3');
     check('payment_history entry has the website\'s fields', raw0?.pay_no === 1 && raw0?.payment_history?.[0]?.payment_mode === 'Cash' && /^\d{4}-\d{2}-\d{2}$/.test(raw0?.payment_history?.[0]?.payment_date || '') && /^\d\d:\d\d:\d\d$/.test(raw0?.payment_history?.[0]?.payment_time || '') && /Initial payment with invoice #/.test(raw0?.payment_history?.[0]?.transaction_reference || ''));
     check('customer is linked by id (the website never did)', raw0?.customer_id === multi._id && /^LGP/.test(raw0?.customer_code || ''));
+    // hallmark / HUID fee: the centre already charged GST on it, so it is added after the tax, never taxed again (checked on a real bill further down)
+    r = await call('POST', '/api/billing/calculate', { token: admin, body: { items: [ring({ netWt: 2, rate: 1000, makingCharge: 100, certification: 'huid', huid: 'AB12CD', hallmarkCharge: 45 })], goldRate: 9000, silverRate: 100 } });
+    check('the live total (website) treats the HUID fee the same way', r.data?.totalPayableAmount === 2208 && r.data?.hallmarkTotal === 45 && r.data?.gstSummary?.total_taxable_amount === 2100, JSON.stringify(r.data || r.json).slice(0, 200));
     const info = await lgp.collection('shop_info').findOne({ shop_id: 'default' });
     check('shop_info.last_invoice_number moved to the number just used', info?.last_invoice_number === Number(inv0.invoiceNumber), `(${info?.last_invoice_number})`);
 
@@ -500,14 +503,14 @@ const section = (t) => console.log(`\n${t}`);
     check('stones and other metals: value added to taxable, details kept', r.status === 201 && li?.taxableAmount === 62600 && li?.stoneCharge === 2100 && li?.extras?.length === 2 && li?.extras?.[0]?.name === 'Ruby' && li?.purity === '22K' && li?.grossWt === 10.4 && li?.productCode === 'LG-101' && li?.huid === 'AB12CD', JSON.stringify(li).slice(0, 200));
     const rawX = r.data && await lgp.collection('invoices').findOne({ invoice_number: r.data.invoiceNumber });
     check('...website fields are still complete (taxable_amount, cgst, total)', rawX?.items?.[0]?.taxable_amount === 62600 && rawX?.items?.[0]?.cgst === 939 && rawX?.items?.[0]?.total === 64478 && rawX?.items?.[0]?.gross_wt === 10.4);
-    // -- hallmark / HUID: pre-tax charge, name on the invoice ---------------------------------------
-    r = await bill({ items: [ring({ particulars: 'Earring', netWt: 2, rate: 1000, makingCharge: 100, certification: 'hallmark', hallmarkCharge: 45 })], paidAmount: 2210 });
+    // -- hallmark / HUID: fee passed on after tax (no GST on it), name on the invoice ---------------------------------------
+    r = await bill({ items: [ring({ particulars: 'Earring', netWt: 2, rate: 1000, makingCharge: 100, certification: 'hallmark', hallmarkCharge: 45 })], paidAmount: 2208 });
     const hm = r.data?.items?.[0];
-    const rawH = r.data && await lgp.collection('invoices').findOne({ invoice_number: r.data.invoiceNumber });
-    check('hallmarked: name "Earring (Hallmarked)", charge added before GST', r.status === 201 && hm?.particular === 'Earring (Hallmarked)' && hm?.taxableAmount === 2145 && hm?.hallmarkCharge === 45 && hm?.itemName === 'Earring' && r.data?.totalPayableAmount === 2209, `(${r.status} ${r.json.message || ''} ${JSON.stringify(hm).slice(0, 120)})`);
-    check('...stored: particulars carries the name, hallmark_charge kept', rawH?.items?.[0]?.particulars === 'Earring (Hallmarked)' && rawH?.items?.[0]?.hallmark_charge === 45 && rawH?.items?.[0]?.certification === 'hallmark' && rawH?.items?.[0]?.taxable_amount === 2145);
+    const rawHm = r.data && await lgp.collection('invoices').findOne({ invoice_number: r.data.invoiceNumber });
+    check('hallmarked: name "Earring (Hallmarked)", fee 45 outside the taxable value (taxable 2100, GST 63, payable 2208)', r.status === 201 && hm?.particular === 'Earring (Hallmarked)' && hm?.taxableAmount === 2100 && hm?.hallmarkCharge === 45 && hm?.hallmarkTaxed === false && hm?.total === 2208 && r.data?.hallmarkTotal === 45 && r.data?.gstSummary?.taxableValue === 2100 && r.data?.gstSummary?.totalTax === 63 && hm?.itemName === 'Earring' && r.data?.totalPayableAmount === 2208, `(${r.status} ${r.json.message || ''} ${JSON.stringify(hm).slice(0, 120)})`);
+    check('...stored: particulars carries the name, hallmark_charge kept', rawHm?.items?.[0]?.particulars === 'Earring (Hallmarked)' && rawHm?.items?.[0]?.hallmark_charge === 45 && rawHm?.items?.[0]?.certification === 'hallmark' && rawHm?.items?.[0]?.taxable_amount === 2100 && rawHm?.items?.[0]?.hallmark_in_taxable === false && rawHm?.hallmark_total === 45 && rawHm?.gst_summary?.total_taxable_amount === 2100 && rawHm?.calc_rule === 'lgpmanagement-v3');
     r = await bill({ items: [ring({ particulars: 'Earring', certification: 'huid', huid: 'ab12cd', hallmarkCharge: 45 })] });
-    check('HUID: name "Earring (HUID: AB12CD)"', r.status === 201 && r.data?.items?.[0]?.particular === 'Earring (HUID: AB12CD)' && r.data?.items?.[0]?.huid === 'AB12CD' && r.data?.items?.[0]?.taxableAmount === 64545, `(${r.status} ${r.json.message || ''})`);
+    check('HUID: name "Earring (HUID: AB12CD)"', r.status === 201 && r.data?.items?.[0]?.particular === 'Earring (HUID: AB12CD)' && r.data?.items?.[0]?.huid === 'AB12CD' && r.data?.items?.[0]?.taxableAmount === 64500 && r.data?.items?.[0]?.hallmarkCharge === 45, `(${r.status} ${r.json.message || ''})`);
     r = await bill({ items: [ring({ certification: 'huid', huid: 'AB1' })] });
     check('HUID must be 6 letters/digits (400)', r.status === 400 && /HUID/.test(r.json.message || ''), r.json.message);
     r = await bill({ items: [ring({ certification: 'huid' })] });
@@ -1594,6 +1597,30 @@ const section = (t) => console.log(`\n${t}`);
     }
     r = await call('POST', '/api/purchases/calculate', { token: admin, body: { metalType: 'gold', quantity: 10, rate: 7000, transactionType: 'intra-state' } });
     check('purchase calculate: taxable value, GST and input credit, nothing saved', r.status === 200 && r.data?.totalAmount === 70000 && r.data?.totalGst === 2100 && r.data?.totalItc === 2100, JSON.stringify(r.data).slice(0, 120));
+    // the supplier's round-off: the invoice total can be typed, within a small difference
+    r = await call('POST', '/api/purchases/calculate', { token: admin, body: { metalType: 'gold', quantity: 10, rate: 7000, transactionType: 'intra-state', invoiceTotal: 72110 } });
+    check('purchase calculate with a typed invoice total: calculated 72,100, round-off +10, GST and input credit unchanged', r.status === 200 && r.data?.totalPayable === 72110 && r.data?.calculatedPayable === 72100 && r.data?.roundOff === 10 && r.data?.totalGst === 2100 && r.data?.totalItc === 2100 && r.data?.netPayable === 72110, JSON.stringify(r.data).slice(0, 200));
+    r = await call('POST', '/api/purchases/calculate', { token: admin, body: { metalType: 'gold', quantity: 10, rate: 7000, invoiceTotal: 72200 } });
+    check('an invoice total far from the calculated one is refused (it is a round-off, not a new price)', r.status === 400 && /round-off/.test(r.json.message || ''), JSON.stringify(r.json).slice(0, 160));
+    r = await call('POST', '/api/purchases/calculate', { token: admin, body: { metalType: 'gold', quantity: 10, rate: 7000, invoiceTotal: 72100 } });
+    check('a typed total equal to the calculated one has no round-off', r.status === 200 && r.data?.roundOff === 0 && r.data?.totalPayable === 72100);
+    {
+        const invR = `SMK-RO-${tag}`;
+        const crc = await MongoClient.connect('mongodb://127.0.0.1:27018');
+        const pcol = crc.db('lgp_dev').collection('purchases');
+        r = await call('POST', '/api/purchases', { token: admin, body: { invoiceDate: '2019-06-10T05:00:00.000Z', invoiceNumber: invR, metalType: 'gold', biller: 'SMOKE Supplier', billerGstin: '19AAAAA0000A1Z5', quantity: 10, rate: 1000, totalAmount: 10000, invoiceTotal: 10301 } });
+        const pr = r.data?.purchase;
+        const rawR = await pcol.findOne({ invoice_number: invR });
+        check('a purchase saved with a typed invoice total: payable 10,301, round-off +1, GST 300 as calculated, website total_amount = 10,301', r.status === 201 && pr?.totalPayable === 10301 && pr?.roundOff === 1 && pr?.calculatedPayable === 10300 && pr?.totalGst === 300 && pr?.gstRecorded === true && rawR?.total_amount === 10301 && rawR?.roundOff === 1, JSON.stringify(r.json).slice(0, 200));
+        r = await call('PUT', `/api/purchases/${pr?._id}`, { token: admin, body: { invoiceTotal: 10299 } });
+        check('the invoice total can be corrected later (round-off -1), GST untouched', r.status === 200 && r.data?.purchase?.totalPayable === 10299 && r.data?.purchase?.roundOff === -1 && r.data?.purchase?.totalGst === 300 && r.data?.purchase?.netPayable === 10299, JSON.stringify(r.json).slice(0, 200));
+        r = await call('PUT', `/api/purchases/${pr?._id}`, { token: admin, body: { invoiceTotal: 10400 } });
+        check('a correction beyond the allowed round-off is refused and nothing changes', r.status === 400 && (await pcol.findOne({ invoice_number: invR }))?.total_amount === 10299);
+        r = await call('PUT', `/api/purchases/${pr?._id}`, { token: admin, body: { invoiceTotal: '' } });
+        check('clearing the typed total goes back to the calculated one', r.status === 200 && r.data?.purchase?.totalPayable === 10300 && r.data?.purchase?.roundOff === 0);
+        await pcol.deleteMany({ invoice_number: invR });
+        await crc.close();
+    }
     r = await call('POST', '/api/purchases/calculate', { token: admin, body: {} });
     check('purchase calculate: nothing entered is a clear 400', r.status === 400);
     r = await call('POST', '/api/purchases/calculate', { token: viewer, body: { quantity: 10, rate: 7000 } });

@@ -154,8 +154,8 @@
         if (!window.htmx) return;
         if (type === 'rate.changed') { htmx.trigger(document.body, 'rate-saved'); if (msg.by) toast('info', 'Rate changed by ' + msg.by); }
         else if (type === 'data.changed') { htmx.trigger(document.body, 'data-changed'); }
-        else if (type === 'notification.new') { toast('info', (msg.data && msg.data.title) ? msg.data.title : 'New notification'); }
-        else if (type === 'app.update') { toast('info', 'A new app version is available'); }
+        else if (type === 'notification.new') { toast('info', (msg.data && msg.data.title) ? msg.data.title : 'New notification'); htmx.trigger(document.body, 'notification-new'); }
+        else if (type === 'app.update') { toast('info', 'A new app version is available'); htmx.trigger(document.body, 'notification-new'); }
         else if (type === 'permissions.changed') {
             // access changed: re-read it and rebuild the page so the menu and buttons match
             fetch('/session/refresh', { method: 'POST', headers: { 'X-CSRF-Token': csrf() }, credentials: 'same-origin' })
@@ -229,6 +229,18 @@
                 close: function () { this.open = false; },
                 get sidebarClass() { return this.open ? 'sidebar is-open' : 'sidebar'; },
                 get shellClass() { return this.collapsed ? 'shell is-collapsed' : 'shell'; }
+            };
+        });
+
+        // the bell in the top bar: opening it loads the list (the page uses the CSP-safe Alpine, so no inline code in the markup)
+        Alpine.data('bell', function () {
+            return {
+                open: false,
+                toggle: function () {
+                    this.open = !this.open;
+                    if (this.open && window.htmx) htmx.trigger(document.getElementById('bell-list'), 'bell-open');
+                },
+                close: function () { this.open = false; }
             };
         });
 

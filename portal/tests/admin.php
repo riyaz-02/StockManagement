@@ -113,7 +113,7 @@ check('and it was put back as it was', ($back['expenses.view'] ?? null) === ($gr
 echo "\nApp updates\n";
 $cur = apiCall('GET', $api . '/app-version')['data']['appVersion'] ?? [];
 $r = $a->req('GET', '/admin/updates');
-check('the page shows the current version and the publish form', $r['code'] === 200 && str_contains($r['body'], (string) ($cur['latestVersion'] ?? '')) && str_contains($r['body'], 'Publish a new version'));
+check('the page shows the current version, the upload step and the link-of-your-own form', $r['code'] === 200 && str_contains($r['body'], (string) ($cur['latestVersion'] ?? '')) && str_contains($r['body'], 'Upload the new app') && str_contains($r['body'], 'link of your own'));
 $r = $a->req('POST', '/admin/updates', ['_csrf' => $tok, 'latestVersion' => '', 'latestVersionCode' => '']);
 check('an empty version is refused in the page (422)', $r['code'] === 422 && str_contains($r['body'], 'notice-error'));
 $r = $a->req('POST', '/admin/updates', ['_csrf' => $tok, 'latestVersion' => '9.9.9', 'latestVersionCode' => '99', 'downloadUrl' => $cur['downloadUrl'] ?? '', 'updateMessage' => 'PORTAL TEST']);

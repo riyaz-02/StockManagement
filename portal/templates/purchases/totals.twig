@@ -1,10 +1,13 @@
 {% if c %}
+<small class="hint" id="inv-total-hint" hx-swap-oob="true">Calculated total {{ c.calculatedPayable|default(c.totalPayable)|inr }}. Type the supplier's invoice total only if it differs (round-off up to ₹50); GST stays as calculated.</small>
 <div class="kv">
     <div class="kv-row"><span>Weight · rate</span><strong>{{ c.quantity|grams }} · {{ c.rate|inr(0) }}</strong></div>
     <div class="kv-row"><span>Taxable value</span><strong>{{ c.totalAmount|inr }}</strong></div>
     {% if c.transactionType == 'inter-state' %}<div class="kv-row"><span>IGST {{ c.gstRate }}%</span><strong>{{ c.igstAmount|inr }}</strong></div>
     {% else %}<div class="kv-row"><span>CGST</span><strong>{{ c.cgstAmount|inr }}</strong></div><div class="kv-row"><span>SGST</span><strong>{{ c.sgstAmount|inr }}</strong></div>{% endif %}
-    <div class="kv-row total"><span>Total payable</span><strong>{{ c.totalPayable|inr }}</strong></div>
+    {% if c.roundOff|default(0) != 0 %}<div class="kv-row"><span>Calculated total</span><strong>{{ c.calculatedPayable|inr }}</strong></div>
+    <div class="kv-row"><span>Supplier's round-off</span><strong>{{ c.roundOff > 0 ? '+ ' : '− ' }}{{ c.roundOff|abs|inr }}</strong></div>{% endif %}
+    <div class="kv-row total"><span>{{ c.roundOff|default(0) != 0 ? 'Invoice total' : 'Total payable' }}</span><strong>{{ c.totalPayable|inr }}</strong></div>
     <div class="kv-row"><span>GST claimed back</span><strong class="pos">{{ c.totalItc|inr }}</strong></div>
     {% if c.tdsApplicable %}<div class="kv-row"><span>TDS {{ c.tdsRate }}%</span><strong>{{ c.tdsAmount|inr }}</strong></div><div class="kv-row"><span>Net to pay</span><strong>{{ c.netPayable|inr }}</strong></div>{% endif %}
 </div>

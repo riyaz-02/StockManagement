@@ -182,6 +182,7 @@
             h += '<div class="kv-row"><span>Taxable value</span><strong>' + inr(g.total_taxable_amount) + '</strong></div>';
             if (c.gstType === 'IGST') h += '<div class="kv-row"><span>IGST 3%</span><strong>' + inr(g.total_igst || 0) + '</strong></div>';
             else h += '<div class="kv-row"><span>CGST 1.5%</span><strong>' + inr(g.total_cgst) + '</strong></div><div class="kv-row"><span>SGST 1.5%</span><strong>' + inr(g.total_sgst) + '</strong></div>';
+            if (c.hallmarkTotal > 0) h += '<div class="kv-row"><span>Hallmark / HUID fee (no GST)</span><strong>' + inr(c.hallmarkTotal) + '</strong></div>';
             if (c.additionalCharges > 0) h += '<div class="kv-row"><span>Extra charge</span><strong>' + inr(c.additionalCharges) + '</strong></div>';
             h += '<div class="kv-row"><span>Round off</span><strong>' + (c.roundOff >= 0 ? '' : '− ') + inr(Math.abs(c.roundOff)) + '</strong></div>';
             h += '<div class="kv-row total"><span>Bill total</span><strong>' + inr(c.totalPayableAmount, 0) + '</strong></div>';

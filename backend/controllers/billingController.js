@@ -547,6 +547,7 @@ exports.createInvoice = async (req, res, next) => {
             // discount is taken off BEFORE GST (lines above are already net of it); the website's own `discount` stays 0
             discount_mode: calc.discountMode, discount_given: calc.discountGiven, discount_before_gst: calc.discountBeforeGst,
             gross_taxable: calc.grossTaxable, bill_before_discount: calc.billBeforeDiscount, metal_value: calc.metalValue,
+            ...(calc.hallmarkTotal > 0 ? { hallmark_total: calc.hallmarkTotal } : {}),
         };
 
         const inserted = await Invoices().insertOne(doc);

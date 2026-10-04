@@ -35,6 +35,25 @@ final class Browser
         curl_close($ch);
         return ['code' => $code, 'headers' => $out, 'body' => $body];
     }
+    /** multipart/form-data with one file (for the APK upload) */
+    public function upload(string $path, array $fields, string $field, string $file, string $name, array $headers = []): array
+    {
+        $ch = curl_init($this->base . $path);
+        $out = [];
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 600, CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_COOKIEJAR => $this->jar, CURLOPT_COOKIEFILE => $this->jar, CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_POSTFIELDS => $fields + [$field => new CURLFile($file, 'application/octet-stream', $name)],
+            CURLOPT_HEADERFUNCTION => function ($c, $line) use (&$out) {
+                if (str_contains($line, ':')) { [$k, $v] = explode(':', $line, 2); $out[strtolower(trim($k))] = trim($v); }
+                return strlen($line);
+            },
+        ]);
+        $body = (string) curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        return ['code' => $code, 'headers' => $out, 'body' => $body];
+    }
     public function csrf(string $path = '/login'): string
     {
         $r = $this->req('GET', $path);

@@ -19,6 +19,7 @@ class SummaryTab extends StatefulWidget {
 class _SummaryTabState extends State<SummaryTab> {
   List<Movement>? _moreMovements;
   bool _loadingMore = false;
+  bool _showAdvice = false; // the explanation stays folded away until the user asks for it
 
   Color _sevColor(String s) => s == 'high' ? Colors.red.shade700 : s == 'moderate' ? Colors.orange.shade800 : Colors.green.shade700;
   String _sevLabel(String s, bool bn) => s == 'high' ? (bn ? 'বেশি' : 'High') : s == 'moderate' ? (bn ? 'সতর্ক' : 'Watch') : (bn ? 'স্বাভাবিক' : 'Normal');
@@ -100,9 +101,33 @@ class _SummaryTabState extends State<SummaryTab> {
             _metalCard(s.silver, s, bn),
             const SizedBox(height: 18),
 
-            _heading(bn ? 'এর মানে কী · করণীয়' : 'What it means · what to do'),
-            _insightCard(bn ? 'স্বর্ণ' : 'Gold', s.goldInsight, lang),
-            _insightCard(bn ? 'রূপা' : 'Silver', s.silverInsight, lang),
+            if (s.wholeFirm) Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => setState(() => _showAdvice = !_showAdvice),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(children: [
+                    const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFF59E0B), size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(bn ? 'এর মানে কী · করণীয়' : 'What it means · what to do', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        if (!_showAdvice) Text(bn ? 'পড়তে চাপুন' : 'Tap to read', style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+                      ]),
+                    ),
+                    Icon(_showAdvice ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.grey[600]),
+                  ]),
+                ),
+              ),
+            ),
+            if (s.wholeFirm && _showAdvice) ...[
+              const SizedBox(height: 8),
+              _insightCard(bn ? 'স্বর্ণ' : 'Gold', s.goldInsight, lang),
+              _insightCard(bn ? 'রূপা' : 'Silver', s.silverInsight, lang),
+            ],
             const SizedBox(height: 14),
 
             _heading(bn ? 'তথ্য যাচাই' : 'Data checks'),
@@ -176,6 +201,9 @@ class _SummaryTabState extends State<SummaryTab> {
     final gold = m.metal == 'gold';
     final accent = gold ? const Color(0xFFD4A017) : const Color(0xFF94A3B8);
     final sev = _sevColor(m.severity);
+    // Purchases are recorded for the whole firm, so a branch login sees its own stock and sales only: the balance check
+    // (what came in vs what is accounted for) belongs to the whole-firm login.
+    final whole = s.wholeFirm;
     Widget row(String en, String bnT, String v, {bool bold = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(children: [
@@ -197,7 +225,12 @@ class _SummaryTabState extends State<SummaryTab> {
             const Spacer(),
             Text(_g(m.stockTotal), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
           ]),
-          subtitle: Padding(
+          subtitle: !whole
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(bn ? 'এই শাখার স্টক ও বিক্রি' : 'This branch: stock and sales', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                )
+              : Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Row(children: [
               Text(bn ? 'গড়মিল ' : 'Difference ', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
@@ -208,19 +241,22 @@ class _SummaryTabState extends State<SummaryTab> {
             ]),
           ),
           children: [
+            if (whole) ...[
             row('Metal bought (purchases)', 'ক্রয় করা ধাতু', _g(m.purchased)),
             row('+ Allowance for alloy and process (${m.allowancePct.toStringAsFixed(m.allowancePct % 1 == 0 ? 0 : 1)}%)', 'খাদ ও কাজের জন্য বাড়তি (${m.allowancePct.toStringAsFixed(m.allowancePct % 1 == 0 ? 0 : 1)}%)', _g(m.allowance)),
             if (m.oldMetal > 0 || m.rawMetal > 0) row('+ Old metal taken in and raw metal bought', 'পুরনো ও কাঁচা ধাতু প্রাপ্তি', _g(m.oldMetal + m.rawMetal)),
             row('Total metal received', 'মোট প্রাপ্ত ধাতু', _g(m.receiptsTotal), bold: true),
             const Divider(height: 14),
+            ],
             row('In the shop (${m.piecesInShop} pieces)', 'দোকানে (${m.piecesInShop}টি পিস)', _g(m.inShop)),
             if (m.withOthers > 0) row('Out for repair / with agent or customer (${m.piecesWithOthers})', 'বাইরে — মেরামত / এজেন্ট / গ্রাহক (${m.piecesWithOthers})', _g(m.withOthers)),
             row('Bulk stock (${m.bulkEntries} entries)', 'বাল্ক স্টক (${m.bulkEntries}টি)', _g(m.bulk)),
             row('Stock now', 'বর্তমান স্টক', _g(m.stockTotal), bold: true),
             const Divider(height: 14),
-            row('Expected to have left the shop', 'প্রত্যাশিত বেরিয়ে গেছে', _g(m.expectedOut)),
+            if (whole) row('Expected to have left the shop', 'প্রত্যাশিত বেরিয়ে গেছে', _g(m.expectedOut)),
             row('Sold on GST bills${m.returned > 0 ? ' (after ${_g(m.returned)} returned)' : ''}', 'বিক্রি — জিএসটি বিল${m.returned > 0 ? ' (${_g(m.returned)} ফেরত বাদে)' : ''}', _g(m.sold)),
             row('Less: approved wastage', 'বিয়োগ: অনুমোদিত ক্ষতি', _g(m.wastage)),
+            if (whole) ...[
             const Divider(height: 14),
             Container(
               padding: const EdgeInsets.all(10),
@@ -239,6 +275,11 @@ class _SummaryTabState extends State<SummaryTab> {
                       : (bn ? 'রেকর্ডের চেয়ে বেশি: কোনো ক্রয় লেখা হয়নি, বা কিছু দুবার লেখা হয়েছে।' : 'More than the records explain: a purchase may be missing, or something is entered twice.'),
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(bn ? 'গড়মিলের হিসাব পুরো দোকানের লগইনে দেখা যায়।' : 'The balance check (bought vs stock and sold) is shown to the whole-firm login.', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              ),
           ],
         ),
       ),

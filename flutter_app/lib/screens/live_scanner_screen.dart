@@ -2,13 +2,15 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
+import '../providers/language_provider.dart';
 import '../providers/tally_provider.dart';
 import '../models/item_model.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_toast.dart';
+import '../widgets/app_dialog.dart';
+import '../widgets/fast_scanner.dart';
 import '../widgets/weight_verification_dialog.dart';
 import 'quick_add_item_screen.dart';
 
@@ -25,33 +27,36 @@ class LiveScannerScreen extends StatefulWidget {
 }
 
 class _LiveScannerScreenState extends State<LiveScannerScreen> {
-  MobileScannerController cameraController = MobileScannerController();
+  final GlobalKey<FastScannerState> _scanner = GlobalKey<FastScannerState>();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
 
-  bool _isProcessing = false;
+  // Scans go into a queue and are worked through one by one, so the camera never waits for the server:
+  // the next barcode can be scanned while the previous one is still being saved.
+  final List<String> _queue = [];
+  bool _draining = false;
+  bool _modalOpen = false; // a dialog / form is open: the camera ignores codes until it is closed
+  bool _completeShown = false;
+  Timer? _refreshTimer;
+  int _pending = 0;
+
   int _scannedCount = 0;
   int _totalItems = 0;
   String? _lastScannedBarcode;
   String? _lastResult;
   Color _resultColor = Colors.green;
 
-  // Cooldown mechanism to prevent rapid re-scans
-  DateTime? _lastScanTime;
-  String? _lastProcessedBarcode;
-  static const Duration _scanCooldown =
-      Duration(milliseconds: 5000); // 5 second cooldown
-
   @override
   void initState() {
     super.initState();
+    _audioPlayer.setPlayerMode(PlayerMode.lowLatency).catchError((_) {});   // the beep follows the scan at once
     _loadTallyInfo();
   }
 
   @override
   void dispose() {
-    cameraController.dispose();
+    _refreshTimer?.cancel();
     _audioPlayer.dispose();
     _barcodeController.dispose();
     _barcodeFocusNode.dispose();
@@ -95,96 +100,95 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
     }
   }
 
-  Future<void> _processScan(String barcode) async {
-    if (barcode.isEmpty || _isProcessing) return;
+  /// A dialog / form is about to open: pause the camera until it is closed.
+  Future<T> _modal<T>(Future<T> Function() open) async {
+    if (mounted) setState(() => _modalOpen = true);
+    try {
+      return await open();
+    } finally {
+      if (mounted) setState(() => _modalOpen = false);
+    }
+  }
 
-    // Cooldown check: prevent scanning same barcode within cooldown period
-    final now = DateTime.now();
-    if (_lastScanTime != null && _lastProcessedBarcode == barcode) {
-      final timeSinceLastScan = now.difference(_lastScanTime!);
-      if (timeSinceLastScan < _scanCooldown) {
-        // Still in cooldown period for this barcode - ignore
-        print(
-            'Cooldown active: ${_scanCooldown.inMilliseconds - timeSinceLastScan.inMilliseconds}ms remaining');
-        return;
+  /// One refresh of the tally a moment after the last scan (instead of one per scan).
+  void _scheduleRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(const Duration(milliseconds: 700), () async {
+      if (!mounted) return;
+      await _loadTallyInfo();
+      if (!mounted) return;
+      Provider.of<TallyProvider>(context, listen: false).notifyListeners();
+      if (_totalItems > 0 && _scannedCount >= _totalItems && !_completeShown) {
+        _completeShown = true;
+        _playSound('complete');
+        HapticFeedback.heavyImpact();
+        _modal(() => _showCompletionDialog());
+      }
+    });
+  }
+
+  /// Every code (camera or typed) comes here: acknowledged at once, saved in the background.
+  void _processScan(String barcode) {
+    final code = barcode.trim();
+    if (code.isEmpty) return;
+    if (_queue.contains(code)) return; // the same code is already waiting
+    HapticFeedback.selectionClick();
+    _queue.add(code);
+    if (mounted) setState(() => _pending = _queue.length + (_draining ? 1 : 0));
+    _drain();
+  }
+
+  Future<void> _drain() async {
+    if (_draining) return;
+    _draining = true;
+    if (mounted) setState(() {});
+    while (_queue.isNotEmpty && mounted) {
+      final code = _queue.removeAt(0);
+      if (mounted) setState(() => _pending = _queue.length + 1);
+      try {
+        await _processOne(code);
+      } catch (e) {
+        print('[SCAN] EXCEPTION during scan: $e');
       }
     }
+    _draining = false;
+    if (mounted) setState(() => _pending = 0);
+  }
 
-    setState(() {
-      _isProcessing = true;
-      _lastScanTime = now;
-      _lastProcessedBarcode = barcode;
-    });
-
-    print('[SCAN] Processing barcode: $barcode');
-    print('[SCAN] Current count: $_scannedCount/$_totalItems');
-
+  Future<void> _processOne(String barcode) async {
     final tallyProvider = Provider.of<TallyProvider>(context, listen: false);
-
     try {
-      final result = await tallyProvider.scanItem(widget.tallyId, barcode);
-
+      final result = await tallyProvider.scanItem(widget.tallyId, barcode, refresh: false);
       if (!mounted) return;
 
       if (result != null) {
-        print('[SCAN] ✓ API returned success for barcode: $barcode');
-
-        // **WEIGHT VERIFICATION CHECK**
-        final requiresWeightVerification =
-            result['requiresWeightVerification'] ?? false;
-
+        // weight verification (approx / bulk pieces)
+        final requiresWeightVerification = result['requiresWeightVerification'] ?? false;
         if (requiresWeightVerification) {
-          print('[SCAN] ⚖️ Weight verification required');
           final itemData = result['data']?['item'];
-
           if (itemData != null) {
-            // Show weight verification dialog
-            await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => WeightVerificationDialog(
-                itemData: itemData,
-                onVerified: (verifiedWeight) async {
-                  try {
-                    // Call API to verify weight
-                    final tallyProvider =
-                        Provider.of<TallyProvider>(context, listen: false);
-                    await tallyProvider.verifyTallyWeight(
-                      widget.tallyId,
-                      itemData['_id'],
-                      verifiedWeight,
-                    );
-
-                    // Close dialog
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                    }
-
-                    // Reload tally
-                    await _loadTallyInfo();
-
-                    // Show success feedback
-                    _playSound('success');
-                    HapticFeedback.lightImpact();
-                  } catch (e) {
-                    print('[SCAN] Weight verification error: $e');
-                    // Show error
-                    if (mounted) {
-                      showAppSnackBar(
-                        context,
-                        SnackBar(
-                          content: Text('Failed to verify weight: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-            );
+            await _modal(() => showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => WeightVerificationDialog(
+                    itemData: itemData,
+                    onVerified: (verifiedWeight) async {
+                      try {
+                        final tp = Provider.of<TallyProvider>(context, listen: false);
+                        await tp.verifyTallyWeight(widget.tallyId, itemData['_id'], verifiedWeight);
+                        if (mounted) Navigator.of(context).pop();
+                        _playSound('success');
+                        HapticFeedback.lightImpact();
+                        _scheduleRefresh();
+                      } catch (e) {
+                        if (mounted) {
+                          showAppSnackBar(context, SnackBar(content: Text('Failed to verify weight: $e'), backgroundColor: Colors.red));
+                        }
+                      }
+                    },
+                  ),
+                ));
           }
-
-          setState(() => _isProcessing = false);
           return;
         }
 
@@ -192,23 +196,17 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
         final scannedItemData = result['data']?['item'];
         final needsDetails = scannedItemData?['status'] == 'action_needed';
 
-        // Play success sound and vibration
         _playSound('success');
         HapticFeedback.lightImpact();
-
-        setState(() {
-          _lastScannedBarcode = barcode;
-          // CRITICAL: Only increment count if item was actually added to tally
-          // Don't increment for items not in expected list
-          _scannedCount++;
-          _lastResult = isOutOfStock
-              ? '⚠️ Out of stock - weight excluded'
-              : '✓ Item scanned successfully';
-          _resultColor = isOutOfStock ? Colors.orange : Colors.green;
-        });
-
-        // Auto-dismiss alert after 8 seconds
-        Future.delayed(const Duration(seconds: 8), () {
+        if (mounted) {
+          setState(() {
+            _lastScannedBarcode = barcode;
+            _scannedCount++; // shown at once; the true count is read back once the queue is quiet
+            _lastResult = isOutOfStock ? '⚠️ Out of stock - weight excluded' : '✓ Item scanned';
+            _resultColor = isOutOfStock ? Colors.orange : Colors.green;
+          });
+        }
+        Future.delayed(const Duration(seconds: 3), () {
           if (mounted && _lastScannedBarcode == barcode) {
             setState(() {
               _lastResult = null;
@@ -216,71 +214,32 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
             });
           }
         });
+        _scheduleRefresh();
 
-        // Reload tally info to get updated weights and counts
-        print('Reloading tally info after scan...');
-
-        // Add delay to ensure database has updated
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        await _loadTallyInfo();
-
-        // Force provider to notify all listeners (updates parent page immediately)
-        tallyProvider.notifyListeners();
-        print('Tally reloaded: $_scannedCount / $_totalItems');
-
-        // Check if tally is complete
-        if (_scannedCount >= _totalItems) {
-          _playSound('complete');
-          HapticFeedback.heavyImpact();
-          if (mounted) {
-            _showCompletionDialog();
-          }
-        }
-
-        // If this item was a quick-add with pending details, offer to
-        // complete/activate it right here instead of leaving it for later.
+        // a quick-added piece that still needs its details: offer to finish it right here
         if (needsDetails && scannedItemData != null && mounted) {
-          await _offerCompleteDetails(scannedItemData);
+          await _modal(() => _offerCompleteDetails(scannedItemData));
         }
-
-        // Resume scanning after brief delay (reduced for faster workflow)
-        await Future.delayed(const Duration(milliseconds: 500));
       } else {
-        // API returned error or null
-        print('[SCAN] ✗ API returned error/null for barcode: $barcode');
-        print('[SCAN] Provider error: ${tallyProvider.error}');
+        final err = (tallyProvider.error ?? '').toLowerCase();
+        final isNotFound = err.contains('not found');
+        final isOutOfStockWarning = err.contains('sold') || err.contains('repair') || err.contains('customer') || err.contains('out of stock') || err.contains('deleted');
 
-        final isNotFound =
-            tallyProvider.error?.toLowerCase().contains('not found') == true;
-
-        // Check if it's an out-of-stock item (warning) or other error
-        final isOutOfStockWarning =
-            tallyProvider.error?.contains('sold') == true ||
-                tallyProvider.error?.contains('repair') == true ||
-                tallyProvider.error?.contains('customer') == true ||
-                tallyProvider.error?.contains('out of stock') == true ||
-                tallyProvider.error?.contains('deleted') == true;
-
-        // Play appropriate sound
-        if (isOutOfStockWarning || isNotFound) {
-          _playSound('error'); // Could add a separate warning sound
+        _playSound('error');
+        if (isNotFound || isOutOfStockWarning) {
           HapticFeedback.mediumImpact();
         } else {
-          _playSound('error');
           HapticFeedback.vibrate();
         }
 
-        setState(() {
-          _lastScannedBarcode = barcode;
-          _lastResult =
-              tallyProvider.error ?? '✗ Scan failed - please try again';
-          _resultColor =
-              (isOutOfStockWarning || isNotFound) ? Colors.orange : Colors.red;
-        });
-
-        // Auto-dismiss error after 10 seconds
-        Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) {
+          setState(() {
+            _lastScannedBarcode = barcode;
+            _lastResult = tallyProvider.error ?? '✗ Scan failed - please try again';
+            _resultColor = (isOutOfStockWarning || isNotFound) ? Colors.orange : Colors.red;
+          });
+        }
+        Future.delayed(const Duration(seconds: 5), () {
           if (mounted && _lastScannedBarcode == barcode) {
             setState(() {
               _lastResult = null;
@@ -290,75 +249,35 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
         });
 
         if (isNotFound && mounted) {
-          // Barcode isn't registered at all — offer to add it on the spot
-          // instead of just failing the scan.
-          await _offerAddMissingItem(barcode);
-        } else if (mounted) {
-          showAppSnackBar(
-            context,
-            SnackBar(
-              content: Text(tallyProvider.error ??
-                  'Failed to save scan. Please try again.'),
-              backgroundColor: isOutOfStockWarning ? Colors.orange : Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          // Barcode isn't registered at all: offer to add it on the spot
+          await _modal(() => _offerAddMissingItem(barcode));
         }
-
-        await Future.delayed(const Duration(milliseconds: 1500));
       }
     } catch (e) {
-      print('[SCAN] ✗ EXCEPTION during scan: $e');
-
-      // Play error sound and vibration
+      print('[SCAN] EXCEPTION during scan: $e');
       _playSound('error');
       HapticFeedback.vibrate();
-
-      setState(() {
-        _lastScannedBarcode = barcode;
-        _lastResult = '✗ Error: ${e.toString()}';
-        _resultColor = Colors.red;
-      });
-
       if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(
-            content: Text('Scan error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        setState(() {
+          _lastScannedBarcode = barcode;
+          _lastResult = '✗ Error: ${e.toString().replaceFirst('Exception: ', '')}';
+          _resultColor = Colors.red;
+        });
       }
-
-      await Future.delayed(const Duration(milliseconds: 1500));
     }
-
-    setState(() => _isProcessing = false);
   }
 
   // ── Barcode not found — offer to add it as a new item ─────────────────────
   Future<void> _offerAddMissingItem(String barcode) async {
-    final shouldAdd = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Item Not Found'),
-        content: Text(
-          'No item with barcode "$barcode" exists yet. Add it to stock now '
-          'and count it in this tally?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Skip'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Add Item'),
-          ),
-        ],
-      ),
+    final bn = Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
+    final shouldAdd = await confirmModern(
+      context,
+      icon: Icons.search_off_rounded,
+      accent: const Color(0xFFF59E0B),
+      title: bn ? 'বারকোড পাওয়া যায়নি' : 'Barcode not found',
+      message: bn ? '$barcode স্টকে নেই। এখনই যোগ করবেন?' : '$barcode is not in stock. Add it now?',
+      confirmLabel: bn ? 'যোগ করুন' : 'Add item',
+      cancelLabel: bn ? 'বাদ দিন' : 'Skip',
     );
 
     if (shouldAdd != true || !mounted) return;
@@ -400,26 +319,15 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
 
   // ── Scanned item still has pending "action needed" details ────────────────
   Future<void> _offerCompleteDetails(Map<String, dynamic> itemData) async {
-    final shouldEdit = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Details Pending'),
-        content: Text(
-          '"${itemData['barcode'] ?? 'This item'}" was quick-added and still '
-          'needs its full details filled in. Complete them now?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Later'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Edit Now'),
-          ),
-        ],
-      ),
+    final bn = Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
+    final shouldEdit = await confirmModern(
+      context,
+      icon: Icons.edit_note_rounded,
+      accent: const Color(0xFF2F6BFF),
+      title: bn ? 'বিবরণ বাকি' : 'Details pending',
+      message: bn ? '${itemData['barcode'] ?? 'এই আইটেম'}-এর বিবরণ এখন লিখবেন?' : 'Fill in the details of ${itemData['barcode'] ?? 'this item'} now?',
+      confirmLabel: bn ? 'এখনই লিখুন' : 'Edit now',
+      cancelLabel: bn ? 'পরে' : 'Later',
     );
 
     if (shouldEdit != true || !mounted) return;
@@ -444,29 +352,21 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
     if (mounted) await _loadTallyInfo();
   }
 
-  void _showCompletionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎉 Tally Complete!'),
-        content: const Text(
-            'All items have been scanned. Would you like to lock the tally?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Continue Scanning'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Close scanner
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Done'),
-          ),
-        ],
+  Future<void> _showCompletionDialog() {
+    final bn = Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
+    return showModernDialog<void>(
+      context,
+      child: Builder(
+        builder: (ctx) => ModernDialogCard(
+          icon: Icons.verified_rounded,
+          accent: const Color(0xFF16A34A),
+          title: bn ? 'সব আইটেম স্ক্যান হয়েছে' : 'All items scanned',
+          primary: ModernDialogButton.primary(bn ? 'শেষ' : 'Done', color: const Color(0xFF16A34A), onPressed: () {
+            Navigator.of(ctx).pop();
+            Navigator.of(context).pop(); // close the scanner
+          }),
+          secondary: ModernDialogButton.text(bn ? 'স্ক্যান চালান' : 'Keep scanning', onPressed: () => Navigator.of(ctx).pop()),
+        ),
       ),
     );
   }
@@ -479,34 +379,16 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera preview with scan window restriction
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final h = constraints.maxHeight;
-              const boxSize = 270.0;
-              final scanWindow = Rect.fromCenter(
-                center: Offset(w / 2, h / 2),
-                width: boxSize,
-                height: boxSize,
-              );
-              return Stack(children: [
-                MobileScanner(
-                  controller: cameraController,
-                  scanWindow: scanWindow,
-                  onDetect: (capture) {
-                    for (final barcode in capture.barcodes) {
-                      if (barcode.rawValue != null && !_isProcessing) {
-                        _processScan(barcode.rawValue!);
-                        break;
-                      }
-                    }
-                  },
-                ),
-                _LiveScanOverlay(
-                    scanWindow: scanWindow, isProcessing: _isProcessing),
-              ]);
-            },
+          // Camera: high resolution, whole-frame detection, zoom + torch (see widgets/fast_scanner.dart)
+          Positioned.fill(
+            child: FastScanner(
+              key: _scanner,
+              onCode: _processScan,
+              paused: _modalOpen,
+              success: _lastResult != null && _resultColor == Colors.green,
+              sameCodeCooldown: const Duration(milliseconds: 3000),
+              guideCenterY: 0.5,
+            ),
           ),
 
           // Top bar with progress
@@ -547,15 +429,7 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            cameraController.torchEnabled
-                                ? Icons.flash_on
-                                : Icons.flash_off,
-                            color: Colors.white,
-                          ),
-                          onPressed: () => cameraController.toggleTorch(),
-                        ),
+                        const SizedBox(width: 48),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -753,83 +627,23 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
               ),
             ),
 
-          // Processing indicator
-          if (_isProcessing)
-            const Center(
-              child: CircularProgressIndicator(
-                color: Colors.white,
+          // saving in the background: small, never blocks the camera
+          if (_pending > 0)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 14,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(16)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                  const SizedBox(width: 8),
+                  Text('Saving $_pending', style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                ]),
               ),
             ),
         ],
       ),
     );
   }
-}
-
-// ── Scan overlay ──────────────────────────────────────────────────────────────
-class _LiveScanOverlay extends StatelessWidget {
-  final Rect scanWindow;
-  final bool isProcessing;
-  const _LiveScanOverlay(
-      {required this.scanWindow, required this.isProcessing});
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(
-        size: Size.infinite,
-        painter: _LiveScanPainter(
-            scanWindow: scanWindow, isProcessing: isProcessing),
-      );
-}
-
-class _LiveScanPainter extends CustomPainter {
-  final Rect scanWindow;
-  final bool isProcessing;
-  _LiveScanPainter({required this.scanWindow, required this.isProcessing});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final mask = Paint()..color = const Color(0xBB000000);
-    const r = Radius.circular(18);
-    final rrect = RRect.fromRectAndRadius(scanWindow, r);
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(rrect)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, mask);
-
-    final color = isProcessing ? const Color(0xFF4CAF50) : Colors.white;
-    final p = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round;
-
-    const cl = 26.0;
-    const cr = 16.0;
-    final l = scanWindow.left;
-    final t = scanWindow.top;
-    final ri = scanWindow.right;
-    final b = scanWindow.bottom;
-
-    canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
-    canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
-    canvas.drawArc(
-        Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
-    canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
-    canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2,
-        3.14159 / 2, false, p);
-    canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
-    canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2,
-        3.14159 / 2, false, p);
-    canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
-    canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0,
-        3.14159 / 2, false, p);
-  }
-
-  @override
-  bool shouldRepaint(_LiveScanPainter old) =>
-      old.isProcessing != isProcessing || old.scanWindow != scanWindow;
 }

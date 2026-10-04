@@ -24,6 +24,7 @@ use Portal\Http\Controllers\PageController;
 use Portal\Http\Controllers\PurchaseController;
 use Portal\Http\Controllers\RateController;
 use Portal\Http\Controllers\ReportsController;
+use Portal\Http\Controllers\BellController;
 use Portal\Http\Controllers\StockController;
 use Portal\Http\Controllers\StockSummaryController;
 use Portal\Http\Controllers\WastageController;
@@ -83,6 +84,9 @@ final class App
         $app->get('/partials/rate', [RateController::class, 'strip'])->add($auth);
         $app->get('/partials/rate-form', [RateController::class, 'form'])->add(new RequireAuth('rates.edit'));
         $app->post('/rates', [RateController::class, 'save'])->add(new RequireAuth('rates.edit'));
+        $app->get('/partials/bell/count', [BellController::class, 'count'])->add($auth);
+        $app->get('/partials/bell/list', [BellController::class, 'list'])->add($auth);
+        $app->post('/partials/bell/seen', [BellController::class, 'seen'])->add($auth);
         $app->post('/live/ticket', [LiveController::class, 'ticket'])->add($auth);
         $app->post('/session/refresh', [LiveController::class, 'refresh'])->add($auth);
         $app->post('/presence/ping', [LiveController::class, 'ping'])->add($auth);
@@ -187,6 +191,7 @@ final class App
         $app->post('/purchases/calc', [PurchaseController::class, 'calc'])->add($need('purchases.create'));
         $app->post('/purchases', [PurchaseController::class, 'create'])->add($need('purchases.create'));
         $app->get('/purchases/{id}', [PurchaseController::class, 'show'])->add($need('purchases.view'));
+        $app->post('/purchases/{id}/total', [PurchaseController::class, 'total'])->add($need('purchases.edit'));
         $app->post('/purchases/{id}/remove', [PurchaseController::class, 'remove'])->add($need('purchases.delete'));
 
         // Stock tally
@@ -233,6 +238,9 @@ final class App
         $app->post('/admin/roles/{role}', [AdminStaffController::class, 'saveRole'])->add($need('users.manage'));
         $app->get('/admin/updates', [AdminController::class, 'updates'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates', [AdminController::class, 'publishUpdate'])->add($need('appUpdate.manage'));
+        $app->post('/admin/updates/upload', [AdminController::class, 'uploadApk'])->add($need('appUpdate.manage'));
+        $app->post('/admin/updates/publish', [AdminController::class, 'publishApk'])->add($need('appUpdate.manage'));
+        $app->post('/admin/updates/discard', [AdminController::class, 'discardApk'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates/maintenance', [AdminController::class, 'updateMaintenance'])->add($need('appUpdate.manage'));
         $app->get('/admin/notifications', [AdminController::class, 'notifications'])->add($need('notifications.send'));
         $app->post('/admin/notifications', [AdminController::class, 'sendNotification'])->add($need('notifications.send'));

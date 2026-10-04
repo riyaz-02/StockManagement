@@ -31,6 +31,7 @@
         <div class="kv-row"><span>Taxable value</span><strong>{{ e.totals.taxable|inr }}</strong></div>
         {% if e.totals.igst > 0 %}<div class="kv-row"><span>IGST</span><strong>{{ e.totals.igst|inr }}</strong></div>
         {% else %}<div class="kv-row"><span>CGST + SGST</span><strong>{{ (e.totals.cgst + e.totals.sgst)|inr }}</strong></div>{% endif %}
+        {% if e.totals.hallmark > 0 %}<div class="kv-row"><span>Hallmark / HUID fee (no GST)</span><strong>{{ e.totals.hallmark|inr }}</strong></div>{% endif %}
         {% if e.additionalCharges > 0 %}<div class="kv-row"><span>Extra charge</span><strong>{{ e.additionalCharges|inr }}</strong></div>{% endif %}
         {% if e.totals.discount > 0 %}<div class="kv-row"><span>Discount</span><strong class="neg">− {{ e.totals.discount|inr }}</strong></div>{% endif %}
         <div class="kv-row total"><span>Estimate total</span><strong>{{ e.totals.payable|inr(0) }}</strong></div>

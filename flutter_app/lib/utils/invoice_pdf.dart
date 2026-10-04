@@ -60,10 +60,13 @@ Future<Uint8List> buildInvoicePdf({
       final a = _n(e['amount']);
       return '${_s(e['name']).isEmpty ? _s(e['kind']) : _s(e['name'])}${w > 0 ? ' ${w.toStringAsFixed(3)} g' : ''}${a > 0 ? ' $rupee${money.format(a)}' : ''}';
     }).toList();
-    final incl = [if (_n(i['hallmarkCharge']) > 0) 'Hallmark $rupee${money.format(_n(i['hallmarkCharge']))}', ...extras];
+    // a hallmark fee on a bill made since rule v3 is added after the tax (no GST on it); older bills had it inside the taxable amount
+    final hallPassedOn = _n(i['hallmarkCharge']) > 0 && i['hallmarkTaxed'] == false;
+    final incl = [if (_n(i['hallmarkCharge']) > 0 && !hallPassedOn) 'Hallmark $rupee${money.format(_n(i['hallmarkCharge']))}', ...extras];
     return [
       if (parts.isNotEmpty) parts.join('  |  '),
       if (incl.isNotEmpty) 'Incl.: ${incl.join(', ')}',
+      if (hallPassedOn) 'Hallmark fee $rupee${money.format(_n(i['hallmarkCharge']))} (no GST, added after tax)',
     ].join('\n');
   }
 
@@ -232,6 +235,7 @@ Future<Uint8List> buildInvoicePdf({
                 if (_n(inv['discountBeforeGst']) > 0) _sumRow('Discount', '- ${m(inv['discountBeforeGst'])}'),
                 _sumRow('Taxable amount', m(gst['taxableValue']), bold: true),
                 if (igst) _sumRow('IGST 3%', m(gst['igst'])) else ...[_sumRow('CGST 1.5%', m(gst['cgst'])), _sumRow('SGST 1.5%', m(gst['sgst']))],
+                if (_n(inv['hallmarkTotal']) > 0) _sumRow('Hallmark / HUID fee (no GST)', '+ ${m(inv['hallmarkTotal'])}'),
               ] else ...[
                 _sumRow('Items total', m(_n(inv['totalAmount']) - _n(inv['additionalCharges']))),
                 if (_n(inv['additionalCharges']) > 0) _sumRow('Additional charges', m(inv['additionalCharges'])),

@@ -1137,7 +1137,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                         Wrap(children: [
                           if (it.purity.isNotEmpty) tag(it.purity, c: const Color(0xFFB45309)),
                           if (it.productCode.isNotEmpty) tag(it.productCode, icon: Icons.qr_code_2),
-                          if (it.certification.isNotEmpty && it.hallmarkCharge > 0) tag('Hallmark ${inr(it.hallmarkCharge)}', c: const Color(0xFF0F766E), icon: Icons.verified_outlined),
+                          if (it.certification.isNotEmpty && it.hallmarkCharge > 0) tag('Hallmark ${inr(it.hallmarkCharge)} · no GST', c: const Color(0xFF0F766E), icon: Icons.verified_outlined),
                           for (final e in stones) tag('${e.name.isEmpty ? e.kind : e.name}${e.amount > 0 ? ' ${inr(e.amount)}' : ''}', c: const Color(0xFF7C3AED), icon: Icons.auto_awesome),
                           if (it.taxableOverride != null) tag('edited', c: Colors.red.shade700, icon: Icons.edit_outlined),
                         ]),
@@ -1213,6 +1213,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           if (t.discountBeforeGst > 0) MoneyRow('Discount', '− ${inr(t.discountBeforeGst)}', color: Colors.red.shade700),
           MoneyRow('Taxable amount', inr(t.taxableSum)),
           if (t.interstate) MoneyRow('IGST 3%', inr(t.igstSum)) else ...[MoneyRow('CGST 1.5%', inr(t.cgstSum)), MoneyRow('SGST 1.5%', inr(t.sgstSum))],
+          if (t.hallmarkTotal > 0) MoneyRow('Hallmark / HUID fee (no GST)', '+ ${inr(t.hallmarkTotal)}'),
           const SizedBox(height: 4),
           _discountBlock(t),
           if (t.roundOff != 0) MoneyRow('Round off', (t.roundOff >= 0 ? '' : '−') + inr(t.roundOff.abs())),

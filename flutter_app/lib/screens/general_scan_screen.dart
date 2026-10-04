@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import '../widgets/fast_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -22,9 +22,7 @@ class GeneralScanScreen extends StatefulWidget {
 
 class _GeneralScanScreenState extends State<GeneralScanScreen>
     with WidgetsBindingObserver, RouteAware {
-  final MobileScannerController cameraController = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
-  );
+  final GlobalKey<FastScannerState> _scanner = GlobalKey<FastScannerState>();
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
   final ApiService _apiService = ApiService();
@@ -45,6 +43,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _audioPlayer.setPlayerMode(PlayerMode.lowLatency).catchError((_) {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Subscribe to route changes so camera stops/starts automatically
       final route = ModalRoute.of(context);
@@ -66,16 +65,12 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
   }
 
   void _stopCamera() {
-    try {
-      cameraController.stop();
-    } catch (_) {}
+    _scanner.currentState?.stop();
   }
 
   void _startCamera() {
     if (!mounted) return;
-    try {
-      cameraController.start();
-    } catch (_) {}
+    _scanner.currentState?.start();
   }
 
   @override
@@ -100,7 +95,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
     });
 
     // Wait for camera to initialize
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 150));
 
     if (mounted) {
       setState(() {
@@ -114,7 +109,6 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
   void dispose() {
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
-    cameraController.dispose();
     _barcodeController.dispose();
     _barcodeFocusNode.dispose();
     _audioPlayer.dispose();
@@ -136,16 +130,6 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
     } catch (e) {
       print('Error playing sound: $e');
     }
-  }
-
-  void _onBarcodeDetected(BarcodeCapture capture) {
-    final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-
-    final String? code = barcodes.first.rawValue;
-    if (code == null || code.isEmpty) return;
-
-    _processBarcode(code);
   }
 
   Future<void> _processBarcode(String barcode) async {
@@ -184,9 +168,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
           _feedbackColor = Colors.green;
         });
 
-        // Navigate to details page
-        await Future.delayed(const Duration(milliseconds: 500));
-
+        // Navigate to details page (no artificial wait: the beep and the green frame are the feedback)
         if (!mounted) return;
 
         if (type == 'item') {
@@ -258,27 +240,13 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
       body: Stack(
         children: [
           // Camera preview full-screen
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final h = constraints.maxHeight;
-              const boxSize = 270.0;
-              final scanWindow = Rect.fromCenter(
-                center: Offset(w / 2, h / 2),
-                width: boxSize,
-                height: boxSize,
-              );
-              return Stack(children: [
-                MobileScanner(
-                  controller: cameraController,
-                  scanWindow: scanWindow,
-                  onDetect: _onBarcodeDetected,
-                ),
-                // Dark overlay outside scan box
-                _ScanOverlay(
-                    scanWindow: scanWindow, isProcessing: _isProcessing),
-              ]);
-            },
+          Positioned.fill(
+            child: FastScanner(
+              key: _scanner,
+              onCode: _processBarcode,
+              paused: _isProcessing,
+              success: _isProcessing,
+            ),
           ),
 
           // Camera initialization overlay
@@ -340,15 +308,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(
-                          cameraController.torchEnabled
-                              ? Icons.flash_on
-                              : Icons.flash_off,
-                          color: Colors.white,
-                        ),
-                        onPressed: () => cameraController.toggleTorch(),
-                      ),
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
@@ -510,7 +470,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
                             _unknownBarcode = null;
                           });
                           // Stop camera to save battery while user fills the form
-                          await cameraController.stop();
+                          await _scanner.currentState?.stop();
                           if (!mounted) return;
                           await Navigator.push(
                             context,
@@ -520,7 +480,7 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
                             ),
                           );
                           // Restart camera when returning to scanner
-                          if (mounted) cameraController.start();
+                          if (mounted) _scanner.currentState?.start();
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -630,78 +590,4 @@ class _GeneralScanScreenState extends State<GeneralScanScreen>
       ),
     );
   }
-}
-
-// ── Scan overlay ──────────────────────────────────────────────────────────────
-class _ScanOverlay extends StatelessWidget {
-  final Rect scanWindow;
-  final bool isProcessing;
-  const _ScanOverlay({required this.scanWindow, required this.isProcessing});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size.infinite,
-      painter: _ScanPainter(scanWindow: scanWindow, isProcessing: isProcessing),
-    );
-  }
-}
-
-class _ScanPainter extends CustomPainter {
-  final Rect scanWindow;
-  final bool isProcessing;
-  _ScanPainter({required this.scanWindow, required this.isProcessing});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Dark mask outside the scan box
-    final mask = Paint()..color = const Color(0xBB000000);
-    const r = Radius.circular(18);
-    final rrect = RRect.fromRectAndRadius(scanWindow, r);
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(rrect)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, mask);
-
-    // Corner brackets
-    final color = isProcessing ? const Color(0xFF4CAF50) : Colors.white;
-    final p = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round;
-
-    const cl = 26.0; // bracket arm length
-    const cr = 16.0; // corner radius
-    final l = scanWindow.left;
-    final t = scanWindow.top;
-    final ri = scanWindow.right;
-    final b = scanWindow.bottom;
-
-    // Top-left corner
-    canvas.drawLine(Offset(l + cr, t), Offset(l + cr + cl, t), p);
-    canvas.drawLine(Offset(l, t + cr), Offset(l, t + cr + cl), p);
-    canvas.drawArc(
-        Rect.fromLTWH(l, t, cr * 2, cr * 2), 3.14159, 3.14159 / 2, false, p);
-    // Top-right corner
-    canvas.drawLine(Offset(ri - cr - cl, t), Offset(ri - cr, t), p);
-    canvas.drawLine(Offset(ri, t + cr), Offset(ri, t + cr + cl), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, t, cr * 2, cr * 2), -3.14159 / 2,
-        3.14159 / 2, false, p);
-    // Bottom-left corner
-    canvas.drawLine(Offset(l + cr, b), Offset(l + cr + cl, b), p);
-    canvas.drawLine(Offset(l, b - cr - cl), Offset(l, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(l, b - cr * 2, cr * 2, cr * 2), 3.14159 / 2,
-        3.14159 / 2, false, p);
-    // Bottom-right corner
-    canvas.drawLine(Offset(ri - cr - cl, b), Offset(ri - cr, b), p);
-    canvas.drawLine(Offset(ri, b - cr - cl), Offset(ri, b - cr), p);
-    canvas.drawArc(Rect.fromLTWH(ri - cr * 2, b - cr * 2, cr * 2, cr * 2), 0,
-        3.14159 / 2, false, p);
-  }
-
-  @override
-  bool shouldRepaint(_ScanPainter old) =>
-      old.isProcessing != isProcessing || old.scanWindow != scanWindow;
 }

@@ -71,6 +71,8 @@ const purchaseSchema = new mongoose.Schema(
         igstAmount: Number,
         totalGst: Number,
         totalPayable: Number,           // = total_amount when the split is valid
+        roundOff: Number,               // invoice total as printed by the supplier minus the calculated total (the supplier's round-off)
+        calculatedPayable: Number,      // what the rules worked out, before the round-off
         hsnCode: String,
         itcCgst: Number,
         itcSgst: Number,
@@ -128,6 +130,7 @@ function toApp(d) {
             totalAmount: num(o.totalAmount), transactionType: o.transactionType, gstRate: num(o.gstRate),
             cgstAmount: num(o.cgstAmount), sgstAmount: num(o.sgstAmount), igstAmount: num(o.igstAmount), totalGst: num(o.totalGst),
             totalPayable: num(o.totalPayable), hsnCode: o.hsnCode,
+            roundOff: num(o.roundOff), calculatedPayable: o.calculatedPayable != null ? num(o.calculatedPayable) : r2(num(o.totalPayable) - num(o.roundOff)),
             itcCgst: num(o.itcCgst), itcSgst: num(o.itcSgst), itcIgst: num(o.itcIgst), totalItc: num(o.totalItc),
             effectiveCost: num(o.effectiveCost), tdsApplicable: !!o.tdsApplicable, tdsRate: num(o.tdsRate), tdsAmount: num(o.tdsAmount),
             netPayable: num(o.netPayable),
@@ -136,7 +139,7 @@ function toApp(d) {
     return {
         ...base,
         totalAmount: total, transactionType: '', gstRate: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, totalGst: 0,
-        totalPayable: total, hsnCode: '', itcCgst: 0, itcSgst: 0, itcIgst: 0, totalItc: 0,
+        totalPayable: total, roundOff: 0, calculatedPayable: total, hsnCode: '', itcCgst: 0, itcSgst: 0, itcIgst: 0, totalItc: 0,
         effectiveCost: total, tdsApplicable: false, tdsRate: 0, tdsAmount: 0, netPayable: total,
     };
 }

@@ -442,7 +442,8 @@ class StoreProvider extends ChangeNotifier {
       final resp = await _api.getStockSummary();
       if (resp['success'] == true) {
         _summary = StockSummary.fromJson(Map<String, dynamic>.from(resp['data'] as Map));
-        _hasReconcileAlert = _summary!.anyAlert || _summary!.confidenceLevel == 'fix';
+        // the balance check is the whole-firm login's: a branch view only has its own stock and sales
+        _hasReconcileAlert = _summary!.wholeFirm && (_summary!.anyAlert || _summary!.confidenceLevel == 'fix');
       }
     } catch (e) {
       _summaryError = e.toString().replaceFirst('Exception: ', '');

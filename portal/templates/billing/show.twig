@@ -37,6 +37,7 @@
             <div class="kv-row"><span>Taxable value</span><strong>{{ inv.gstSummary.taxableValue|inr }}</strong></div>
             {% if inv.gstType == 'IGST' %}<div class="kv-row"><span>IGST 3%</span><strong>{{ inv.gstSummary.igst|inr }}</strong></div>
             {% else %}<div class="kv-row"><span>CGST 1.5%</span><strong>{{ inv.gstSummary.cgst|inr }}</strong></div><div class="kv-row"><span>SGST 1.5%</span><strong>{{ inv.gstSummary.sgst|inr }}</strong></div>{% endif %}
+            {% if inv.hallmarkTotal > 0 %}<div class="kv-row"><span>Hallmark / HUID fee (no GST)</span><strong>{{ inv.hallmarkTotal|inr }}</strong></div>{% endif %}
             {% if inv.additionalCharges > 0 %}<div class="kv-row"><span>Extra charges</span><strong>{{ inv.additionalCharges|inr }}</strong></div>{% endif %}
             {% if inv.discountGiven > 0 %}<div class="kv-row"><span>Discount given</span><strong class="neg">− {{ inv.discountGiven|inr }}</strong></div>{% endif %}
             {% if inv.roundOff != 0 %}<div class="kv-row"><span>Round off</span><strong>{{ inv.roundOff|inr }}</strong></div>{% endif %}
@@ -56,7 +57,7 @@
             <tbody>
             {% for i in inv.items %}
                 <tr>
-                    <td class="strong">{{ i.particular }}<small>{{ i.metalType }}{% if i.purity %} {{ i.purity }}{% endif %} · HSN {{ i.hsnCode }}{% if i.huid %} · HUID {{ i.huid }}{% endif %}{% if i.productCode %} · {{ i.productCode }}{% endif %}</small></td>
+                    <td class="strong">{{ i.particular }}<small>{{ i.metalType }}{% if i.purity %} {{ i.purity }}{% endif %} · HSN {{ i.hsnCode }}{% if i.huid %} · HUID {{ i.huid }}{% endif %}{% if i.productCode %} · {{ i.productCode }}{% endif %}{% if i.hallmarkCharge > 0 %} · Hallmark fee {{ i.hallmarkCharge|inr }}{{ i.hallmarkTaxed ? '' : ' (no GST, added after tax)' }}{% endif %}</small></td>
                     <td class="num">{{ i.netWt|grams }}</td>
                     <td class="num">{{ i.rate|inr(0) }}</td>
                     <td class="num">{{ i.makingCharge|inr }}</td>

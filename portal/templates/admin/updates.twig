@@ -4,34 +4,74 @@
 {% block heading %}App updates{% endblock %}
 
 {% block content %}
-<div class="page-head"><div><h1>App updates</h1><p class="muted">Tell every phone that a new version is ready, and control who can sign in. Open phones and browser tabs hear it at once.</p></div></div>
+<div class="page-head"><div><h1>App updates</h1><p class="muted">Upload the new app here and publish it. Every phone is told, and installs it from the app itself: nobody needs the file sent to them.</p></div></div>
+
+{% if upError %}<div class="notice notice-error" role="alert">{{ upError }}</div>{% endif %}
+
 <div class="grid grid-2">
     <section class="panel">
-        <div class="panel-head"><h2>Right now</h2></div>
+        <div class="panel-head"><h2>On the phones now</h2></div>
         <div class="panel-body kv">
-            <div class="kv-row"><span>Latest version</span><strong>{{ cur.latestVersion }} (build {{ cur.latestVersionCode }})</strong></div>
+            <div class="kv-row"><span>Version</span><strong>{{ cur.latestVersion }} (build {{ cur.latestVersionCode }})</strong></div>
             <div class="kv-row"><span>Must everyone update?</span><strong class="{{ cur.forceUpdate ? 'neg' : 'pos' }}">{{ cur.forceUpdate ? 'Yes, now' : 'No, optional' }}</strong></div>
-            <div class="kv-row"><span>Download page</span><strong>{{ cur.downloadUrl ?: 'Not set' }}</strong></div>
-            <div class="kv-row"><span>Message shown</span><strong>{{ cur.updateMessage ?: '–' }}</strong></div>
+            <div class="kv-row"><span>Where phones download it</span><strong>{% if cur.apk %}This server ({{ cur.apk.sizeBytes|bytes }}){% elseif cur.downloadUrl %}{{ cur.downloadUrl }}{% else %}Nothing uploaded yet{% endif %}</strong></div>
+            {% if cur.apk %}<div class="kv-row"><span>File check (SHA-256)</span><strong class="mono">{{ cur.apk.sha256|slice(0, 16) }}…</strong></div>{% endif %}
+            <div class="kv-row"><span>Message</span><strong>{{ cur.updateMessage ?: '–' }}</strong></div>
             <div class="kv-row"><span>Sign-ins</span><strong class="{{ cur.maintenanceMode.enabled ? 'neg' : 'pos' }}">{{ cur.maintenanceMode.enabled ? 'Gated (Admin / Owner only)' : 'Open to everyone' }}</strong></div>
         </div>
     </section>
-    <form method="post" action="/admin/updates" class="panel">
-        {{ csrf_field() }}
-        <div class="panel-head"><h2>Publish a new version</h2></div>
-        <div class="panel-body">
-            {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
-            <div class="form-grid">
-                {{ ui.field('Version (as shown to people)', 'latestVersion', v.latestVersion|default(cur.latestVersion), {required: true, placeholder: 'e.g. 1.5.0'}) }}
-                {{ ui.field('Build number', 'latestVersionCode', v.latestVersionCode|default(cur.latestVersionCode), {type: 'number', step: '1', min: '1', required: true, hint: 'The number after the + in the app version. It must go up.'}) }}
-                {{ ui.field('Download page', 'downloadUrl', v.downloadUrl|default(cur.downloadUrl), {span: true}) }}
-                {{ ui.field('Message (optional)', 'updateMessage', v.updateMessage|default(cur.updateMessage), {span: true, placeholder: 'What is new, in a line'}) }}
+
+    <section class="panel">
+        <div class="panel-head"><h2>{{ cur.staged ? '2. Review and publish' : '1. Upload the new app' }}</h2></div>
+        {% if cur.staged %}
+        <form method="post" action="/admin/updates/publish">
+            {{ csrf_field() }}
+            <div class="panel-body">
+                <div class="kv">
+                    <div class="kv-row"><span>Version</span><strong>{{ cur.staged.versionName }} (build {{ cur.staged.versionCode }})</strong></div>
+                    <div class="kv-row"><span>Size</span><strong>{{ cur.staged.sizeBytes|bytes }}</strong></div>
+                    <div class="kv-row"><span>Uploaded</span><strong>{{ cur.staged.uploadedAt|dmy_time }}{% if cur.staged.uploadedByName %} · {{ cur.staged.uploadedByName }}{% endif %}</strong></div>
+                </div>
+                <p class="muted small">The file was opened and checked: it is this shop's app, and its build number is above what phones have. Nothing has reached the phones yet.</p>
+                {{ ui.field('What is new (optional, one line)', 'updateMessage', v.updateMessage|default(''), {span: true, placeholder: 'e.g. Faster scanning, new Home screen'}) }}
+                <label class="check"><input type="checkbox" name="forceUpdate" value="1"> <span>Everyone must update before using the app (only for something important)</span></label>
             </div>
-            <label class="check"><input type="checkbox" name="forceUpdate" value="1"{{ v.forceUpdate|default(cur.forceUpdate) ? ' checked' : '' }}> <span>Everyone must update before using the app (use only for something important)</span></label>
-        </div>
-        <div class="panel-foot"><button class="btn btn-primary" type="submit" data-confirm="Tell every phone about this version?">Publish</button></div>
-    </form>
+            <div class="panel-foot">
+                <button class="btn btn-primary" type="submit" data-confirm="Tell every phone that version {{ cur.staged.versionName }} is ready?">Publish {{ cur.staged.versionName }}</button>
+                <button class="btn" type="submit" formaction="/admin/updates/discard" data-confirm="Throw this file away?">Discard</button>
+            </div>
+        </form>
+        {% else %}
+        <form method="post" action="/admin/updates/upload" enctype="multipart/form-data" x-data="{ busy: false, name: '' }" @submit="busy = true">
+            {{ csrf_field() }}
+            <div class="panel-body">
+                <label class="field"><span>The APK file (app-release.apk)</span>
+                    <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required @change="name = $event.target.files[0] ? $event.target.files[0].name : ''">
+                </label>
+                <p class="muted small">Build it with <code>flutter build apk --release</code> after raising the number in <code>pubspec.yaml</code> (<code>version: 1.5.0+5</code>: the 5 must be higher than {{ cur.latestVersionCode }}). The version and build number are read from the file itself.</p>
+                {% if uploadLimit > 0 and uploadLimit < 120 * 1048576 %}<div class="notice notice-warn">This website accepts files up to {{ (uploadLimit / 1048576)|round }} MB; an app is about 40 MB or more. If the upload is refused, the server's PHP limits need raising (see portal/DEPLOY.md).</div>{% endif %}
+            </div>
+            <div class="panel-foot">
+                <button class="btn btn-primary" type="submit" :disabled="busy"><span x-show="!busy">Upload and check</span><span x-show="busy" x-cloak>Uploading… please wait</span></button>
+            </div>
+        </form>
+        {% endif %}
+    </section>
 </div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Releases</h2></div>
+    {% if cur.releases|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Version</th><th>Published</th><th>By</th><th>Size</th><th>Required?</th><th>Note</th></tr></thead>
+        <tbody>
+        {% for r in cur.releases %}
+            <tr><td class="strong">{{ r.versionName }} <small>build {{ r.versionCode }}</small></td><td>{{ r.publishedAt|dmy_time }}</td><td>{{ r.publishedByName ?: '–' }}</td><td>{{ r.sizeBytes|bytes }}</td><td>{{ r.forceUpdate ? 'Yes' : 'No' }}</td><td>{{ r.message ?: '–' }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="t-empty">Nothing has been uploaded from this page yet.</div>{% endif %}
+</section>
 
 <div class="grid grid-2">
     <form method="post" action="/admin/updates/maintenance" class="panel">
@@ -46,14 +86,33 @@
         <div class="panel-foot"><button class="btn btn-primary" type="submit" data-confirm="Change who can sign in?">Save</button></div>
     </form>
     <section class="panel">
-        <div class="panel-head"><h2>Recent publishes</h2></div>
+        <div class="panel-head"><h2>Who did what</h2></div>
         {% if history|length %}
         <div class="panel-body kv">
             {% for h in history %}
                 <div class="kv-row"><span>{{ h.at|dmy_time }} · {{ h.byName|default('') ?: 'System' }}</span><strong>{{ h.entityLabel }} <span class="pill pill-grey">{{ h.action|pretty }}</span></strong></div>
             {% endfor %}
         </div>
-        {% else %}<div class="t-empty">Nothing published yet.</div>{% endif %}
+        {% else %}<div class="t-empty">Nothing yet.</div>{% endif %}
     </section>
 </div>
+
+<details class="panel advanced">
+    <summary class="panel-head"><h2>Advanced: use a link of your own</h2></summary>
+    <form method="post" action="/admin/updates">
+        {{ csrf_field() }}
+        <div class="panel-body">
+            {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+            <p class="muted small">Only if the app is hosted somewhere else. Normally upload the file above instead.</p>
+            <div class="form-grid">
+                {{ ui.field('Version (as shown to people)', 'latestVersion', v.latestVersion|default(cur.latestVersion), {required: true, placeholder: 'e.g. 1.5.0'}) }}
+                {{ ui.field('Build number', 'latestVersionCode', v.latestVersionCode|default(cur.latestVersionCode), {type: 'number', step: '1', min: '1', required: true, hint: 'The number after the + in the app version. It must go up.'}) }}
+                {{ ui.field('Download link', 'downloadUrl', v.downloadUrl|default(cur.downloadUrl), {span: true}) }}
+                {{ ui.field('Message (optional)', 'updateMessage', v.updateMessage|default(cur.updateMessage), {span: true}) }}
+            </div>
+            <label class="check"><input type="checkbox" name="forceUpdate" value="1"{{ v.forceUpdate|default(cur.forceUpdate) ? ' checked' : '' }}> <span>Everyone must update</span></label>
+        </div>
+        <div class="panel-foot"><button class="btn" type="submit" data-confirm="Tell every phone about this version?">Publish this link</button></div>
+    </form>
+</details>
 {% endblock %}

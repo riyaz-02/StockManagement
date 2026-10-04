@@ -195,5 +195,24 @@
 
     <footer>© Laltu Guinea Palace</footer>
   </div>
+  <script>
+    // The newest app is the one uploaded on the website (Admin > App updates). Ask the server for its version and link to
+    // it; if the server cannot be reached the page keeps the file that sits next to it.
+    (function () {
+      var API = 'https://api.laltuguineapalace.com';
+      var ctl = new AbortController();
+      setTimeout(function () { ctl.abort(); }, 6000);
+      fetch(API + '/api/app-version', { signal: ctl.signal })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var v = j && j.data && j.data.appVersion;
+          if (!v || !v.apkFromServer) return;
+          document.querySelector('.download-btn').setAttribute('href', API + '/api/app-version/download');
+          document.getElementById('version-pill').textContent = 'Version ' + v.latestVersion;
+          if (v.apkSize) document.getElementById('size-pill').textContent = (v.apkSize / 1048576).toFixed(1) + ' MB';
+        })
+        .catch(function () {});
+    })();
+  </script>
 </body>
 </html>

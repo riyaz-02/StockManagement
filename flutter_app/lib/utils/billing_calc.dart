@@ -59,7 +59,7 @@ class BillItem {
   String productCode; // barcode of the stock item, if scanned
   String huid;
   String certification; // '' | 'hallmark' | 'huid'
-  double hallmarkCharge; // pre-tax charge, only used when certified
+  double hallmarkCharge; // the centre's fee, already taxed: passed on after GST (never taxed again); only used when certified
   String itemId; // stock item id, if scanned
   List<BillExtra> extras;
 
@@ -88,8 +88,9 @@ class BillItem {
   double get extrasWeight => BillingCalc.r3(extras.fold<double>(0, (a, e) => a + e.weight));
   double get extrasAmount => BillingCalc.r2(extras.fold<double>(0, (a, e) => a + e.amount));
 
-  /// Everything added to the taxable amount besides weight x rate + making.
-  double get preTaxExtras => BillingCalc.r2(extrasAmount + (certification.isEmpty ? 0 : hallmarkCharge));
+  /// Everything added to the taxable amount besides weight x rate + making: the stones. (The hallmark fee already carries
+  /// its GST, so it is NOT taxable: it is added after the tax, rule v3.)
+  double get preTaxExtras => extrasAmount;
 
   /// How the item is printed on the invoice: "Ring", "Ring (Hallmarked)" or "Ring (HUID: AB12CD)".
   String get displayName {
@@ -154,9 +155,11 @@ class BillLine {
     required this.name,
     required this.hiddenMaking,
     required this.metalValue,
+    this.hallmark = 0,
   });
   final double rate, taxable, cgst, sgst, igst, total;
-  final double autoTaxable; // the CALCULATED taxable amount (weight x rate + making + stones + hallmark), ignoring any typed amount
+  final double hallmark; // hallmark / HUID fee inside `total` but outside `taxable` (no GST on it)
+  final double autoTaxable; // the CALCULATED taxable amount (weight x rate + making + stones), ignoring any typed amount (the hallmark fee is not part of it)
   final double making; // making charge left after the discount (0 for a typed taxable amount)
   final double discount; // part of the discount taken off this line (before GST)
   final String name; // as printed on the invoice, e.g. "Ring (HUID: AB12CD) + Making Charge"
@@ -188,6 +191,7 @@ class BillTotals {
     required this.maxDiscount,
     required this.metalValue,
     required this.additionalGst,
+    this.hallmarkTotal = 0,
     this.discountError,
   });
   final List<BillLine> lines;
@@ -211,6 +215,9 @@ class BillTotals {
   /// GST charged on the extra charges (they are taxed like the goods).
   final double additionalGst;
 
+  /// Hallmark / HUID fees passed on: inside the total, outside the taxable value (no GST on them).
+  final double hallmarkTotal;
+
   /// Set when the requested discount could not be applied (too high / no making charge).
   final String? discountError;
   double get totalTax => BillingCalc.r2(cgstSum + sgstSum + igstSum);
@@ -220,9 +227,9 @@ class BillTotals {
 }
 
 class _Base {
-  _Base(this.it, this.rate, this.making, this.overridden, this.taxable0, this.metalRaw, this.floorRaw, this.headroom, this.auto);
+  _Base(this.it, this.rate, this.making, this.overridden, this.taxable0, this.metalRaw, this.floorRaw, this.headroom, this.auto, this.hall);
   final BillItem it;
-  final double rate, making, taxable0, metalRaw, floorRaw, auto; // auto = what it would be with no typed amount
+  final double rate, making, taxable0, metalRaw, floorRaw, auto, hall; // auto = what it would be with no typed amount
   final bool overridden;
   final int headroom; // paise that can be discounted on this line
 }
@@ -234,7 +241,7 @@ class BillingCalc {
   static double r2(num n) => ((n + _eps) * 100).round() / 100;
   static double r3(num n) => ((n + _eps) * 1000).round() / 1000;
 
-  /// Mirrors `computeInvoice` in backend/services/billingCalc.js (rule v2: discount BEFORE GST).
+  /// Mirrors `computeInvoice` in backend/services/billingCalc.js (rule v3: discount BEFORE GST; the hallmark fee is added after tax).
   static BillTotals compute({
     required List<BillItem> items,
     double goldRate = 0,
@@ -262,7 +269,7 @@ class BillingCalc {
       final making = r2(it.making < 0 ? 0 : it.making);
       final extras = r2(it.extras.fold<double>(0, (a, e) => a + (e.amount < 0 ? 0 : r2(e.amount))));
       final hall = it.certification.isEmpty ? 0.0 : r2(it.hallmarkCharge < 0 ? 0 : it.hallmarkCharge);
-      final preTax = extras + hall;
+      final preTax = extras;   // stones only: the hallmark fee is outside the taxable value
       final metalRaw = wt * rate;
       final ov = it.taxableOverride;
       final taxable0 = ov != null ? r2(ov) : metalRaw + making + preTax;
@@ -270,7 +277,7 @@ class BillingCalc {
       final noMaking = ov == null && !(making > 0);
       final floorRaw = noMaking ? metalRaw : metalRaw + preTax;
       final headroom = (taxable0 * 100).round() - (floorRaw * 100).round();
-      base.add(_Base(it, rate, making, ov != null, taxable0, metalRaw, floorRaw, headroom < 0 ? 0 : headroom, metalRaw + making + preTax));
+      base.add(_Base(it, rate, making, ov != null, taxable0, metalRaw, floorRaw, headroom < 0 ? 0 : headroom, metalRaw + making + preTax, hall));
     }
 
     BillLine buildLine(_Base b, int dPaise) {
@@ -278,7 +285,7 @@ class BillingCalc {
       final cg = interstate ? 0.0 : taxableRaw * 0.015;
       final sg = interstate ? 0.0 : taxableRaw * 0.015;
       final ig = interstate ? taxableRaw * 0.03 : 0.0;
-      final total = r2(taxableRaw + cg + sg + ig);
+      final total = r2(taxableRaw + cg + sg + ig + b.hall);   // hallmark fee: after tax, no GST on it
       final making = b.overridden ? 0.0 : r2(b.making - dPaise / 100 < 0 ? 0 : b.making - dPaise / 100);
       final hidden = b.overridden && (taxableRaw * 100).round() > (b.floorRaw * 100).round();
       return BillLine(
@@ -294,6 +301,7 @@ class BillingCalc {
         name: b.it.displayName + (hidden ? ' + Making Charge' : ''),
         hiddenMaking: hidden,
         metalValue: r2(b.metalRaw),
+        hallmark: b.hall,
       );
     }
 
@@ -395,6 +403,7 @@ class BillingCalc {
       sgstSum: r2(lines.fold<double>(0, (a, l) => a + l.sgst) + r2(addSg)),
       igstSum: r2(lines.fold<double>(0, (a, l) => a + l.igst) + r2(addIg)),
       additionalGst: r2(addCg + addSg + addIg),
+      hallmarkTotal: r2(base.fold<double>(0, (a, b) => a + b.hall)),
       tdsApplicable: tds,
       tdsAmount: tds ? r2(payable / 100) : 0,
       interstate: interstate,

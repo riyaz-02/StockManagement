@@ -10,6 +10,7 @@
         <div class="kv-row"><span>CGST 1.5%</span><strong>{{ c.gstSummary.total_cgst|inr }}</strong></div>
         <div class="kv-row"><span>SGST 1.5%</span><strong>{{ c.gstSummary.total_sgst|inr }}</strong></div>
     {% endif %}
+    {% if c.hallmarkTotal > 0 %}<div class="kv-row"><span>Hallmark / HUID fee (no GST)</span><strong>{{ c.hallmarkTotal|inr }}</strong></div>{% endif %}
     {% if c.additionalCharges > 0 %}<div class="kv-row"><span>Extra charge</span><strong>{{ c.additionalCharges|inr }}</strong></div>{% endif %}
     {% if c.roundOff != 0 %}<div class="kv-row"><span>Round off</span><strong>{{ c.roundOff|inr }}</strong></div>{% endif %}
     <div class="kv-row total"><span>Bill total</span><strong>{{ c.totalPayableAmount|inr(0) }}</strong></div>

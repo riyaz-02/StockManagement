@@ -52,6 +52,8 @@ $r = $a->req('GET', '/billing/row', [], $HX);
 check('"Add another item" gives a new empty row', $r['code'] === 200 && str_contains($r['body'], '[particulars]') && str_contains($r['body'], 'data-remove-row'));
 $r = $post('/billing/calc', ['goldRate' => '9000', 'silverRate' => '100', 'placeOfSupply' => '19-West Bengal', 'items' => ['a' => $item()], 'payments' => [['mode' => 'Cash', 'amount' => '1000']]]);
 check('the total box shows taxable value, CGST/SGST, total and what stays due', $r['code'] === 200 && str_contains($r['body'], 'CGST 1.5%') && str_contains($r['body'], 'Bill total') && str_contains($r['body'], 'Will stay due'), substr($r['body'], 0, 200));
+$r = $post('/billing/calc', ['goldRate' => '9000', 'placeOfSupply' => '19-West Bengal', 'items' => ['a' => ['particulars' => 'PORTAL TEST earring', 'metalType' => 'Gold', 'netWt' => '2', 'rate' => '1000', 'makingCharge' => '100', 'certification' => 'hallmark', 'hallmarkCharge' => '45']]]);
+check('a hallmark fee has its own "no GST" row: taxable 2,100, total 2,208 (the fee is not taxed again)', $r['code'] === 200 && str_contains($r['body'], 'Hallmark / HUID fee (no GST)') && str_contains($r['body'], '2,100') && str_contains($r['body'], '2,208') && !str_contains($r['body'], '2,145'), substr(strip_tags($r['body']), 0, 300));
 $r = $post('/billing/calc', ['goldRate' => '9000', 'placeOfSupply' => '27-Maharashtra', 'items' => ['a' => $item()]]);
 check('another state shows IGST', str_contains($r['body'], 'IGST 3%') && !str_contains($r['body'], 'CGST 1.5%'));
 $r = $post('/billing/calc', ['goldRate' => '9000', 'items' => ['a' => $item(['netWt' => '5', 'grossWt' => '2'])]]);

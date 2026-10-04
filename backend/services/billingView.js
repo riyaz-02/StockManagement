@@ -60,6 +60,7 @@ function toView(d) {
         stoneCharge: num(i.stone_charge),
         certification: str(i.certification),
         hallmarkCharge: num(i.hallmark_charge),
+        hallmarkTaxed: i.hallmark_in_taxable !== false,           // bills before rule v3 had the hallmark fee inside the taxable amount; since v3 it is added after tax
         itemName: str(i.item_name),
         discount: num(i.discount),
         extras: (Array.isArray(i.extras) ? i.extras : []).map((e) => ({ kind: str(e.kind), name: str(e.name), weight: num(e.weight), amount: num(e.amount) })),
@@ -98,6 +99,7 @@ function toView(d) {
         totalAmount: num(d.total_amount),
         additionalCharges: num(d.additional_charges),
         additionalChargesGst: num(d.additional_charges_gst),
+        hallmarkTotal: num(d.hallmark_total),                       // hallmark / HUID fees passed on (rule v3): inside the total, outside the taxable value
         discount: num(d.discount),
         discountMode: str(d.discount_mode) || 'after_gst',        // old (website) invoices took it off after GST
         discountGiven: d.discount_given != null ? num(d.discount_given) : num(d.discount),

@@ -51,6 +51,16 @@
             </div>
             <span id="live-dot" class="live-dot" title="Live updates" aria-label="Live updates"><i></i><em>Live</em></span>
             <div id="rate-strip" class="rate-strip" hx-get="/partials/rate" hx-trigger="load, rate-saved from:body" hx-swap="innerHTML"></div>
+            {# the bell: a number for what needs a look; the list opens under it #}
+            <div class="bell" x-data="bell" @click.outside="close" @keydown.escape.window="close">
+                <button class="icon-btn bell-btn" type="button" aria-label="Notifications" title="Notifications" @click="toggle">
+                    {{ icon('bell', 20) }}
+                    <span id="bell-count" hx-get="/partials/bell/count" hx-trigger="load, bell-refresh from:body, notification-new from:body" hx-swap="innerHTML"></span>
+                </button>
+                <div class="bell-panel" x-show="open" x-cloak>
+                    <div id="bell-list" hx-get="/partials/bell/list" hx-trigger="bell-open, notification-new from:body" hx-swap="innerHTML"><div class="loading"><span class="spinner"></span></div></div>
+                </div>
+            </div>
         </header>
         <main class="content" id="content">
             {% if flash|default(false) %}

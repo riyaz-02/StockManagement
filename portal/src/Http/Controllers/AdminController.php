@@ -12,24 +12,105 @@ final class AdminController extends BaseController
 {
     // ── app updates ───────────────────────────────────────────────────────────────────────────
 
-    /** Current config + who published what, when (the audit log already keeps this — nothing extra to store). */
+    /** The live version, the upload that is waiting, the release history (and the audit trail of who did what). */
     private function updatesContext(): array
     {
-        $cur = (array) ($this->api()->get('app-version')['data']['appVersion'] ?? []);
+        $cur = [];
+        try {
+            $cur = (array) ($this->api()->get('app-version/admin')['data']['appVersion'] ?? []);
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+        }
         $history = [];
         try {
             $history = (array) ($this->api()->get('admin/audit', ['entity' => 'app_update', 'limit' => 8])['data'] ?? []);
         } catch (ApiException $e) {
             $this->rethrowIfSystem($e);
         }
-        return ['cur' => $cur + ['updateMessage' => '', 'downloadUrl' => '', 'forceUpdate' => false, 'maintenanceMode' => ['enabled' => false, 'message' => '']], 'history' => $history];
+        return [
+            'cur' => $cur + ['updateMessage' => '', 'downloadUrl' => '', 'forceUpdate' => false, 'maintenanceMode' => ['enabled' => false, 'message' => ''], 'staged' => null, 'releases' => [], 'apk' => null],
+            'history' => $history,
+            'uploadLimit' => self::iniBytes((string) ini_get('upload_max_filesize')),
+            'postLimit' => self::iniBytes((string) ini_get('post_max_size')),
+        ];
+    }
+
+    /** "64M" -> bytes (the PHP limits decide how big an APK this website can accept). */
+    private static function iniBytes(string $v): int
+    {
+        $v = trim($v);
+        $n = (int) $v;
+        return match (strtolower(substr($v, -1))) {
+            'g' => $n * 1073741824, 'm' => $n * 1048576, 'k' => $n * 1024, default => $n,
+        };
+    }
+
+    private function updatesPage(Request $rq, Response $rs, array $more = []): Response
+    {
+        return $this->view($rq, $rs, 'admin/updates.twig', $this->updatesContext() + $more + ['v' => [], 'mv' => [], 'error' => null, 'mError' => null, 'upError' => null, 'active' => 'updates']);
     }
 
     public function updates(Request $rq, Response $rs): Response
     {
-        return $this->view($rq, $rs, 'admin/updates.twig', $this->updatesContext() + ['v' => [], 'mv' => [], 'error' => null, 'mError' => null, 'active' => 'updates']);
+        return $this->updatesPage($rq, $rs);
     }
 
+    /** Step 1: the APK file is sent to the API, which reads it and keeps it ready (nothing reaches the phones yet). */
+    public function uploadApk(Request $rq, Response $rs): Response
+    {
+        $f = $_FILES['apk'] ?? null;
+        $err = null;
+        if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            $err = 'Choose the APK file first.';
+        } elseif (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            $err = 'This website refuses a file that big (its limit is ' . number_format(self::iniBytes((string) ini_get('upload_max_filesize')) / 1048576, 0) . ' MB). Ask whoever looks after the server to raise upload_max_filesize and post_max_size in PHP (see portal/DEPLOY.md).';
+        } elseif ($f['error'] !== UPLOAD_ERR_OK) {
+            $err = 'The upload did not finish (error ' . $f['error'] . '). Try again.';
+        } elseif (!str_ends_with(strtolower((string) $f['name']), '.apk')) {
+            $err = 'That is not an .apk file.';
+        }
+        if ($err === null) {
+            try {
+                $this->api()->upload('app-version/upload', 'apk', (string) $f['tmp_name'], (string) $f['name']);
+            } catch (ApiException $e) {
+                $this->rethrowIfSystem($e);
+                $err = $e->getMessage();
+            }
+        }
+        if ($err !== null) {
+            return $this->updatesPage($rq, $rs->withStatus(422), ['upError' => $err]);
+        }
+        $this->flash('success', 'The APK was read and checked. Review it below, then publish.');
+        return $this->redirect($rs, '/admin/updates');
+    }
+
+    /** Step 2: tell every phone (a push, a live message and a line in everyone's bell). */
+    public function publishApk(Request $rq, Response $rs): Response
+    {
+        $b = $this->input($rq);
+        try {
+            $r = $this->api()->post('app-version/publish', ['forceUpdate' => !empty($b['forceUpdate']), 'updateMessage' => trim((string) ($b['updateMessage'] ?? ''))]);
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+            return $this->updatesPage($rq, $rs->withStatus(422), ['upError' => $e->getMessage()]);
+        }
+        $this->flash('success', (string) ($r['message'] ?? 'Published') . '. Every phone that is open is told now; the others get a push.');
+        return $this->redirect($rs, '/admin/updates');
+    }
+
+    public function discardApk(Request $rq, Response $rs): Response
+    {
+        try {
+            $this->api()->delete('app-version/staged');
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+            return $this->updatesPage($rq, $rs->withStatus(422), ['upError' => $e->getMessage()]);
+        }
+        $this->flash('success', 'The uploaded file was removed.');
+        return $this->redirect($rs, '/admin/updates');
+    }
+
+    /** Advanced: point phones at a link of your own (the old way); the published APK is the normal way. */
     public function publishUpdate(Request $rq, Response $rs): Response
     {
         $b = $this->input($rq);
@@ -40,7 +121,7 @@ final class AdminController extends BaseController
             ]);
         } catch (ApiException $e) {
             $this->rethrowIfSystem($e);
-            return $this->view($rq, $rs->withStatus(422), 'admin/updates.twig', $this->updatesContext() + ['v' => $b, 'mv' => [], 'error' => $e->getMessage(), 'mError' => null, 'active' => 'updates']);
+            return $this->updatesPage($rq, $rs->withStatus(422), ['v' => $b, 'error' => $e->getMessage()]);
         }
         $this->flash('success', 'Update published. Every phone that is open is told now.');
         return $this->redirect($rs, '/admin/updates');
@@ -54,7 +135,7 @@ final class AdminController extends BaseController
             $this->api()->put('app-version/maintenance', ['enabled' => !empty($b['enabled']), 'message' => trim((string) ($b['message'] ?? ''))]);
         } catch (ApiException $e) {
             $this->rethrowIfSystem($e);
-            return $this->view($rq, $rs->withStatus(422), 'admin/updates.twig', $this->updatesContext() + ['v' => [], 'mv' => $b, 'error' => null, 'mError' => $e->getMessage(), 'active' => 'updates']);
+            return $this->updatesPage($rq, $rs->withStatus(422), ['mv' => $b, 'mError' => $e->getMessage()]);
         }
         $this->flash('success', !empty($b['enabled']) ? 'Sign-ins are gated. Admin and Owner can still get in.' : 'Sign-ins are open again.');
         return $this->redirect($rs, '/admin/updates');

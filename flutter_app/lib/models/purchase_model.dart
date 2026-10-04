@@ -22,7 +22,9 @@ class Purchase {
   final double sgstAmount;
   final double igstAmount;
   final double totalGst;
-  final double totalPayable;     // totalAmount + totalGst (paid to supplier)
+  final double totalPayable;     // the invoice total as printed by the supplier (totalAmount + GST + any round-off)
+  final double roundOff;         // supplier's round-off: invoice total minus the calculated total
+  final double calculatedPayable; // what the rules worked out, before the round-off
 
   // ── ITC (Input Tax Credit) ────────────────────────────────────────────────
   // In B2B, buyer reclaims GST paid from the government credit ledger.
@@ -71,6 +73,8 @@ class Purchase {
     this.igstAmount = 0,
     this.totalGst = 0,
     this.totalPayable = 0,
+    this.roundOff = 0,
+    this.calculatedPayable = 0,
     this.itcCgst = 0,
     this.itcSgst = 0,
     this.itcIgst = 0,
@@ -115,6 +119,8 @@ class Purchase {
       igstAmount: (json['igstAmount'] ?? 0).toDouble(),
       totalGst: (json['totalGst'] ?? 0).toDouble(),
       totalPayable: (json['totalPayable'] ?? 0).toDouble(),
+      roundOff: (json['roundOff'] ?? 0).toDouble(),
+      calculatedPayable: (json['calculatedPayable'] ?? json['totalPayable'] ?? 0).toDouble(),
       itcCgst: (json['itcCgst'] ?? 0).toDouble(),
       itcSgst: (json['itcSgst'] ?? 0).toDouble(),
       itcIgst: (json['itcIgst'] ?? 0).toDouble(),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
 import '../services/live_service.dart';
@@ -14,7 +15,9 @@ String _rs(double v) => v <= 0 ? '—' : '₹${NumberFormat('#,##,##0.##', 'en_I
 /// Today's gold / silver rate at the top of Home. Set it once in the morning; every new bill and form starts from it.
 /// The colour tells the story: green = set today, orange = an old rate, red = never set.
 class RateStrip extends StatefulWidget {
-  const RateStrip({super.key});
+  /// compact: just the two rates and one status icon (no sentences), for the Home screen.
+  const RateStrip({super.key, this.compact = false});
+  final bool compact;
   @override
   State<RateStrip> createState() => _RateStripState();
 }
@@ -57,18 +60,17 @@ class _RateStripState extends State<RateStrip> {
   Future<void> _edit() async {
     final gold = TextEditingController(text: _n(_r['gold']) > 0 ? _n(_r['gold']).toString().replaceFirst(RegExp(r'\.0$'), '') : '');
     final silver = TextEditingController(text: _n(_r['silver']) > 0 ? _n(_r['silver']).toString().replaceFirst(RegExp(r'\.0$'), '') : '');
+    final bn = context.read<LanguageProvider>().currentLanguage == 'bn';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Today's rate"),
+        title: Text(bn ? 'আজকের দর' : "Today's rate"),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Rupees per gram. New bills, old metal and stock forms start from these.', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
-          const SizedBox(height: 12),
-          TextField(controller: gold, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Gold ₹ / gram', border: OutlineInputBorder(), prefixText: '₹ ')),
+          TextField(controller: gold, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: bn ? 'সোনা ₹ / গ্রাম' : 'Gold ₹ / gram', border: const OutlineInputBorder(), prefixText: '₹ ')),
           const SizedBox(height: 10),
-          TextField(controller: silver, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Silver ₹ / gram', border: OutlineInputBorder(), prefixText: '₹ ')),
+          TextField(controller: silver, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: bn ? 'রূপা ₹ / গ্রাম' : 'Silver ₹ / gram', border: const OutlineInputBorder(), prefixText: '₹ ')),
         ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(bn ? 'বাতিল' : 'Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(bn ? 'সেভ' : 'Save'))],
       ),
     );
     if (ok != true) return;
@@ -88,7 +90,8 @@ class _RateStripState extends State<RateStrip> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) return const SizedBox(height: 74);
+    if (!_loaded) return SizedBox(height: widget.compact ? 58 : 74);
+    final bn = context.watch<LanguageProvider>().currentLanguage == 'bn';
     final canEdit = context.watch<AuthProvider>().can('rates.edit');
     final gold = _n(_r['gold']), silver = _n(_r['silver']);
     final at = DateTime.tryParse(_s(_r['updatedAt']))?.toLocal();
@@ -100,6 +103,25 @@ class _RateStripState extends State<RateStrip> {
         : today
             ? 'Set today ${DateFormat('hh:mm a').format(at!)}${_s(_r['updatedByName']).isEmpty ? '' : ' by ${_s(_r['updatedByName'])}'}'
             : 'Old rate from ${at == null ? '' : DateFormat('dd MMM').format(at)}: update it';
+    if (widget.compact) {
+      // Two rates and one status icon: green tick = set today, orange = an old rate, red = never set. No sentences.
+      final icon = never ? Icons.error_rounded : (today ? Icons.check_circle_rounded : Icons.warning_amber_rounded);
+      return InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: canEdit ? _edit : null,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: tone.withOpacity(0.45), width: 1.3)),
+          child: Row(children: [
+            Expanded(child: _cell(bn ? 'সোনা' : 'Gold', _rs(gold), const Color(0xFFB8860B))),
+            Container(width: 1, height: 30, color: Colors.grey.shade300),
+            Expanded(child: _cell(bn ? 'রূপা' : 'Silver', _rs(silver), const Color(0xFF64748B))),
+            Icon(icon, color: tone, size: 24),
+            if (canEdit) ...[const SizedBox(width: 6), Icon(Icons.edit_outlined, color: tone, size: 18)],
+          ]),
+        ),
+      );
+    }
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: canEdit ? _edit : null,

@@ -80,6 +80,15 @@ final class TwigExtension extends AbstractExtension
                 $t = is_string($v) ? strtotime($v) : false;
                 return $t ? date('d M Y, h:i A', $t) : (string) $v;
             }),
+            // "just now", "5 min ago", "3 h ago", "yesterday", else the date: for the bell
+            new TwigFilter('ago', function ($v) {
+                $t = is_string($v) && $v !== '' ? strtotime($v) : false;
+                if (!$t) {
+                    return '';
+                }
+                $d = time() - $t;
+                return $d < 60 ? 'just now' : ($d < 3600 ? intdiv($d, 60) . ' min ago' : ($d < 86400 ? intdiv($d, 3600) . ' h ago' : ($d < 172800 ? 'yesterday' : date('d M', $t))));
+            }),
             new TwigFilter('pretty', fn ($v) => ucfirst(str_replace('_', ' ', (string) $v))),
         ];
     }

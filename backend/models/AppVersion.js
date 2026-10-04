@@ -35,6 +35,28 @@ const appVersionSchema = new mongoose.Schema(
             trim: true,
             default: 'A new version of the app is available.',
         },
+        // The published APK that phones download (uploaded on the website: Admin > App updates). `file` is a name inside
+        // uploads/app/, never a path from outside. When there is none, `downloadUrl` is used as typed (an outside link).
+        apk: {
+            file: { type: String, default: '' },
+            versionName: { type: String, default: '' },
+            versionCode: { type: Number, default: 0 },
+            sizeBytes: { type: Number, default: 0 },
+            sha256: { type: String, default: '' },
+            publishedAt: { type: Date, default: null },
+        },
+        // An uploaded APK that is checked and waiting to be published (so a wrong file never reaches the phones).
+        staged: {
+            file: { type: String, default: '' },
+            versionName: { type: String, default: '' },
+            versionCode: { type: Number, default: 0 },
+            sizeBytes: { type: Number, default: 0 },
+            sha256: { type: String, default: '' },
+            uploadedAt: { type: Date, default: null },
+            uploadedByName: { type: String, default: '' },
+        },
+        // What was published, newest last (for the history table).
+        releases: { type: [Object], default: [] },
         // A temporary "come back later" gate on sign-in only (app + website share /api/auth/login). Admin/owner can
         // always still sign in, so whoever turned it on can turn it back off.
         maintenanceMode: {

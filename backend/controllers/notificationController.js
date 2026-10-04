@@ -107,5 +107,23 @@ exports.getNotificationHistory = async (req, res) => {
     }
 };
 
+// @desc    The bell: notices this person was meant to get + reminders that are open right now
+// @route   GET /api/notifications/feed
+// @access  Private (any signed-in user; reminders only for what they may see)
+exports.getFeed = async (req, res, next) => {
+    try {
+        res.json({ success: true, data: await require('../services/notificationFeed').feedFor(req.user, { limit: parseInt(req.query.limit, 10) || 40, lang: req.query.lang === 'bn' ? 'bn' : 'en' }) });
+    } catch (e) { next(e); }
+};
+
+// @desc    The person opened the bell: notices up to now count as read
+// @route   POST /api/notifications/feed/seen
+exports.markFeedSeen = async (req, res, next) => {
+    try {
+        await require('../services/notificationFeed').markSeen(req.user);
+        res.json({ success: true });
+    } catch (e) { next(e); }
+};
+
 module.exports.resolveTargetTokens = resolveTargetTokens;
 module.exports.pruneInvalidTokens = pruneInvalidTokens;

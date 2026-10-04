@@ -116,17 +116,31 @@ void main() {
     expect(BillingCalc.validateItems([BillItem(particular: 'x', netWt: 5, grossWt: 4, rate: 1)]), contains('gross'));
   });
 
-  test('hallmarked: charge is pre-tax and the name gets (Hallmarked); same numbers as the server', () {
+  test('hallmarked: the fee is passed on after tax (no GST on it) and the name gets (Hallmarked); same numbers as the server', () {
     final it = BillItem(particular: 'Earring', netWt: 2, rate: 1000, making: 100, certification: 'hallmark', hallmarkCharge: 45);
     final t = BillingCalc.compute(items: [it]);
-    expect([t.lines[0].taxable, t.lines[0].cgst, t.lines[0].sgst, t.lines[0].total], [2145, 32.17, 32.17, 2209.35]);
+    expect([t.lines[0].taxable, t.lines[0].cgst, t.lines[0].sgst, t.lines[0].total], [2100, 31.5, 31.5, 2208]);
+    expect(t.lines[0].hallmark, 45);
+    expect(t.hallmarkTotal, 45);
+    expect(t.taxableSum, 2100);
+    expect(t.payable, 2208);
     expect(it.displayName, 'Earring (Hallmarked)');
+  });
+
+  test('hallmark fee is never discounted and stays outside the taxable value', () {
+    BillItem chain() => BillItem(particular: 'Chain', netWt: 2, rate: 10000, making: 1000, certification: 'huid', huid: 'AB12CD', hallmarkCharge: 60);
+    final full = BillingCalc.compute(items: [chain()]);
+    expect(full.lines[0].total, 21630 + 60);
+    final d = BillingCalc.compute(items: [chain()], discount: 500);
+    expect(d.discountError, isNull);
+    expect(d.payable, full.payable - 500);
+    expect(d.lines[0].hallmark, 60);
   });
 
   test('HUID: code in the name, must be 6 letters/digits', () {
     final it = BillItem(particular: 'Earring', netWt: 1, rate: 1000, certification: 'huid', huid: 'ab12cd', hallmarkCharge: 45);
     expect(it.displayName, 'Earring (HUID: AB12CD)');
-    expect(BillingCalc.compute(items: [it]).lines[0].taxable, 1045);
+    expect(BillingCalc.compute(items: [it]).lines[0].taxable, 1000);   // the 45 fee is outside the taxable value
     expect(BillingCalc.validateItems([it]), isNull);
     it.huid = 'AB1';
     expect(BillingCalc.validateItems([it]), contains('HUID'));

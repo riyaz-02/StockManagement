@@ -265,7 +265,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                         if (_s(items[i]['productCode']).isNotEmpty) 'code ${_s(items[i]['productCode'])}',
                       ].join(' · '), style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
                     if (_n(items[i]['hallmarkCharge']) > 0)
-                      Text('✓ Hallmark · ${inr(_n(items[i]['hallmarkCharge']))}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF0F766E))),
+                      Text('✓ Hallmark · ${inr(_n(items[i]['hallmarkCharge']))}${items[i]['hallmarkTaxed'] == false ? ' (no GST)' : ''}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF0F766E))),
                     for (final e in (items[i]['extras'] as List? ?? []))
                       Text('◆ ${_s(e['name']).isEmpty ? _s(e['kind']) : _s(e['name'])}${_n(e['weight']) > 0 ? ' ${grams(_n(e['weight']))} g' : ''}${_n(e['amount']) > 0 ? ' · ${inr(_n(e['amount']))}' : ''}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF7C3AED))),
                     Text(igst ? 'Taxable ${inr(_n(items[i]['taxableAmount']))} · IGST ${inr(_n(items[i]['igst']))}' : 'Taxable ${inr(_n(items[i]['taxableAmount']))} · CGST ${inr(_n(items[i]['cgst']))} · SGST ${inr(_n(items[i]['sgst']))}', style: const TextStyle(fontSize: 11, color: Colors.black45)),
@@ -291,6 +291,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             MoneyRow('CGST 1.5%', inr(_n(gst['cgst']))),
             MoneyRow('SGST 1.5%', inr(_n(gst['sgst']))),
           ],
+          if (_n(inv['hallmarkTotal']) > 0) MoneyRow('Hallmark / HUID fee (no GST)', '+ ${inr(_n(inv['hallmarkTotal']))}'),
           if (!v2 && _n(inv['additionalCharges']) > 0) MoneyRow('Additional charges', '+ ${inr(_n(inv['additionalCharges']))}'),
           if (_n(inv['discount']) > 0) MoneyRow('Discount', '− ${inr(_n(inv['discount']))}', color: Colors.red.shade700),
           MoneyRow('Round off', (_n(inv['roundOff']) >= 0 ? '' : '−') + inr(_n(inv['roundOff']).abs())),

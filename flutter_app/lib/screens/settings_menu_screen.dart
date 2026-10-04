@@ -1,3 +1,4 @@
+import '../widgets/app_version_text.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -230,9 +231,7 @@ class SettingsMenuScreen extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: Colors.grey[500]),
           ),
           const SizedBox(height: 2),
-          Text(
-            'Version 1.3.0',
-            textAlign: TextAlign.center,
+          AppVersionText(
             style: TextStyle(fontSize: 11, color: Colors.grey[400]),
           ),
         ],

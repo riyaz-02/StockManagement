@@ -1,0 +1,22 @@
+<div class="bell-head"><strong>Notifications</strong>{% if unread > 0 %}<span class="pill pill-red">{{ unread }} new</span>{% endif %}</div>
+{% if items|length %}
+<ul class="bell-items">
+    {% for i in items %}
+    <li class="bell-item is-{{ i.kind }} lvl-{{ i.level }}{{ i.kind == 'notice' and not i.read ? ' is-unread' : '' }}">
+        {% set tag = i.href ? 'a' : 'div' %}
+        <{{ tag }} class="bell-link"{% if i.href %} href="{{ i.href }}"{% endif %}>
+            <span class="bell-ico">{{ icon(i.kind == 'reminder' ? 'alert' : (i.level == 'update' ? 'phone' : 'bell'), 16) }}</span>
+            <span class="bell-text">
+                <strong>{{ i.title }}</strong>
+                {% if i.body %}<small>{{ i.body }}</small>{% endif %}
+                <em>{{ i.kind == 'reminder' ? 'Reminder' : (i.at|ago) }}</em>
+            </span>
+        </{{ tag }}>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="bell-empty">{{ icon('check', 28) }}<span>You are all caught up</span></div>
+{% endif %}
+{# opening the list counts the notices as read, a moment later so a glance is enough #}
+<div hidden hx-post="/partials/bell/seen" hx-trigger="load delay:1200ms" hx-swap="none" hx-headers='{"X-CSRF-Token": "{{ csrf() }}"}'></div>

@@ -339,7 +339,7 @@ async function main() {
                     // what only the app records
                     totalAmount: amt, gstRate: 3, cgstAmount: same ? half : 0, sgstAmount: same ? half : 0, igstAmount: same ? 0 : gst, totalGst: gst,
                     transactionType: same ? 'intra-state' : 'inter-state', hsnCode: '7113', billerGstin: gstin, itcCgst: same ? half : 0, itcSgst: same ? half : 0, itcIgst: same ? 0 : gst, totalItc: gst,
-                    effectiveCost: amt, totalPayable: Math.round((amt + gst) * 100) / 100, branchId: shop.id, source: 'app', sample_history: true,
+                    effectiveCost: amt, totalPayable: Math.round((amt + gst) * 100) / 100, netPayable: Math.round((amt + gst) * 100) / 100, roundOff: 0, branchId: shop.id, source: 'app', sample_history: true,
                 });
             }
         }
