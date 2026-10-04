@@ -1,0 +1,70 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}Login screen{% endblock %}
+{% block heading %}Login screen{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Login screen pictures</h1><p class="muted">The pictures that slide across the top of the app's sign-in screen (above the passcode box). Add up to {{ max }}. Phones pick up changes the next time the app opens.</p></div></div>
+
+{% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+<div class="grid grid-2">
+    <form method="post" action="/admin/login-screen" enctype="multipart/form-data" class="panel">
+        {{ csrf_field() }}
+        <div class="panel-head"><h2>Add a picture</h2></div>
+        <div class="panel-body">
+            <label class="field"><span>Picture (JPG, PNG or WebP)</span>
+                <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+            </label>
+            <div class="form-grid">
+                {{ ui.field('Words under it, English (optional)', 'captionEn', v.captionEn|default(''), {placeholder: 'e.g. Bill in seconds', hint: 'Up to 80 letters'}) }}
+                {{ ui.field('Words under it, Bengali (optional)', 'captionBn', v.captionBn|default(''), {placeholder: 'যেমন: সেকেন্ডে বিল'}) }}
+            </div>
+            <div class="login-size-guide">
+                <strong>Make the picture 1080 × 1350 pixels (4:5, portrait).</strong>
+                <ul>
+                    <li>Any size with the same 4:5 shape works (for example 1600 × 2000). It is shrunk to fit and saved as WebP for fast loading (up to 12 MB).</li>
+                    <li>The picture is shown <b>whole</b>, in the middle of the screen: nothing is cut off. On a short phone it is shown a little smaller, so keep words inside the picture large.</li>
+                    <li>The area behind it is a soft cream colour, so a <b>transparent background</b> (PNG or WebP with no background) looks best. A plain cream or white background also works.</li>
+                    <li>If the picture already contains words, leave the two boxes above empty.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="panel-foot"><button class="btn btn-primary" type="submit"{{ slides|length >= max ? ' disabled' : '' }}>Add picture</button>{% if slides|length >= max %} <span class="muted small">The most are added: remove one first.</span>{% endif %}</div>
+    </form>
+
+    <section class="panel">
+        <div class="panel-head"><h2>How it looks on the phone</h2></div>
+        <div class="panel-body">
+            <p class="muted small">The pictures sit in the top part of the screen and change by themselves every few seconds (people can also swipe). Under them is a white sheet with the passcode boxes, the Login button and "Forgot passcode?". With no pictures added, the app shows the shop's logo on a soft background.</p>
+            <p class="muted small">The first picture is shown first. Use the arrows below to change the order, and <b>Show</b> to hide one for a while without deleting it.</p>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Pictures now ({{ slides|length }} of {{ max }})</h2></div>
+    {% if slides|length %}
+    <div class="login-slides">
+        {% for s in slides %}
+        <form method="post" action="/admin/login-screen/{{ s.id }}" class="login-slide{{ s.active ? '' : ' is-off' }}">
+            {{ csrf_field() }}
+            <div class="login-slide-img"><img src="{{ s.imageUrl }}" alt="Picture {{ loop.index }}" loading="lazy"></div>
+            <div class="login-slide-body">
+                <div class="login-slide-title"><strong>{{ loop.index }}.</strong> {% if s.active %}{{ ui.pill('Shown', 'green') }}{% else %}{{ ui.pill('Hidden', 'grey') }}{% endif %} {% if s.width %}<small class="muted">{{ s.width }} × {{ s.height }}</small>{% endif %}</div>
+                {{ ui.field('English words', 'captionEn', s.captionEn) }}
+                {{ ui.field('Bengali words', 'captionBn', s.captionBn) }}
+                <label class="check"><input type="checkbox" name="active" value="1"{{ s.active ? ' checked' : '' }}> <span>Show on the sign-in screen</span></label>
+                <div class="login-slide-actions">
+                    <button class="btn btn-primary" type="submit">Save</button>
+                    <button class="btn" type="submit" formaction="/admin/login-screen/{{ s.id }}/move" name="dir" value="up" aria-label="Move earlier"{{ loop.first ? ' disabled' : '' }}>&#8593; Earlier</button>
+                    <button class="btn" type="submit" formaction="/admin/login-screen/{{ s.id }}/move" name="dir" value="down" aria-label="Move later"{{ loop.last ? ' disabled' : '' }}>&#8595; Later</button>
+                    <button class="btn" type="submit" formaction="/admin/login-screen/{{ s.id }}/delete" data-confirm="Remove this picture for good?">Remove</button>
+                </div>
+            </div>
+        </form>
+        {% endfor %}
+    </div>
+    {% else %}<div class="t-empty">No pictures yet: the sign-in screen shows the shop's logo. Add the first one above.</div>{% endif %}
+</section>
+{% endblock %}

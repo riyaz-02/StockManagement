@@ -121,8 +121,10 @@ exports.requirePermission = (key) => {
 };
 
 // Generate JWT token
-exports.generateToken = (userId) => {
+// `expiresIn` overrides the default: the app asks for a long one (REMEMBER_EXPIRE) so a phone stays signed in.
+exports.generateToken = (userId, expiresIn) => {
     return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE || '7d'
+        expiresIn: expiresIn || process.env.JWT_EXPIRE || '7d'
     });
 };
+exports.REMEMBER_EXPIRE = () => process.env.JWT_REMEMBER_EXPIRE || '90d';

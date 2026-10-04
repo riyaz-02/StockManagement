@@ -82,7 +82,7 @@ class SettingsMenuScreen extends StatelessWidget {
             rows: [
               _SettingsRow(
                 title: languageProvider.t('account_settings'),
-                subtitle: 'Profile, password, fingerprint login',
+                subtitle: 'Profile, password, passcode, fingerprint',
                 icon: Icons.account_circle_outlined,
                 onTap: () => Navigator.push(
                   context,

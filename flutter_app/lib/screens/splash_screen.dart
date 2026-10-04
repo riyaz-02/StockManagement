@@ -10,6 +10,7 @@ import 'package:jewellery_stock_app/screens/login_screen.dart';
 import 'package:jewellery_stock_app/screens/main_navigation_screen.dart';
 import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
 import 'package:jewellery_stock_app/services/live_reactions.dart';
+import 'package:jewellery_stock_app/services/login_slides_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -102,8 +103,19 @@ class _SplashScreenState extends State<SplashScreen>
     // Server is online — check auth token
     await authProvider.initialize();
     if (!mounted) return;
+    // the sign-in screen's pictures: fetched now so they are ready when it opens (the last ones are kept on the phone)
+    unawaited(LoginSlidesService.instance.refresh());
 
-    if (authProvider.isAuthenticated) {
+    // A remembered person with a passcode / fingerprint goes to the lock screen (LoginScreen). One without goes straight
+    // in, after the saved session is renewed: if the server no longer accepts it, they sign in again.
+    var openHome = authProvider.isAuthenticated && !authProvider.isLocked;
+    if (openHome && await authProvider.refreshSession() == 'expired') {
+      await authProvider.logout();
+      openHome = false;
+    }
+    if (!mounted) return;
+
+    if (openHome) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
       );

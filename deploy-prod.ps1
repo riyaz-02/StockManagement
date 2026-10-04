@@ -11,7 +11,7 @@
 param([switch]$Yes)
 
 # -- CONFIG ------------------------------------------------------------------
-$KeyFile      = "$env:USERPROFILE\OneDrive\Desktop\lgp-stock-key.pem"   # or stock-key-2.pem - whichever your EC2 uses
+$KeyFile      = "$env:USERPROFILE\.ssh\lgp-stock-key.pem"   # the EC2 key (owner-only permissions: ssh refuses a key others can read)
 $SshUser      = 'ubuntu'
 $Host_        = 'api.laltuguineapalace.com'                             # DNS follows the EC2 public IP after wake
 $RemoteRepo   = '/home/ubuntu/StockManagement'                         # folder on EC2 that holds the git clone (confirmed from pm2 on 4 Oct 2026)

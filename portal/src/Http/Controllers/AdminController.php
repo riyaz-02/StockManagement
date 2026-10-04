@@ -143,6 +143,112 @@ final class AdminController extends BaseController
 
     // ── notifications ─────────────────────────────────────────────────────────────────────────
 
+    // ── the pictures on the app sign-in screen ────────────────────────────────────────────────
+
+    /** @return array{0: array, 1: int} the pictures (in order) and the most the app can hold */
+    private function loginSlides(): array
+    {
+        $slides = [];
+        $max = 8;
+        try {
+            $d = (array) ($this->api()->get('app-assets/login-slides/admin')['data'] ?? []);
+            $slides = (array) ($d['slides'] ?? []);
+            $max = (int) ($d['max'] ?? 8);
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+        }
+        return [$slides, $max];
+    }
+
+    private function loginScreenPage(Request $rq, Response $rs, array $more = []): Response
+    {
+        [$slides, $max] = $this->loginSlides();
+        return $this->view($rq, $rs, 'admin/login_screen.twig', $more + ['slides' => $slides, 'max' => $max, 'error' => null, 'v' => [], 'active' => 'loginscreen']);
+    }
+
+    public function loginScreen(Request $rq, Response $rs): Response
+    {
+        return $this->loginScreenPage($rq, $rs);
+    }
+
+    public function loginScreenAdd(Request $rq, Response $rs): Response
+    {
+        $b = $this->input($rq);
+        $f = $_FILES['image'] ?? null;
+        $err = null;
+        if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            $err = 'Choose a picture first.';
+        } elseif (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            $err = 'That picture is too big for this website (limit ' . number_format(self::iniBytes((string) ini_get('upload_max_filesize')) / 1048576, 0) . ' MB). Use a smaller one.';
+        } elseif ($f['error'] !== UPLOAD_ERR_OK) {
+            $err = 'The upload did not finish (error ' . $f['error'] . '). Try again.';
+        }
+        if ($err === null) {
+            $mime = (string) (function_exists('mime_content_type') ? @mime_content_type((string) $f['tmp_name']) : '') ?: 'application/octet-stream';
+            try {
+                $this->api()->upload('app-assets/login-slides', 'image', (string) $f['tmp_name'], (string) $f['name'], [
+                    'captionEn' => trim((string) ($b['captionEn'] ?? '')), 'captionBn' => trim((string) ($b['captionBn'] ?? '')),
+                ], 120, $mime);
+            } catch (ApiException $e) {
+                $this->rethrowIfSystem($e);
+                $err = $e->getMessage();
+            }
+        }
+        if ($err !== null) {
+            return $this->loginScreenPage($rq, $rs->withStatus(422), ['error' => $err, 'v' => $b]);
+        }
+        $this->flash('success', 'Picture added. The app shows it on its sign-in screen from the next time it opens.');
+        return $this->redirect($rs, '/admin/login-screen');
+    }
+
+    /** Captions and on/off for one picture. */
+    public function loginScreenSave(Request $rq, Response $rs, array $args): Response
+    {
+        $b = $this->input($rq);
+        try {
+            $this->api()->patch('app-assets/login-slides/' . rawurlencode((string) $args['id']), [
+                'captionEn' => trim((string) ($b['captionEn'] ?? '')), 'captionBn' => trim((string) ($b['captionBn'] ?? '')), 'active' => !empty($b['active']),
+            ]);
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+            return $this->loginScreenPage($rq, $rs->withStatus(422), ['error' => $e->getMessage()]);
+        }
+        $this->flash('success', 'Saved.');
+        return $this->redirect($rs, '/admin/login-screen');
+    }
+
+    /** One step earlier (dir=up) or later (dir=down) in the slideshow. */
+    public function loginScreenMove(Request $rq, Response $rs, array $args): Response
+    {
+        $dir = (string) ($this->input($rq)['dir'] ?? '');
+        [$slides] = $this->loginSlides();
+        $ids = array_map(static fn ($s) => (string) $s['id'], $slides);
+        $i = array_search((string) $args['id'], $ids, true);
+        $j = $i === false ? false : ($dir === 'up' ? $i - 1 : $i + 1);
+        if ($i !== false && $j !== false && $j >= 0 && $j < count($ids)) {
+            [$ids[$i], $ids[$j]] = [$ids[$j], $ids[$i]];
+            try {
+                $this->api()->post('app-assets/login-slides/reorder', ['ids' => $ids]);
+            } catch (ApiException $e) {
+                $this->rethrowIfSystem($e);
+                return $this->loginScreenPage($rq, $rs->withStatus(422), ['error' => $e->getMessage()]);
+            }
+        }
+        return $this->redirect($rs, '/admin/login-screen');
+    }
+
+    public function loginScreenDelete(Request $rq, Response $rs, array $args): Response
+    {
+        try {
+            $this->api()->delete('app-assets/login-slides/' . rawurlencode((string) $args['id']));
+        } catch (ApiException $e) {
+            $this->rethrowIfSystem($e);
+            return $this->loginScreenPage($rq, $rs->withStatus(422), ['error' => $e->getMessage()]);
+        }
+        $this->flash('success', 'Picture removed.');
+        return $this->redirect($rs, '/admin/login-screen');
+    }
+
     public function notifications(Request $rq, Response $rs): Response
     {
         $rows = [];

@@ -41,34 +41,33 @@ class CustomBottomNav extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildNavItem(
+                    Expanded(child: _buildNavItem(
                       context: context,
                       icon: Icons.home_rounded,
                       label: languageProvider.t('home'),
                       index: 0,
-                    ),
-                    _buildNavItem(
+                    )),
+                    Expanded(child: _buildNavItem(
                       context: context,
                       icon: Icons.inventory_2_rounded,
                       label: languageProvider.t('items'),
                       index: 1,
-                    ),
-                    // Center scan button - smaller and inside the bar
-                    _buildCenterButton(),
-                    _buildNavItem(
+                    )),
+                    // Center scan button: its own equal slot, so it sits exactly under the notch
+                    Expanded(child: Center(child: _buildCenterButton())),
+                    Expanded(child: _buildNavItem(
                       context: context,
                       icon: Icons.bookmark_rounded,
                       label: languageProvider.t('bookings'),
                       index: 2,
-                    ),
-                    _buildNavItem(
+                    )),
+                    Expanded(child: _buildNavItem(
                       context: context,
                       icon: Icons.settings_rounded,
                       label: languageProvider.t('settings'),
                       index: 3,
-                    ),
+                    )),
                   ],
                 ),
               ),
@@ -123,6 +122,8 @@ class CustomBottomNav extends StatelessWidget {
             const SizedBox(height: 1),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 8,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
@@ -141,7 +142,6 @@ class CustomBottomNav extends StatelessWidget {
   Widget _buildCenterButton() {
     return Builder(
       builder: (context) => Container(
-        margin: const EdgeInsets.only(left: 5),
         child: Transform.translate(
           offset: const Offset(0, -12),
           child: GestureDetector(

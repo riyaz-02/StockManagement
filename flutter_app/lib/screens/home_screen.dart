@@ -330,17 +330,17 @@ class _HeroButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           onLongPress: onLong,
           child: Ink(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(16),
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
               boxShadow: [BoxShadow(color: colors.last.withOpacity(0.32), blurRadius: 18, offset: const Offset(0, 8))],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(16),
               child: Stack(children: [
                 // the watermark: the same picture, huge and faint, falling off the corner
                 Positioned(right: -22, bottom: -26, child: Icon(tile.icon, size: 138, color: glyph.withOpacity(0.15))),
@@ -351,7 +351,7 @@ class _HeroButton extends StatelessWidget {
                     Container(
                       width: 42,
                       height: 42,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.28))),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withOpacity(0.28))),
                       child: Icon(tile.icon, color: glyph, size: 24),
                     ),
                     Text(tile.title(bn), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
@@ -377,14 +377,14 @@ class _IconTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white.withOpacity(0.92),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         onLongPress: onLong,
         child: Container(
           padding: const EdgeInsets.fromLTRB(2, 9, 2, 6),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE9E4DA))),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE9E4DA))),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
               width: 38,

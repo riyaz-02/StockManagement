@@ -4,7 +4,7 @@ import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/secure_credential_storage.dart';
-import '../services/biometric_auth_service.dart';
+import '../services/app_lock_service.dart';
 import '../services/live_service.dart';
 import '../services/presence_service.dart';
 
@@ -12,10 +12,12 @@ class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final StorageService _storage = StorageService();
   final SecureCredentialStorage _credentialStorage = SecureCredentialStorage();
+  final AppLockService _lock = AppLockService.instance;
 
   User? _user;
   String? _token;
   bool _isLoading = false;
+  bool _locked = false;
   String? _error;
   Map<String, bool> _permissions = {};
   StreamSubscription<LiveEvent>? _liveSub;
@@ -43,6 +45,9 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null && _token != null;
+
+  /// A person is remembered on this phone (a saved session) but the screen is still guarded by their passcode / fingerprint.
+  bool get isLocked => _locked && isAuthenticated;
 
   // Admin/Owner always pass; everyone else is checked against the fetched
   // effective permission map (role defaults merged with any per-user
@@ -116,8 +121,11 @@ class AuthProvider with ChangeNotifier {
             if (!_user!.hasFullAccess) _fetchPermissions(),
             _restoreBranch(),
           ]);
+          _locked = await _lockApplies();
         }
       }
+      // an older version kept the password itself for its fingerprint shortcut: it is no longer needed, so it is wiped
+      await _credentialStorage.clearCredentials();
     } catch (e) {
       _error = e.toString();
     }
@@ -139,6 +147,9 @@ class AuthProvider with ChangeNotifier {
       if (response['success'] == true) {
         _token = response['data']['token'];
         _user = User.fromJson(response['data']['user']);
+        _locked = false;
+        // a passcode belongs to one person: signing in as somebody else must not keep the previous person's
+        if (await _lock.hasPin() && (await _lock.owner()) != _user!.id) await _lock.removePin();
 
         // Save to storage
         await _storage.saveToken(_token!);
@@ -172,73 +183,59 @@ class AuthProvider with ChangeNotifier {
     ApiService.activeGstin = '';
     _branchName = '';
     _syncLive();
+    _locked = false;
     await _storage.clearAll();
-    // Forget saved fingerprint-login credentials — this device may be
-    // shared by other staff, so a logout shouldn't leave a shortcut that
-    // logs the next person straight back into this account.
+    // The passcode and fingerprint belong to the person who signed out: this phone may be shared, so signing out must not
+    // leave a shortcut into their account.
+    await _lock.clearAll();
     await _credentialStorage.clearCredentials();
     notifyListeners();
   }
 
-  // ── Biometric login ──────────────────────────────────────────────────
-  Future<bool> isBiometricAvailable() => BiometricAuthService().isDeviceSupported();
+  // ── Passcode / fingerprint (the lock of a phone that stays signed in) ─────────────────────────────
 
-  Future<bool> hasSavedBiometricCredentials() => _credentialStorage.hasCredentials();
+  AppLockService get lock => _lock;
 
-  Future<void> saveBiometricCredentials(String mobile, String password) =>
-      _credentialStorage.saveCredentials(mobile, password);
-
-  Future<bool> biometricPromptWasDismissed() => _credentialStorage.wasPromptDismissed();
-
-  Future<void> setBiometricPromptDismissed() =>
-      _credentialStorage.setPromptDismissed(true);
-
-  Future<void> forgetBiometricCredentials() => _credentialStorage.clearCredentials();
-
-  /// Prompts the fingerprint/face sensor, then logs in with the stored
-  /// credentials. Returns 'success', 'biometric_failed', 'no_credentials',
-  /// 'invalid_credentials' (stored password no longer works — cleared), or
-  /// 'network_error' (kept, since that's not the stored password's fault).
-  Future<String> loginWithBiometrics() async {
-    final creds = await _credentialStorage.getCredentials();
-    if (creds == null) return 'no_credentials';
-
-    final authenticated = await BiometricAuthService().authenticate();
-    if (!authenticated) return 'biometric_failed';
-
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.login(creds['mobile']!, creds['password']!);
-
-      if (response['success'] == true) {
-        _token = response['data']['token'];
-        _user = User.fromJson(response['data']['user']);
-        await _storage.saveToken(_token!);
-        await _storage.saveUser(response['data']['user']);
-        await _fetchPermissions();
-        _isLoading = false;
-        _syncLive();
-        notifyListeners();
-        return 'success';
-      } else {
-        // Server rejected the stored credentials (password changed, account
-        // deactivated, etc.) — forget them so we stop offering a fingerprint
-        // shortcut that can no longer work.
-        await _credentialStorage.clearCredentials();
-        _error = response['message'] ?? 'Login failed';
-        _isLoading = false;
-        notifyListeners();
-        return 'invalid_credentials';
-      }
-    } catch (e) {
-      _error = e.toString().replaceAll('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return 'network_error';
+  /// Is there a passcode that belongs to the person whose session this is?
+  Future<bool> _lockApplies() async {
+    if (!await _lock.hasPin()) return false;
+    final owner = await _lock.owner();
+    if (owner != null && _user != null && owner != _user!.id) {
+      await _lock.removePin(); // somebody else's passcode must never guard this session
+      return false;
     }
+    return true;
+  }
+
+  Future<bool> hasLock() => _lock.hasPin();
+
+  /// The screen has been unlocked (right passcode, or a recognised fingerprint).
+  void unlock() {
+    _locked = false;
+    notifyListeners();
+  }
+
+  /// Sets or changes the passcode of the signed-in person.
+  Future<void> setPasscode(String pin) async {
+    if (_user == null) return;
+    await _lock.setPin(pin, owner: _user!.id);
+    await _lock.clearSetupSkips();
+  }
+
+  /// Takes the passcode (and the fingerprint with it) off this phone. The person stays signed in.
+  Future<void> removePasscode() => _lock.removePin();
+
+  /// Renews the saved session. 'expired' = the server no longer accepts it (a fresh sign-in is needed); 'offline' keeps the
+  /// phone usable as it is (a shop with a weak connection must still be able to open the app).
+  Future<String> refreshSession() async {
+    if (_token == null) return 'expired';
+    final code = await _apiService.refreshToken();
+    if (code == 200) {
+      _token = await _storage.getToken();
+      return 'ok';
+    }
+    if (code == 401 || code == 403) return 'expired';
+    return 'offline';
   }
 
   // Update language

@@ -242,6 +242,11 @@ final class App
         $app->post('/admin/updates/publish', [AdminController::class, 'publishApk'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates/discard', [AdminController::class, 'discardApk'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates/maintenance', [AdminController::class, 'updateMaintenance'])->add($need('appUpdate.manage'));
+        $app->get('/admin/login-screen', [AdminController::class, 'loginScreen'])->add($need('appAssets.manage'));
+        $app->post('/admin/login-screen', [AdminController::class, 'loginScreenAdd'])->add($need('appAssets.manage'));
+        $app->post('/admin/login-screen/{id}', [AdminController::class, 'loginScreenSave'])->add($need('appAssets.manage'));
+        $app->post('/admin/login-screen/{id}/move', [AdminController::class, 'loginScreenMove'])->add($need('appAssets.manage'));
+        $app->post('/admin/login-screen/{id}/delete', [AdminController::class, 'loginScreenDelete'])->add($need('appAssets.manage'));
         $app->get('/admin/notifications', [AdminController::class, 'notifications'])->add($need('notifications.send'));
         $app->post('/admin/notifications', [AdminController::class, 'sendNotification'])->add($need('notifications.send'));
         $app->get('/admin/settings', [AdminController::class, 'settings'])->add($need('settings.manageStockRules'));

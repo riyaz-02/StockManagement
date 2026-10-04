@@ -68,6 +68,6 @@ return [
     'nav.stock' => 'Stock', 'nav.summary' => 'Stock Summary', 'nav.oldmetal' => 'Old Metal', 'nav.purchases' => 'Purchases', 'nav.tally' => 'Stock Tally',
     'nav.daybook' => 'Day Book', 'nav.expenses' => 'Expenses', 'nav.gst' => 'GST Summary', 'nav.reports' => 'Reports',
     'nav.directory' => 'Customers & suppliers', 'nav.staff' => 'Staff & roles', 'nav.updates' => 'App updates',
-    'nav.notify' => 'Notifications', 'nav.settings' => 'App settings', 'nav.audit' => 'Audit log', 'nav.server' => 'Server status', 'nav.backup' => 'Data backup',
+    'nav.loginscreen' => 'Login screen', 'nav.notify' => 'Notifications', 'nav.settings' => 'App settings', 'nav.audit' => 'Audit log', 'nav.server' => 'Server status', 'nav.backup' => 'Data backup',
     'nav.s.Sell' => 'Sell', 'nav.s.Stock' => 'Stock', 'nav.s.Money' => 'Money', 'nav.s.People' => 'People', 'nav.s.Admin Control' => 'Admin Control',
 ];

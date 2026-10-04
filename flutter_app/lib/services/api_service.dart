@@ -60,13 +60,31 @@ class ApiService {
   }
 
   // Authentication
-  Future<Map<String, dynamic>> login(String mobile, String password) async {
+  /// `remember: true` asks for the long session (about 90 days) that keeps this phone signed in; its passcode / fingerprint guard the screen.
+  Future<Map<String, dynamic>> login(String mobile, String password, {bool remember = true}) async {
     final response = await http.post(
       Uri.parse('${AppConstants.baseUrl}/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'mobile': mobile, 'password': password}),
+      body: json.encode({'mobile': mobile, 'password': password, 'remember': remember}),
     );
     return _handleResponse(response);
+  }
+
+  /// Swaps the saved token for a fresh long one (the app does it each time it opens). Returns the HTTP status:
+  /// 200 = done (the new token is saved), 401 = the session has ended (sign in again), 0 = could not reach the server.
+  Future<int> refreshToken() async {
+    try {
+      final response = await http
+          .post(Uri.parse('${AppConstants.baseUrl}/auth/refresh'), headers: await _getHeaders())
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final token = json.decode(response.body)['data']?['token'];
+        if (token is String && token.isNotEmpty) await _storage.saveToken(token);
+      }
+      return response.statusCode;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<Map<String, dynamic>> getMe() async {

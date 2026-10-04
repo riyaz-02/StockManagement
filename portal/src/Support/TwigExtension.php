@@ -33,6 +33,7 @@ final class TwigExtension extends AbstractExtension
         'shield' => 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
         'phone' => 'M8 2h8a1 1 0 011 1v18a1 1 0 01-1 1H8a1 1 0 01-1-1V3a1 1 0 011-1zM11 18h2',
         'bell' => 'M6 9a6 6 0 1112 0c0 6 2 7 2 8H4c0-1 2-2 2-8zM10 21h4',
+        'image' => 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9.5h.01',
         'sliders' => 'M4 7h9M17 7h3M4 17h3M11 17h9M13 5v4M7 15v4',
         'list' => 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
         'logout' => 'M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4M16 8l4 4-4 4M20 12H9',

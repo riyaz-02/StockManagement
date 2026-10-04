@@ -50,10 +50,14 @@ class _ItemListScreenState extends State<ItemListScreen>
       _statusFilter = widget.initialStatus!;
     }
     // Fetch filter options
+    // After the first frame: fetchItems() notifies listeners at once, and the Stock tab of the bottom bar (kept alive
+    // behind this page when opened from the Home card) listens to the same provider -> "setState during build" aborted
+    // the fetch and left the spinner on forever.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       Provider.of<ItemProvider>(context, listen: false).fetchFilterOptions();
+      _loadItems();
     });
-    _loadItems();
   }
 
   void _loadItems() {

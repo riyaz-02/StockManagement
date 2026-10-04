@@ -39,6 +39,11 @@ final class ApiClient
         return $this->request('PUT', $path, [], $body, $timeout);
     }
 
+    public function patch(string $path, array $body = [], int $timeout = 40): array
+    {
+        return $this->request('PATCH', $path, [], $body, $timeout);
+    }
+
     public function delete(string $path, int $timeout = 25): array
     {
         return $this->request('DELETE', $path, [], null, $timeout);
@@ -49,12 +54,12 @@ final class ApiClient
      * browser to the API: the file is streamed from PHP's temp file, never held in memory.
      * @return array the decoded JSON envelope
      */
-    public function upload(string $path, string $field, string $filePath, string $fileName, array $fields = [], int $timeout = 3600): array
+    public function upload(string $path, string $field, string $filePath, string $fileName, array $fields = [], int $timeout = 3600, string $mime = 'application/vnd.android.package-archive'): array
     {
         $ch = curl_init(Config::apiBase() . '/api/' . ltrim($path, '/'));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $fields + [$field => new \CURLFile($filePath, 'application/vnd.android.package-archive', $fileName)],
+            CURLOPT_POSTFIELDS => $fields + [$field => new \CURLFile($filePath, $mime, $fileName)],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CONNECTTIMEOUT => 5,

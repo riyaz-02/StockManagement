@@ -196,6 +196,12 @@ const GROUPS = [
             { key: 'appUpdate.manage', label: 'Manage app update settings' },
         ],
     },
+    {
+        group: 'App Look',
+        keys: [
+            { key: 'appAssets.manage', label: 'Change the pictures on the app sign-in screen' },
+        ],
+    },
 ];
 
 // Flat list of every valid key, for validation.
@@ -220,6 +226,7 @@ const ADMIN_ONLY_KEYS = [
     'notifications.send',
     'notifications.viewHistory',
     'appUpdate.manage',
+    'appAssets.manage',
     'expenses.delete',
     'orders.cancel',
     'daybook.view',

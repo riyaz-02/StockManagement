@@ -9,6 +9,9 @@ import '../utils/app_colors.dart';
 import '../utils/app_toast.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
+import 'quick_unlock_setup_screen.dart';
+import '../services/app_lock_service.dart';
+import '../services/biometric_auth_service.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -21,95 +24,72 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final ApiService _apiService = ApiService();
   final ImagePicker _imagePicker = ImagePicker();
   bool _isUploadingImage = false;
-  bool _biometricSupported = false;
-  bool _biometricEnabled = false;
+  bool _pinSet = false;
+  bool _fingerOn = false;
+  FingerprintState _fpState = FingerprintState.unsupported;
 
   @override
   void initState() {
     super.initState();
-    _loadBiometricState();
+    _loadLockState();
   }
 
-  Future<void> _loadBiometricState() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final supported = await authProvider.isBiometricAvailable();
-    final enabled = await authProvider.hasSavedBiometricCredentials();
-    if (mounted) {
-      setState(() {
-        _biometricSupported = supported;
-        _biometricEnabled = enabled;
-      });
-    }
+  bool get _bn => Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
+  String _t(String en, String bn) => _bn ? bn : en;
+
+  Future<void> _loadLockState() async {
+    final lock = AppLockService.instance;
+    final pin = await lock.hasPin();
+    final fp = await lock.fingerprintOn();
+    final st = await BiometricAuthService().state();
+    if (mounted) setState(() { _pinSet = pin; _fingerOn = fp; _fpState = st; });
   }
 
-  Future<void> _toggleBiometric(bool value) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  Future<void> _setPasscode() async {
+    await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const QuickUnlockSetupScreen()));
+    await _loadLockState();
+  }
 
+  Future<void> _removePasscode() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_t('Remove passcode?', 'পাসকোড সরাবেন?')),
+        content: Text(_t('The app will open without asking for a passcode or fingerprint on this phone.', 'এই ফোনে অ্যাপ খোলার সময় আর পাসকোড বা ফিঙ্গারপ্রিন্ট চাইবে না।')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_t('Cancel', 'বাতিল'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(_t('Remove', 'সরান'), style: const TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await auth.removePasscode();
+    await _loadLockState();
+  }
+
+  Future<void> _toggleFingerprint(bool value) async {
     if (!value) {
-      await authProvider.forgetBiometricCredentials();
-      setState(() => _biometricEnabled = false);
+      await AppLockService.instance.setFingerprint(false);
+      await _loadLockState();
       return;
     }
-
-    final password = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('Confirm your password'),
-          content: TextField(
-            controller: controller,
-            obscureText: true,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Password'),
-            onSubmitted: (v) => Navigator.pop(ctx, v),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, controller.text),
-              child: const Text('Enable'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (password == null || password.isEmpty || !mounted) return;
-
-    final mobile = authProvider.user!.mobile;
-    // Verify the password is actually correct before storing it — a wrong
-    // entry here would otherwise sit silently until the next failed
-    // fingerprint attempt.
-    final verified = await authProvider.login(mobile, password);
-
+    final r = await BiometricAuthService().scan(reason: _t('Touch the fingerprint sensor', 'ফিঙ্গারপ্রিন্ট সেন্সরে আঙুল রাখুন'));
     if (!mounted) return;
-
-    if (!verified) {
+    if (r == FingerprintResult.success) {
+      await AppLockService.instance.setFingerprint(true);
+    } else {
       showAppSnackBar(
         context,
         SnackBar(
-          content: Text(authProvider.error ?? 'Incorrect password'),
+          content: Text(r == FingerprintResult.notEnrolled
+              ? _t('No fingerprint is saved on this phone yet. Add one in the phone Settings first.', 'এই ফোনে এখনও কোনো ফিঙ্গারপ্রিন্ট নেই। আগে ফোনের Settings-এ যোগ করুন।')
+              : _t('The fingerprint was not recognised. Try again.', 'ফিঙ্গারপ্রিন্ট চেনা যায়নি। আবার চেষ্টা করুন।')),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    await authProvider.saveBiometricCredentials(mobile, password);
-    setState(() => _biometricEnabled = true);
-    if (mounted) {
-      showAppSnackBar(
-        context,
-        const SnackBar(
-          content: Text('Fingerprint login enabled'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
+    await _loadLockState();
   }
 
   Future<void> _uploadProfileImage() async {
@@ -334,44 +314,59 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ),
             const SizedBox(height: 16),
 
-            if (_biometricSupported) ...[
-              _buildInfoCard(
-                languageProvider: languageProvider,
-                title: 'Security',
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.fingerprint,
-                            size: 20, color: Colors.grey[700]),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Fingerprint Login',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                      Switch(
-                        value: _biometricEnabled,
-                        activeColor: AppColors.primary,
-                        onChanged: _toggleBiometric,
-                      ),
-                    ],
+            _buildInfoCard(
+              languageProvider: languageProvider,
+              title: _t('App lock', 'অ্যাপ লক'),
+              children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+                    child: Icon(Icons.pin_outlined, size: 20, color: Colors.grey[700]),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_t('4-digit passcode', '৪ সংখ্যার পাসকোড'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
+                      Text(_pinSet ? _t('On: asked every time the app opens', 'চালু: অ্যাপ খোলার সময় প্রতিবার চাইবে') : _t('Off: the app opens straight away', 'বন্ধ: অ্যাপ সরাসরি খুলবে'), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    ]),
+                  ),
+                ]),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    TextButton(onPressed: _setPasscode, child: Text(_pinSet ? _t('Change', 'বদলান') : _t('Set passcode', 'পাসকোড দিন'))),
+                    if (_pinSet) TextButton(onPressed: _removePasscode, child: Text(_t('Remove', 'সরান'), style: const TextStyle(color: Colors.red))),
+                  ]),
+                ),
+                if (_fpState != FingerprintState.unsupported) ...[
+                  const Divider(height: 24),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+                      child: Icon(Icons.fingerprint, size: 20, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_t('Fingerprint', 'আঙুলের ছাপ'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
+                        Text(
+                          !_pinSet
+                              ? _t('Set a passcode first', 'আগে পাসকোড দিন')
+                              : _fpState == FingerprintState.notEnrolled
+                                  ? _t('Add a fingerprint in the phone Settings first', 'আগে ফোনের Settings-এ ফিঙ্গারপ্রিন্ট যোগ করুন')
+                                  : _t('Open the app with one touch', 'এক ছোঁয়ায় অ্যাপ খুলুন'),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ]),
+                    ),
+                    Switch(value: _fingerOn, activeColor: AppColors.primary, onChanged: _pinSet ? _toggleFingerprint : null),
+                  ]),
                 ],
-              ),
-              const SizedBox(height: 16),
-            ],
+              ],
+            ),
+            const SizedBox(height: 16),
 
             // Actions Card
             _buildInfoCard(

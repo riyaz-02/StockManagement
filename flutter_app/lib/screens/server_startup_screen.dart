@@ -227,13 +227,16 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.initialize();
+    var openHome = authProvider.isAuthenticated && !authProvider.isLocked;
+    if (openHome && await authProvider.refreshSession() == 'expired') {
+      await authProvider.logout();
+      openHome = false;
+    }
 
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => authProvider.isAuthenticated
-            ? const MainNavigationScreen()
-            : const LoginScreen(),
+        builder: (_) => openHome ? const MainNavigationScreen() : const LoginScreen(),
       ),
     );
   }

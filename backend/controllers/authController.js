@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { generateToken } = require('../middleware/auth');
+const { generateToken, REMEMBER_EXPIRE } = require('../middleware/auth');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -7,6 +7,8 @@ const { generateToken } = require('../middleware/auth');
 exports.login = async (req, res) => {
     try {
         const { mobile, password } = req.body;
+        // the app sends remember:true so a phone stays signed in (its PIN / fingerprint guard the screen); the website does not
+        const remember = req.body.remember === true || req.body.remember === 'true';
 
         // Validate input
         if (!mobile || !password) {
@@ -57,7 +59,7 @@ exports.login = async (req, res) => {
         User.updateOne({ _id: user._id }, { $set: { last_login: new Date(), last_login_ist: User.istText() } }).catch(() => {});
 
         // Generate token
-        const token = generateToken(user._id);
+        const token = remember ? generateToken(user._id, REMEMBER_EXPIRE()) : generateToken(user._id);
 
         res.status(200).json({
             success: true,
@@ -82,6 +84,18 @@ exports.login = async (req, res) => {
             success: false,
             message: 'Server error during login'
         });
+    }
+};
+
+// @desc    Swap a still-valid token for a fresh long one (the app calls this each time it opens: a phone in daily use never
+//          has to sign in again; one unused for longer than the token lives does)
+// @route   POST /api/auth/refresh
+// @access  Private
+exports.refresh = async (req, res) => {
+    try {
+        res.json({ success: true, data: { token: generateToken(req.user._id, REMEMBER_EXPIRE()) } });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 };
 
