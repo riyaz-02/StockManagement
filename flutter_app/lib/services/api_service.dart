@@ -13,6 +13,13 @@ class ApiService {
   /// lack every-branch access, so it can never widen what someone may see.
   static String activeBranch = '';
 
+  /// The billing counter picked on this phone ('' = the person's own). Sent as `X-Counter`; the server only accepts a live
+  /// counter of the branch being worked on, so it can never file anything under a wrong one.
+  static String activeCounter = '';
+
+  /// The version of this app, e.g. 1.5.1+9 (set once at start): kept on every bill, so it is known which build made it.
+  static String appVersion = '';
+
   /// The GST registration (GSTIN) the GST Summary shows: '' = the firm's default, 'ALL' = every registration (only the
   /// summary / register / export can add them up; returns, credit and filings always belong to one GSTIN).
   static String activeGstin = '';
@@ -24,6 +31,9 @@ class ApiService {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
       if (activeBranch.isNotEmpty) 'X-Branch': activeBranch,
+      if (activeCounter.isNotEmpty) 'X-Counter': activeCounter,
+      'X-Client': 'app',
+      if (appVersion.isNotEmpty) 'X-App-Version': appVersion,
     };
   }
 
@@ -1654,6 +1664,45 @@ class ApiService {
     );
     return _handleResponse(response);
   }
+
+  // ── Branches, counters, who works where (/api/branches) ──────────────────────────────────────────
+
+  Future<Map<String, dynamic>> _branchCall(String method, String path, [Map<String, dynamic>? body, bool wholeFirm = true]) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/branches$path');
+    final headers = await _getHeaders();
+    // managing branches: not narrowed to the branch an admin happens to be working as
+    if (wholeFirm) {
+      headers.remove('X-Branch');
+      headers.remove('X-Counter');
+    }
+    final data = body == null ? null : json.encode(body);
+    final http.Response r;
+    switch (method) {
+      case 'POST':
+        r = await http.post(uri, headers: headers, body: data);
+        break;
+      case 'PATCH':
+        r = await http.patch(uri, headers: headers, body: data);
+        break;
+      default:
+        r = await http.get(uri, headers: headers);
+    }
+    return _handleResponse(r);
+  }
+
+  /// Every branch you may see, each with its counters and its staff count.
+  Future<Map<String, dynamic>> getBranches() => _branchCall('GET', '', null, true);
+  Future<Map<String, dynamic>> getBranch(String id) => _branchCall('GET', '/$id', null, true);
+  Future<Map<String, dynamic>> createBranch(Map<String, dynamic> body) => _branchCall('POST', '', body);
+  Future<Map<String, dynamic>> updateBranch(String id, Map<String, dynamic> body) => _branchCall('PATCH', '/$id', body);
+  Future<Map<String, dynamic>> createCounter(String branchId, Map<String, dynamic> body) => _branchCall('POST', '/$branchId/counters', body);
+  Future<Map<String, dynamic>> updateCounter(String branchId, String counterId, Map<String, dynamic> body) => _branchCall('PATCH', '/$branchId/counters/$counterId', body);
+
+  /// Put a person at a branch, at one of its counters ('' = none).
+  Future<Map<String, dynamic>> assignStaff(String branchId, String userId, String counterId) => _branchCall('PATCH', '/$branchId/staff/$userId', {'counterId': counterId});
+
+  /// The live counters of the branch being worked on, and which one is in force.
+  Future<Map<String, dynamic>> getCurrentCounters() => _branchCall('GET', '/counters/current', null, false);
 
   /// [kind] is one of: customers, staff, suppliers, karigars.
   Future<Map<String, dynamic>> getDirectoryList(

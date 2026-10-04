@@ -8,6 +8,7 @@ use Portal\Api\ApiException;
 use Portal\Auth\Session;
 use Portal\Auth\Throttle;
 use Portal\Support\I18n;
+use Portal\Support\LoginSlides;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Views\Twig;
@@ -23,7 +24,7 @@ final class AuthController
         if (ApiClient::health(3) !== 'online') {
             return $response->withHeader('Location', '/wake?next=' . rawurlencode('/login'))->withStatus(302);
         }
-        return Twig::fromRequest($request)->render($response, 'login.twig', ['flash' => Session::flash(), 'mobile' => '']);
+        return Twig::fromRequest($request)->render($response, 'login.twig', ['flash' => Session::flash(), 'mobile' => '', 'slides' => LoginSlides::all()]);
     }
 
     public function login(Request $request, Response $response): Response
@@ -36,7 +37,7 @@ final class AuthController
         $isNumber = $typed !== '' && preg_match('/^[\d\s+().-]+$/', $typed) === 1;
         $mobile = $isNumber ? preg_replace('/\D+/', '', $typed) : $typed;
         $password = (string) ($b['password'] ?? '');
-        $fail = fn (string $msg, int $code = 200) => $view->render($response->withStatus($code), 'login.twig', ['flash' => ['type' => 'error', 'text' => $msg], 'mobile' => $typed]);
+        $fail = fn (string $msg, int $code = 200) => $view->render($response->withStatus($code), 'login.twig', ['flash' => ['type' => 'error', 'text' => $msg], 'mobile' => $typed, 'slides' => LoginSlides::all()]);
 
         if ($typed === '' || ($isNumber && strlen($mobile) < 10) || $password === '') {
             return $fail(I18n::t('login.missing'));

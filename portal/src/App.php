@@ -25,6 +25,8 @@ use Portal\Http\Controllers\PurchaseController;
 use Portal\Http\Controllers\RateController;
 use Portal\Http\Controllers\ReportsController;
 use Portal\Http\Controllers\BellController;
+use Portal\Http\Controllers\WorkplaceController;
+use Portal\Http\Controllers\AdminBranchController;
 use Portal\Http\Controllers\StockController;
 use Portal\Http\Controllers\StockSummaryController;
 use Portal\Http\Controllers\WastageController;
@@ -84,6 +86,8 @@ final class App
         $app->get('/partials/rate', [RateController::class, 'strip'])->add($auth);
         $app->get('/partials/rate-form', [RateController::class, 'form'])->add(new RequireAuth('rates.edit'));
         $app->post('/rates', [RateController::class, 'save'])->add(new RequireAuth('rates.edit'));
+        $app->get('/partials/workplace', [WorkplaceController::class, 'show'])->add($auth);
+        $app->post('/workplace', [WorkplaceController::class, 'save'])->add($auth);
         $app->get('/partials/bell/count', [BellController::class, 'count'])->add($auth);
         $app->get('/partials/bell/list', [BellController::class, 'list'])->add($auth);
         $app->post('/partials/bell/seen', [BellController::class, 'seen'])->add($auth);
@@ -208,6 +212,8 @@ final class App
         // Customers, suppliers, karigars
         $app->get('/directory', [DirectoryController::class, 'index'])->add($need('directory.view'));
         $app->get('/directory/list', [DirectoryController::class, 'list'])->add($need('directory.view'));
+        $app->get('/directory/lookup', [DirectoryController::class, 'lookup'])->add($need('directory.view'));
+        $app->post('/directory/translate', [DirectoryController::class, 'translate'])->add($need('directory.create'));
         $app->get('/directory/customers/new', [DirectoryController::class, 'newForm'])->add($need('directory.create'));
         $app->post('/directory/customers', [DirectoryController::class, 'create'])->add($need('directory.create'));
         $app->get('/directory/customers/{id}', [DirectoryController::class, 'show'])->add($need('directory.view'));
@@ -242,6 +248,14 @@ final class App
         $app->post('/admin/updates/publish', [AdminController::class, 'publishApk'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates/discard', [AdminController::class, 'discardApk'])->add($need('appUpdate.manage'));
         $app->post('/admin/updates/maintenance', [AdminController::class, 'updateMaintenance'])->add($need('appUpdate.manage'));
+        $app->get('/admin/branches', [AdminBranchController::class, 'index'])->add($need('directory.manageBranches'));
+        $app->post('/admin/branches', [AdminBranchController::class, 'create'])->add($need('directory.manageBranches'));
+        $app->get('/admin/branches/{id}', [AdminBranchController::class, 'show'])->add($need('directory.manageBranches'));
+        $app->post('/admin/branches/{id}', [AdminBranchController::class, 'update'])->add($need('directory.manageBranches'));
+        $app->post('/admin/branches/{id}/counters', [AdminBranchController::class, 'counterAdd'])->add($need('directory.manageBranches'));
+        $app->post('/admin/branches/{id}/counters/{cid}', [AdminBranchController::class, 'counterSave'])->add($need('directory.manageBranches'));
+        $app->post('/admin/branches/{id}/staff/{uid}', [AdminBranchController::class, 'staffAssign'])->add($need('users.manage'));
+        $app->post('/admin/branches/{id}/staff', [AdminBranchController::class, 'staffAssign'])->add($need('users.manage'));
         $app->get('/admin/login-screen', [AdminController::class, 'loginScreen'])->add($need('appAssets.manage'));
         $app->post('/admin/login-screen', [AdminController::class, 'loginScreenAdd'])->add($need('appAssets.manage'));
         $app->post('/admin/login-screen/{id}', [AdminController::class, 'loginScreenSave'])->add($need('appAssets.manage'));

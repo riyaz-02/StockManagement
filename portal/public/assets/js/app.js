@@ -344,3 +344,47 @@
         });
     });
 })();
+
+/* A "Counter" drop-down only offers the counters of the branch chosen next to it (staff forms). */
+(function () {
+    function sync(form) {
+        var counter = form.querySelector('select[data-counter-select]');
+        var branch = form.querySelector('select[name="branchId"]');
+        if (!counter || !branch) { return; }
+        var keep = false;
+        Array.prototype.forEach.call(counter.options, function (o) {
+            var show = !o.getAttribute('data-branch') || o.getAttribute('data-branch') === branch.value;
+            o.hidden = !show;
+            o.disabled = !show;
+            if (o.selected && show) { keep = true; }
+        });
+        if (!keep) { counter.value = ''; }
+    }
+    function all(root) { Array.prototype.forEach.call((root || document).querySelectorAll('form'), function (f) { if (f.querySelector('select[data-counter-select]')) { sync(f); } }); }
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.name === 'branchId' && e.target.form) { sync(e.target.form); }
+    });
+    document.addEventListener('DOMContentLoaded', function () { all(); });
+    document.body && document.body.addEventListener('htmx:afterSwap', function (e) { all(e.target); });
+    document.addEventListener('htmx:afterSwap', function (e) { all(e.target); });
+})();
+
+/* Sign-in page: the pictures change by themselves, slowly (every 7 seconds). */
+(function () {
+    function start() {
+        var box = document.querySelector('[data-login-slider]');
+        if (!box) { return; }
+        var slides = box.querySelectorAll('.login2-slide');
+        var dots = box.querySelectorAll('.login2-dots i');
+        if (slides.length < 2) { return; }
+        var i = 0;
+        setInterval(function () {
+            slides[i].classList.remove('is-on');
+            if (dots[i]) { dots[i].classList.remove('is-on'); }
+            i = (i + 1) % slides.length;
+            slides[i].classList.add('is-on');
+            if (dots[i]) { dots[i].classList.add('is-on'); }
+        }, 7000);
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', start); } else { start(); }
+})();

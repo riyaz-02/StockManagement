@@ -1,0 +1,90 @@
+{# Add / edit a customer: the same form in a pop-up (fast, from any page) or on a page. Behaviour is in public/assets/js/customer-form.js #}
+{% set editing = id is not null %}
+{% set rows = v.numbers|default([]) %}
+{% if not rows|length %}{% set rows = [{number: '', label: 'whatsapp'}] %}{% endif %}
+<form class="{{ modal ? 'modal-form ' : '' }}cform" data-cform data-exclude="{{ id|default('') }}" autocomplete="off" novalidate
+      method="post" action="{{ editing ? '/directory/customers/' ~ id : '/directory/customers' }}"{% if modal %} hx-post="{{ editing ? '/directory/customers/' ~ id : '/directory/customers' }}" hx-target="#modal-body" hx-swap="innerHTML"{% endif %}>
+    {{ csrf_field() }}
+    {% if editing %}<input type="hidden" name="expectedUpdatedAt" value="{{ v.expectedUpdatedAt|default('') }}">{% endif %}
+    <input type="hidden" name="force" value="" data-cf-force>
+    <div class="cf-head"><h2>{{ editing ? 'Edit customer' : 'New customer' }}</h2>{% if modal %}<button type="button" class="icon-btn" data-close-modal aria-label="Close">{{ icon('x', 18) }}</button>{% endif %}</div>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    {% if canForce %}<div class="notice notice-info cf-force">This number already belongs to another customer. <button type="submit" class="btn" name="force" value="1">Save anyway</button></div>{% endif %}
+
+    <div class="cf-numbers" data-cf-numbers>
+        {% for r in rows %}
+        <div class="cf-num" data-cf-num>
+            {% if loop.first %}<span class="cf-badge" title="WhatsApp / mobile">{{ icon('phone', 16) }}<input type="hidden" name="label[]" value="whatsapp"></span>
+            {% else %}<select name="label[]" aria-label="Kind of number">{% for k, l in {mobile: 'Mobile', home: 'Home', work: 'Work', other: 'Other', whatsapp: 'WhatsApp'} %}<option value="{{ k }}"{{ r.label == k ? ' selected' : '' }}>{{ l }}</option>{% endfor %}</select>{% endif %}
+            <input type="tel" name="number[]" value="{{ r.number }}" inputmode="numeric" maxlength="14" placeholder="{{ loop.first ? 'Mobile / WhatsApp number *' : 'Another number' }}" data-cf-number aria-label="Phone number"{{ loop.first ? ' autofocus' : '' }}>
+            {% if not loop.first %}<button type="button" class="icon-btn" data-cf-remove aria-label="Remove this number">{{ icon('x', 16) }}</button>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="cf-dupes" data-cf-dupes hidden></div>
+        <button type="button" class="link-btn cf-add" data-cf-add>{{ icon('plus', 15) }} Add another number</button>
+    </div>
+
+    <label class="field"><span>Name *</span>
+        <input type="text" name="name" value="{{ v.name|default('') }}" data-cf-name autocapitalize="words" maxlength="80" required>
+    </label>
+    <label class="field cf-bn"><span>Name in Bengali <small>(fills itself)</small></span>
+        <div class="cf-bn-row"><input type="text" name="nameBengali" value="{{ v.nameBengali|default('') }}" data-cf-name-bn placeholder="গ্রাহকের নাম"><button type="button" class="icon-btn" data-cf-retranslate="name" title="Translate again" aria-label="Translate the name again">{{ icon('refresh', 16) }}</button></div>
+    </label>
+    <label class="field"><span>Address</span>
+        <input type="text" name="address" value="{{ v.address|default('') }}" data-cf-address autocapitalize="words" maxlength="200">
+    </label>
+    <label class="field cf-bn"><span>Address in Bengali <small>(fills itself)</small></span>
+        <div class="cf-bn-row"><input type="text" name="addressBengali" value="{{ v.addressBengali|default('') }}" data-cf-address-bn placeholder="ঠিকানা"><button type="button" class="icon-btn" data-cf-retranslate="address" title="Translate again" aria-label="Translate the address again">{{ icon('refresh', 16) }}</button></div>
+    </label>
+
+    <fieldset class="cf-notify"><legend>Messages</legend>
+        {% for k, l in {all: 'All', offers: 'Offers', invitations: 'Invitations', none: 'None'} %}
+        <label class="cf-radio"><input type="radio" name="notificationType" value="{{ k }}"{{ (v.notificationType|default('all')) == k ? ' checked' : '' }}><span>{{ l }}</span></label>
+        {% endfor %}
+    </fieldset>
+
+    {# special dates: birthday, marriage anniversary ... as many as needed (kept in the website's `anniversaries`) #}
+    <div class="cf-dates" data-cf-dates>
+        <datalist id="cf-occasions">{% for o in ['Birthday', 'Marriage Anniversary', 'Engagement', 'Work Anniversary', 'Other'] %}<option value="{{ o }}">{% endfor %}</datalist>
+        {% for d in v.dates|default([]) %}
+        <div class="cf-date" data-cf-date>
+            <input type="text" name="dateOccasion[]" value="{{ d.occasion }}" list="cf-occasions" placeholder="Occasion" maxlength="40" aria-label="Occasion">
+            <input type="date" name="dateValue[]" value="{{ d.date }}" aria-label="Date">
+            <button type="button" class="icon-btn" data-cf-date-remove aria-label="Remove this date">{{ icon('x', 16) }}</button>
+        </div>
+        {% endfor %}
+        <template data-cf-date-tpl><div class="cf-date" data-cf-date>
+            <input type="text" name="dateOccasion[]" list="cf-occasions" placeholder="Occasion (Birthday ...)" maxlength="40" aria-label="Occasion">
+            <input type="date" name="dateValue[]" aria-label="Date">
+            <button type="button" class="icon-btn" data-cf-date-remove aria-label="Remove this date">{{ icon('x', 16) }}</button>
+        </div></template>
+        <button type="button" class="link-btn cf-add" data-cf-date-add>{{ icon('plus', 15) }} Add a special date <small>(birthday, anniversary ...)</small></button>
+    </div>
+
+    <div class="cf-ref" data-cf-ref>
+        <label class="field"><span>Referred by <small>(name, mobile or customer ID)</small></span>
+            <input type="text" value="{{ v.referredByText|default('') }}" name="referredByText" data-cf-ref-input maxlength="80"></label>
+        <input type="hidden" name="referredById" value="{{ v.referredById|default('') }}" data-cf-ref-id>
+        <div class="cf-chip" data-cf-ref-chip{{ v.referredById|default('') ? '' : ' hidden' }}><span data-cf-ref-label>{{ v.referredByLabel|default('') }}</span><button type="button" class="icon-btn" data-cf-ref-clear aria-label="Clear">{{ icon('x', 14) }}</button></div>
+        <div class="cf-results" data-cf-ref-results hidden></div>
+    </div>
+
+    <details class="cf-more"{{ v.openMore|default(false) ? ' open' : '' }}>
+        <summary>More details</summary>
+        <div class="form-grid">
+            <label class="field"><span>Email</span><input type="email" name="email" value="{{ v.email|default('') }}" maxlength="80"></label>
+            <label class="field"><span>Customer type</span><select name="membershipStatus">{% for o in ['Regular', 'VIP'] %}<option{{ (v.membershipStatus|default('Regular')) == o ? ' selected' : '' }}>{{ o }}</option>{% endfor %}</select></label>
+            <label class="field"><span>City</span><input type="text" name="city" value="{{ v.city|default('') }}" maxlength="60"></label>
+            <label class="field"><span>State</span><input type="text" name="state" value="{{ v.state|default('') }}" maxlength="60"></label>
+            <label class="field"><span>Pincode</span><input type="text" name="pincode" value="{{ v.pincode|default('') }}" inputmode="numeric" maxlength="6"></label>
+            <label class="field"><span>PAN</span><input type="text" name="panNo" value="{{ v.panNo|default('') }}" maxlength="10" autocapitalize="characters"></label>
+            <label class="field"><span>GSTIN (if they have one)</span><input type="text" name="gstNo" value="{{ v.gstNo|default('') }}" maxlength="15" autocapitalize="characters"></label>
+            <label class="field span-2"><span>Note</span><input type="text" name="notes" value="{{ v.notes|default('') }}" maxlength="200"></label>
+        </div>
+    </details>
+
+    <div class="cf-actions">
+        {% if modal %}<button type="button" class="btn" data-close-modal>Cancel</button>{% else %}<a class="btn" href="{{ editing ? '/directory/customers/' ~ id : '/directory' }}">Cancel</a>{% endif %}
+        <button type="submit" class="btn btn-primary" data-cf-save>{{ editing ? 'Save changes' : 'Save customer' }}</button>
+    </div>
+</form>

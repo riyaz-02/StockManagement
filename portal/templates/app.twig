@@ -50,6 +50,7 @@
                 {% block heading %}{% endblock %}
             </div>
             <span id="live-dot" class="live-dot" title="Live updates" aria-label="Live updates"><i></i><em>Live</em></span>
+            <div id="workplace" hx-get="/partials/workplace" hx-trigger="load" hx-swap="innerHTML"></div>
             <div id="rate-strip" class="rate-strip" hx-get="/partials/rate" hx-trigger="load, rate-saved from:body" hx-swap="innerHTML"></div>
             {# the bell: a number for what needs a look; the list opens under it #}
             <div class="bell" x-data="bell" @click.outside="close" @keydown.escape.window="close">

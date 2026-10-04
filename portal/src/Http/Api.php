@@ -11,6 +11,6 @@ final class Api
 {
     public static function client(): ApiClient
     {
-        return new ApiClient(Session::token(), Session::branch());
+        return new ApiClient(Session::token(), Session::branch(), Session::counter());
     }
 }

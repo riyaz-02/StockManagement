@@ -49,6 +49,18 @@ class StorageService {
     await prefs.setString('active_branch_name', name);
   }
 
+  // The counter picked on this phone (see ApiService.activeCounter); '' = the person's own
+  Future<void> saveCounter(String id, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('active_counter', id);
+    await prefs.setString('active_counter_name', name);
+  }
+
+  Future<(String, String)> getCounter() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getString('active_counter') ?? '', prefs.getString('active_counter_name') ?? '');
+  }
+
   Future<(String, String)> getBranch() async {
     final prefs = await SharedPreferences.getInstance();
     return (prefs.getString('active_branch') ?? '', prefs.getString('active_branch_name') ?? '');

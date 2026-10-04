@@ -1083,6 +1083,13 @@ String _date(dynamic v) {
   return d == null ? '' : DateFormat('dd MMM yyyy').format(d.toLocal());
 }
 
+/// A calendar day from the server's ISO date (no time-zone shift).
+String _day(dynamic v) {
+  final t = _s(v);
+  final d = t.length >= 10 ? DateTime.tryParse(t.substring(0, 10)) : null;
+  return d == null ? '' : DateFormat('dd MMM yyyy').format(d);
+}
+
 String _bal(dynamic b, {bool weight = false}) {
   if (b is! Map) return '';
   final n = weight ? b['weight'] : b['amount'];
@@ -1142,8 +1149,13 @@ List<MapEntry<String, List<MapEntry<String, String>>>> _sectionsBase(
           e('Type', p['customerType']),
           e('S/O · D/O · W/O', p['fatherName']),
           e('Gender', p['gender']),
-          e('Date of birth', _date(p['dob'])),
-          e('Anniversary', _date(p['anniversary'])),
+          // the special dates (birthday, anniversary ...) as the website keeps them; the profile's single dates only when the list lacks them
+          if (d['anniversaries'] is List && (d['anniversaries'] as List).isNotEmpty)
+            for (final a in d['anniversaries'] as List) e(_s((a as Map)['occasion']), _day(a['date']))
+          else ...[
+            e('Date of birth', _date(p['dob'])),
+            e('Anniversary', _date(p['anniversary'])),
+          ],
           e(
               'Referred by',
               (p['referredBy'] is Map)

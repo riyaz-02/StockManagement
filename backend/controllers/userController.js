@@ -1,4 +1,5 @@
 const { resolveBranch } = require('../utils/branches');
+const Counters = require('../utils/counters');
 const User = require('../models/User');
 const cloudinaryHelper = require('../utils/cloudinaryHelper');
 const { hasPermission } = require('../middleware/auth');
@@ -58,7 +59,7 @@ exports.getUser = async (req, res) => {
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
     try {
-        const { name, mobile, password, role, profileImage, branchId, username, email } = req.body;
+        const { name, mobile, password, role, profileImage, branchId, username, email, counterId } = req.body;
 
         // Validate required fields
         if (!name || !mobile || !password) {
@@ -81,9 +82,12 @@ exports.createUser = async (req, res) => {
         const branch = await resolveBranch(branchId || req.user.branchId);
 
         // Create user (in the website's own format: they can sign in there too, with the same password)
-        const user = await User.create(User.forCreate({ name, mobile, password, role: role || 'staff', profileImage, username, email, ...branch }));
+        // Counter: optional; it must be one of that branch's live counters
+        const counter = await Counters.resolveFor(branch.branchId, counterId);
 
-        require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'created', [{ field: 'role', to: user.role }, { field: 'branch', to: user.branchName }]);
+        const user = await User.create(User.forCreate({ name, mobile, password, role: role || 'staff', profileImage, username, email, ...branch, counterId: counter.counterId, counterName: counter.counterName }));
+
+        require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'created', [{ field: 'role', to: user.role }, { field: 'branch', to: user.branchName }, ...(user.counterName ? [{ field: 'counter', to: user.counterName }] : [])]);
         // Remove password from response
         const userResponse = user.toJSON();
 
@@ -113,7 +117,7 @@ exports.createUser = async (req, res) => {
 // @access  Private
 exports.updateUser = async (req, res) => {
     try {
-        const { name, mobile, profileImage, language, role, isActive, branchId, username, email } = req.body;
+        const { name, mobile, profileImage, language, role, isActive, branchId, username, email, counterId } = req.body;
 
         const user = await User.findById(req.params.id);
 
@@ -132,14 +136,21 @@ exports.updateUser = async (req, res) => {
             });
         }
 
-        const auditBefore = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName };
+        const auditBefore = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName, counter: user.counterName || '' };
         // Update fields
         if (name) user.name = name;
         // Branch assignment is an admin action (users.manage), never self-service
         if (branchId !== undefined && (await hasPermission(req.user, 'users.manage'))) {
             const branch = await resolveBranch(branchId);
+            // moving to another branch drops the old counter (it belongs to the old branch) unless a new one is given
+            if (branch.branchId !== (user.branchId || 'main') && counterId === undefined) { user.counterId = ''; user.counterName = ''; }
             user.branchId = branch.branchId;
             user.branchName = branch.branchName;
+        }
+        if (counterId !== undefined && (await hasPermission(req.user, 'users.manage'))) {
+            const counter = await Counters.resolveFor(user.branchId || 'main', counterId);
+            user.counterId = counter.counterId;
+            user.counterName = counter.counterName;
         }
         if (mobile) {
             // Check if mobile is already taken by another user
@@ -195,7 +206,7 @@ exports.updateUser = async (req, res) => {
         await user.save();
 
         {
-            const after = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName };
+            const after = { name: user.name, mobile: user.mobile, role: user.role, active: user.isActive, branch: user.branchName, counter: user.counterName || '' };
             const changes = Object.keys(after).filter((k) => String(after[k]) !== String(auditBefore[k])).map((k) => ({ field: k, from: auditBefore[k], to: after[k] }));
             if (changes.length) require('../services/audit').record(req, 'user', user._id, `${user.name} (${user.mobile})`, 'updated', changes);
         }

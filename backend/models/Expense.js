@@ -21,7 +21,7 @@ const schema = new mongoose.Schema(
     },
     { collection: 'app_expenses', timestamps: true }
 );
-schema.plugin(require('../utils/branchScope').branchPlugin);
+schema.plugin(require('../utils/branchScope').branchPlugin, { counter: true }); // bills / money at a counter carry it
 const Model = mongoose.models.AppExpense || mongoose.model('AppExpense', schema);
 module.exports = Model;
 module.exports.CATEGORIES = CATEGORIES;

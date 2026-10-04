@@ -51,8 +51,14 @@ exports.protect = async (req, res, next) => {
             let restrict = all ? null : [home];
             let branchId = home;
             if (all && pick && pick !== 'all') { restrict = [pick]; branchId = pick; }
-            req.branchScope = { branchId, restrict, all };
-            return runWith({ branchId, restrict }, () => next());
+            // the billing counter in force: the one picked (X-Counter) or the person's own, if it belongs to this branch
+            const counter = await require('../utils/counters').pick(branchId, String(req.headers['x-counter'] || '').trim(), req.user.counterId);
+            req.branchScope = { branchId, restrict, all, counter };
+            return runWith({
+                branchId, restrict,
+                counterId: counter ? counter.counterId : '', counterName: counter ? counter.counterName : '',
+                userId: String(req.user._id), userName: req.user.name || req.user.username || '',
+            }, () => next());
         } catch (err) {
             return res.status(401).json({
                 success: false,

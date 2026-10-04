@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_toast.dart';
 import '../widgets/branch_dropdown.dart';
+import '../widgets/counter_dropdown.dart';
 
 class AddUserScreen extends StatefulWidget {
   const AddUserScreen({super.key});
@@ -25,6 +26,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
   String _selectedRole = 'staff';
   String _branchId = 'main';
+  String _counterId = '';
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   bool _isCreatingUser = false;
@@ -84,6 +86,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
         'password': _passwordController.text,
         'role': _selectedRole,
         'branchId': _branchId,
+        'counterId': _counterId,
         if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl,
       };
 
@@ -327,8 +330,10 @@ class _AddUserScreenState extends State<AddUserScreen> {
             // Branch: records this user creates are filed under it automatically
             BranchDropdown(
               value: _branchId,
-              onChanged: (v) => setState(() => _branchId = v),
+              onChanged: (v) => setState(() { _branchId = v; _counterId = ''; }),
             ),
+            const SizedBox(height: 16),
+            CounterDropdown(branchId: _branchId, value: _counterId, onChanged: (v) => setState(() => _counterId = v)),
             const SizedBox(height: 24),
 
             // Role Description

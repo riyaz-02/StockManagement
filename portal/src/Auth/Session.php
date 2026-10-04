@@ -131,4 +131,15 @@ final class Session
     {
         $_SESSION['branch'] = $id;
     }
+
+    /** The billing counter this person picked for the session ('' = their own default). */
+    public static function counter(): string
+    {
+        return (string) ($_SESSION['counter'] ?? '');
+    }
+
+    public static function setCounter(string $id): void
+    {
+        $_SESSION['counter'] = $id;
+    }
 }

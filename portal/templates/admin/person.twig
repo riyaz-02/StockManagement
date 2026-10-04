@@ -22,6 +22,7 @@
         {{ ui.field('E-mail', 'email', u.email|default(''), {type: 'email'}) }}
         <label class="field"><span>Role</span><select name="role"{{ self ? ' disabled' : '' }}>{% for k, label in roles %}<option value="{{ k }}"{{ k == u.role ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% if self %}<small class="hint">You cannot change your own role.</small>{% endif %}</label>
         <label class="field"><span>Branch</span><select name="branchId">{% for b in branches %}<option value="{{ b._id }}"{{ b._id == u.branchId|default('main') ? ' selected' : '' }}>{{ b.name }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Counter</span><select name="counterId" data-counter-select><option value="">No counter</option>{% for b in branches %}{% for c in b.counters %}<option value="{{ c.id }}" data-branch="{{ b._id }}"{{ c.id == u.counterId|default('') ? ' selected' : '' }}>{{ c.name }} ({{ b.name }})</option>{% endfor %}{% endfor %}</select></label>
         {% if not self %}<label class="check span-2"><input type="checkbox" name="isActive" value="1"{{ u.isActive ? ' checked' : '' }}> <span>Login is on (untick to stop them signing in; nothing is deleted)</span></label>{% endif %}
     </div></div>
     <div class="panel-foot"><button class="btn btn-primary" type="submit">Save</button></div>

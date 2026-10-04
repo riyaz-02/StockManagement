@@ -10,6 +10,7 @@ import 'tag_printing_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'account_settings_screen.dart';
 import 'manage_users_screen.dart';
+import 'branches_screen.dart';
 import 'action_needed_items_screen.dart';
 import 'gst_config_screen.dart';
 import 'app_update_settings_screen.dart';
@@ -182,6 +183,15 @@ class SettingsMenuScreen extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
+                ),
+              ),
+              _SettingsRow(
+                title: 'Branches & counters',
+                subtitle: 'Open branches, add billing counters, assign staff',
+                icon: Icons.storefront_outlined,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BranchesScreen()),
                 ),
               ),
               _SettingsRow(

@@ -11,9 +11,12 @@ enum _Step { create, confirm, finger }
 /// Set (or change) the 4-digit passcode, then offer the fingerprint. Pops `true` when a passcode was saved.
 /// [forgot] = the person just signed in again after "Forgot passcode": the words say they are choosing a new one.
 class QuickUnlockSetupScreen extends StatefulWidget {
-  const QuickUnlockSetupScreen({super.key, this.forgot = false, this.canSkip = true});
+  const QuickUnlockSetupScreen({super.key, this.forgot = false, this.canSkip = true, this.then});
   final bool forgot;
   final bool canSkip;
+
+  /// Where to go when done (the screen replaces itself with it); without it the screen just closes.
+  final void Function(BuildContext context)? then;
 
   @override
   State<QuickUnlockSetupScreen> createState() => _QuickUnlockSetupScreenState();
@@ -32,6 +35,14 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
 
   bool get _bn => Provider.of<LanguageProvider>(context, listen: false).currentLanguage == 'bn';
   String _t(String en, String bn) => _bn ? bn : en;
+
+  void _finish(bool saved) {
+    if (widget.then != null) {
+      widget.then!(context);
+    } else {
+      Navigator.of(context).pop(saved);
+    }
+  }
 
   Future<void> _next() async {
     if (_typed.length != AppLockService.pinLength) return;
@@ -64,7 +75,7 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
       _fpState = await BiometricAuthService().state();
       if (!mounted) return;
       if (_fpState == FingerprintState.unsupported) {
-        Navigator.of(context).pop(true);
+        _finish(true);
         return;
       }
       setState(() {
@@ -84,7 +95,7 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
       if (!mounted) return;
       setState(() { _busy = false; _fingerOn = true; });
       await Future.delayed(const Duration(milliseconds: 900));
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) _finish(true);
       return;
     }
     setState(() {
@@ -102,7 +113,7 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
     if (_step == _Step.create) {
       await AppLockService.instance.addSetupSkip();
     }
-    if (mounted) Navigator.of(context).pop(_step == _Step.finger);
+    if (mounted) _finish(_step == _Step.finger);
   }
 
   @override
@@ -116,21 +127,21 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
       _Step.finger => _t('Use your fingerprint too?', 'আঙুলের ছাপও চালু করবেন?'),
     };
     final sub = switch (_step) {
-      _Step.create => _t('You will use it every time you open the app.', 'অ্যাপ খোলার সময় প্রতিবার এটি লাগবে।'),
-      _Step.confirm => _t('To be sure you remember it.', 'যাতে আপনার মনে থাকে।'),
+      _Step.create => _t('You will type it every time you open the app.', 'অ্যাপ খোলার সময় প্রতিবার এটি দিতে হবে।'),
+      _Step.confirm => _t('Once more, to be sure you remember it.', 'আরেকবার, যাতে আপনার মনে থাকে।'),
       _Step.finger => _fpState == FingerprintState.notEnrolled
           ? _t('This phone has no fingerprint saved yet.', 'এই ফোনে এখনও কোনো ফিঙ্গারপ্রিন্ট সেভ নেই।')
           : _t('Open the app with one touch. The passcode still works.', 'এক ছোঁয়ায় অ্যাপ খুলুন। পাসকোডও কাজ করবে।'),
     };
 
     return PopScope(
-      canPop: _step == _Step.create,
+      canPop: _step == _Step.create && widget.canSkip,
       onPopInvoked: (didPop) {
         if (!didPop && _step == _Step.confirm) {
           setState(() { _step = _Step.create; _typed = ''; _message = null; });
           _pad.currentState?.clear();
         } else if (!didPop && isFinger) {
-          Navigator.of(context).pop(true);
+          _finish(true);
         }
       },
       child: Scaffold(
@@ -140,7 +151,7 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
             child: Column(children: [
               Align(
                 alignment: Alignment.centerRight,
-                child: widget.canSkip && !_busy
+                child: (widget.canSkip || isFinger) && !_busy
                     ? TextButton(onPressed: _skip, child: Text(isFinger ? _t('Skip', 'পরে') : _t('Not now', 'এখন নয়'), style: const TextStyle(color: Color(0xFF6B5B4B), fontSize: 15)))
                     : const SizedBox(height: 48),
               ),
@@ -160,7 +171,10 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
                     const SizedBox(height: 6),
                     Text(sub, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: Color(0xFF6B5B4B))),
                     SizedBox(height: small ? 14 : 24),
-                    if (!isFinger) PinPad(key: _pad, keyHeight: small ? 44 : 52, onChanged: (v) => setState(() { _typed = v; if (v.isNotEmpty) _message = null; })),
+                    if (!isFinger) PinPad(key: _pad, keyHeight: small ? 44 : 52, onChanged: (v) {
+                      setState(() { _typed = v; if (v.isNotEmpty) _message = null; });
+                      if (v.length == AppLockService.pinLength && !_busy) Future.microtask(_next);   // taken at the 4th digit
+                    }),
                     if (isFinger) ...[
                       const SizedBox(height: 8),
                       Icon(_fingerOn ? Icons.check_circle_rounded : Icons.fingerprint_rounded, size: 96, color: _fingerOn ? const Color(0xFF16A34A) : _brand),
@@ -171,11 +185,7 @@ class _QuickUnlockSetupScreenState extends State<QuickUnlockSetupScreen> {
                     if (_message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13.5))),
                     const SizedBox(height: 18),
                     if (!isFinger)
-                      _BigButton(
-                        label: _step == _Step.create ? _t('Next', 'পরের ধাপ') : _t('Save passcode', 'পাসকোড সেভ করুন'),
-                        onTap: _typed.length == AppLockService.pinLength && !_busy ? _next : null,
-                        busy: _busy,
-                      )
+                      SizedBox(height: 52, child: Center(child: _busy ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4, color: _brand)) : null))
                     else if (_fpState == FingerprintState.ready && !_fingerOn)
                       _BigButton(label: _t('Turn on fingerprint', 'আঙুলের ছাপ চালু করুন'), icon: Icons.fingerprint_rounded, onTap: _busy ? null : _enableFingerprint, busy: _busy)
                     else if (!_fingerOn)

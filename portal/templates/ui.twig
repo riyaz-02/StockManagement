@@ -39,6 +39,7 @@
 {# The customer search box: type a name or number, pick from the list, or keep the typed name. Fills customerId / customerName / customerMobile. #}
 {% macro customer_picker(name = '', mobile = '', id = '') %}
 <div class="picker span-2" x-data="picker">
+    {% if can('directory.create') %}<button type="button" class="link-btn picker-new" hx-get="/directory/customers/new" hx-target="#modal-body">+ New customer</button>{% endif %}
     <input type="hidden" name="customerId" value="{{ id }}">
     <label class="field">
         <span>Customer name *</span>

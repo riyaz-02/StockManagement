@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/branch_dropdown.dart';
+import '../widgets/counter_dropdown.dart';
 import '../utils/app_toast.dart';
 
 /// Admin-only screen to edit another user's name, mobile, role, and photo.
@@ -28,6 +29,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
 
   late String _selectedRole;
   late String _branchId;
+  late String _counterId;
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   bool _isSaving = false;
@@ -50,6 +52,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
         TextEditingController(text: widget.user['mobile'] ?? '');
     _selectedRole = widget.user['role'] ?? 'staff';
     _branchId = (widget.user['branchId'] ?? 'main').toString();
+    _counterId = (widget.user['counterId'] ?? '').toString();
     _uploadedImageUrl = widget.user['profileImage'];
 
     final existingOverrides =
@@ -278,6 +281,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
         'mobile': _mobileController.text.trim(),
         'role': _selectedRole,
         'branchId': _branchId,
+        'counterId': _counterId,
         if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl,
       });
 
@@ -554,8 +558,10 @@ class _EditUserScreenState extends State<EditUserScreen> {
             const SizedBox(height: 16),
             BranchDropdown(
               value: _branchId,
-              onChanged: (v) => setState(() => _branchId = v),
+              onChanged: (v) => setState(() { _branchId = v; _counterId = ''; }),
             ),
+            const SizedBox(height: 16),
+            CounterDropdown(branchId: _branchId, value: _counterId, onChanged: (v) => setState(() => _counterId = v)),
             const SizedBox(height: 16),
             if (_isConfigurableRole) _buildCustomPermissionsSection(),
             const SizedBox(height: 24),

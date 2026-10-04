@@ -69,6 +69,9 @@ const userSchema = new mongoose.Schema({
     // The shop this person works at: new records are filed under it (utils/branches.js). 'main' = the built-in default.
     branchId: { type: String, default: 'main' },
     branchName: { type: String, default: 'Main branch' },
+    // The billing counter this person normally works at (models/BranchCounter.js); '' = none. Must belong to branchId.
+    counterId: { type: String, default: '' },
+    counterName: { type: String, default: '' },
     // Push notification device tokens (one account can have several phones)
     fcmTokens: [{
         token: { type: String, required: true },
@@ -141,6 +144,8 @@ userSchema.statics.forCreate = function forCreate(b) {
         language: b.language,
         branchId: b.branchId,
         branchName: b.branchName,
+        counterId: b.counterId || '',
+        counterName: b.counterName || '',
         source: 'app',
     };
 };

@@ -11,6 +11,8 @@ import '../providers/auth_provider.dart';
 import '../utils/app_constants.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
+import 'quick_unlock_setup_screen.dart';
+import '../utils/fast_route.dart';
 
 enum _ServerState { idle, starting, online, error }
 
@@ -234,11 +236,12 @@ class _ServerStartupScreenState extends State<ServerStartupScreen>
     }
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => openHome ? const MainNavigationScreen() : const LoginScreen(),
-      ),
-    );
+    if (openHome && !(await authProvider.hasLock())) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(fastRoute(QuickUnlockSetupScreen(canSkip: false, then: (c) => Navigator.of(c).pushReplacement(fastRoute(const MainNavigationScreen())))));
+      return;
+    }
+    Navigator.of(context).pushReplacement(fastRoute(openHome ? const MainNavigationScreen() : const LoginScreen()));
   }
 
   // ── UI ────────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
     </div>
     <div class="actions">
         {% if can('billing.create') %}<a class="btn btn-primary" href="/billing/new?customer={{ c._id }}">New bill</a>{% endif %}
-        {% if can('directory.edit') %}<a class="btn" href="/directory/customers/{{ c._id }}/edit">Edit</a>{% endif %}
+        {% if can('directory.edit') %}<button class="btn" type="button" hx-get="/directory/customers/{{ c._id }}/edit" hx-target="#modal-body">Edit</button>{% endif %}
         <a class="btn" href="/directory">All people</a>
     </div>
 </div>
@@ -31,6 +31,8 @@
             {% if p.city or p.state or p.pincode %}<div class="kv-row"><span>Place</span><strong>{{ [p.city, p.state, p.pincode]|filter(v => v)|join(', ') }}</strong></div>{% endif %}
             {% if p.gstNo %}<div class="kv-row"><span>GSTIN</span><strong>{{ p.gstNo }}</strong></div>{% endif %}
             {% if p.panNo %}<div class="kv-row"><span>PAN</span><strong>{{ p.panNo }}</strong></div>{% endif %}
+            {% for a in c.anniversaries|default([]) %}<div class="kv-row"><span>{{ a.occasion }}</span><strong>{{ a.date|dmy }}</strong></div>
+            {% else %}{% if p.dob %}<div class="kv-row"><span>Birthday</span><strong>{{ p.dob|dmy }}</strong></div>{% endif %}{% if p.anniversary %}<div class="kv-row"><span>Anniversary</span><strong>{{ p.anniversary|dmy }}</strong></div>{% endif %}{% endfor %}
             {% if p.notes %}<div class="kv-row"><span>Note</span><strong>{{ p.notes }}</strong></div>{% endif %}
         </div>
     </section>

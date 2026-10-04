@@ -56,7 +56,7 @@ final class AdminStaffController extends BaseController
         try {
             $this->api()->post('users', [
                 'name' => trim((string) ($b['name'] ?? '')), 'mobile' => preg_replace('/\D/', '', (string) ($b['mobile'] ?? '')), 'password' => (string) ($b['password'] ?? ''),
-                'role' => (string) ($b['role'] ?? 'staff'), 'branchId' => (string) ($b['branchId'] ?? ''),
+                'role' => (string) ($b['role'] ?? 'staff'), 'branchId' => (string) ($b['branchId'] ?? ''), 'counterId' => (string) ($b['counterId'] ?? ''),
                 'username' => trim((string) ($b['username'] ?? '')), 'email' => trim((string) ($b['email'] ?? '')),
             ]);
         } catch (ApiException $e) {
@@ -85,7 +85,7 @@ final class AdminStaffController extends BaseController
         try {
             $this->api()->put('users/' . rawurlencode($args['id']), [
                 'name' => trim((string) ($b['name'] ?? '')), 'mobile' => preg_replace('/\D/', '', (string) ($b['mobile'] ?? '')),
-                'role' => (string) ($b['role'] ?? ''), 'branchId' => (string) ($b['branchId'] ?? ''), 'isActive' => !empty($b['isActive']),
+                'role' => (string) ($b['role'] ?? ''), 'branchId' => (string) ($b['branchId'] ?? ''), 'counterId' => (string) ($b['counterId'] ?? ''), 'isActive' => !empty($b['isActive']),
                 'username' => trim((string) ($b['username'] ?? '')), 'email' => trim((string) ($b['email'] ?? '')),
             ]);
         } catch (ApiException $e) {
@@ -175,7 +175,9 @@ final class AdminStaffController extends BaseController
     private function branches(): array
     {
         try {
-            return array_values(array_filter((array) ($this->api()->get('directory/branches')['data'] ?? []), fn ($b) => ($b['isActive'] ?? true) !== false));
+            // each branch with its live counters (for the Counter drop-down next to the Branch one)
+            $rows = (array) ($this->api()->get('branches')['data']['branches'] ?? []);
+            return array_values(array_map(fn ($b) => ['_id' => $b['id'], 'name' => $b['name'], 'counters' => array_values(array_filter((array) ($b['counters'] ?? []), fn ($c) => ($c['isActive'] ?? true) !== false))], array_filter($rows, fn ($b) => ($b['isActive'] ?? true) !== false)));
         } catch (ApiException $e) {
             $this->rethrowIfSystem($e);
             return [];

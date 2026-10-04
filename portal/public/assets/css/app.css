@@ -244,3 +244,26 @@ a.bell-link:hover { background: #f8fafc; }
 .bell-text em { font-style: normal; font-size: 11px; color: #94a3b8; }
 .bell-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 14px; color: #94a3b8; font-size: 13px; }
 @media (max-width: 720px) { .bell-panel { position: fixed; left: 8px; right: 8px; top: 54px; width: auto; } }
+
+/* ---------- sign-in: the pictures on the left, the form on the right ---------- */
+.login2 { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; background: #fff; }
+.login2-art { position: relative; overflow: hidden; background: linear-gradient(160deg, #8e2540, #2b0f18); }
+.login2-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; opacity: 0; transition: opacity .7s ease; }
+.login2-slide.is-on { opacity: 1; }
+.login2-dots { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 7px; }
+.login2-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .55); transition: width .25s ease, background .25s ease; }
+.login2-dots i.is-on { width: 22px; border-radius: 6px; background: #fff; }
+.login2-panel { display: flex; align-items: center; justify-content: center; padding: 32px; }
+.login2-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; }
+.login2-logo { width: 210px; max-width: 80%; align-self: center; margin-bottom: 14px; }
+.login2-card input { width: 100%; padding: 13px 14px; font-size: 15.5px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, .05); }
+.login2-card input:focus { outline: none; border-color: var(--brand, #e94560); box-shadow: 0 0 0 3px rgba(233, 69, 96, .15); }
+.login2-pass { position: relative; }
+.login2-pass input { padding-right: 64px; }
+.login2-pass .link-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.login2-card .btn { padding: 13px; font-size: 16px; border-radius: 12px; }
+@media (max-width: 900px) {
+    .login2 { grid-template-columns: 1fr; }
+    .login2-art { display: none; }
+    .login2-panel { min-height: 100vh; }
+}

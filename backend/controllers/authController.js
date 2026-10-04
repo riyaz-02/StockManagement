@@ -74,6 +74,8 @@ exports.login = async (req, res) => {
                     role: user.role,
                     language: user.language,
                     branchId: user.branchId || 'main',
+                    counterId: user.counterId || '',
+                    counterName: user.counterName || '',
                     branchName: user.branchName || 'Main branch'
                 }
             }
@@ -137,6 +139,8 @@ exports.register = async (req, res) => {
                     role: user.role,
                     language: user.language,
                     branchId: user.branchId || 'main',
+                    counterId: user.counterId || '',
+                    counterName: user.counterName || '',
                     branchName: user.branchName || 'Main branch'
                 }
             }

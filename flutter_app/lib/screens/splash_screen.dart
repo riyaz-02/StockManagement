@@ -10,6 +10,9 @@ import 'package:jewellery_stock_app/screens/login_screen.dart';
 import 'package:jewellery_stock_app/screens/main_navigation_screen.dart';
 import 'package:jewellery_stock_app/screens/server_startup_screen.dart';
 import 'package:jewellery_stock_app/services/live_reactions.dart';
+import 'package:jewellery_stock_app/services/api_service.dart';
+import 'package:jewellery_stock_app/screens/quick_unlock_setup_screen.dart';
+import 'package:jewellery_stock_app/utils/fast_route.dart';
 import 'package:jewellery_stock_app/services/login_slides_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -58,6 +61,8 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _loadAppVersionText() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
+      // kept on every bill made with this app, so it is known which build made it
+      ApiService.appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
       if (mounted) {
         setState(() => _appVersionText = 'Version ${packageInfo.version}');
       }
@@ -115,10 +120,12 @@ class _SplashScreenState extends State<SplashScreen>
     }
     if (!mounted) return;
 
-    if (openHome) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-      );
+    if (openHome && !(await authProvider.hasLock())) {
+      // a remembered person without a passcode (a phone from before passcodes): the app asks for one first, then opens
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(fastRoute(QuickUnlockSetupScreen(canSkip: false, then: (c) => Navigator.of(c).pushReplacement(fastRoute(const MainNavigationScreen())))));
+    } else if (openHome) {
+      Navigator.of(context).pushReplacement(fastRoute(const MainNavigationScreen()));
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const LoginScreen()),

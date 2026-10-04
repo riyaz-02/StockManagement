@@ -11,7 +11,7 @@
             {% elseif r.dueAmount > 0 %}<span class="pill pill-amber">Due {{ r.dueAmount|inr(0) }}</span>
             {% else %}<span class="pill pill-green">Paid</span>{% endif %}
         </td>
-        <td class="hide-sm">{{ r.paymentMode }}<small>{{ r.createdBy }}</small></td>
+        <td class="hide-sm">{{ r.paymentMode }}<small>{{ r.createdBy }}{% if r.counterName %} · {{ r.counterName }}{% endif %}</small></td>
     </tr>
 {% endfor %}
 {% if pg.hasMore|default(false) %}

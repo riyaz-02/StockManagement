@@ -1,0 +1,14 @@
+<div class="workplace" aria-label="Working at">
+    {% if branches|length %}
+    <select name="branch" class="wp-select" title="Branch" aria-label="Branch" hx-post="/workplace" hx-trigger="change" hx-include="closest .workplace" hx-swap="none">
+        <option value=""{{ branchSel == '' ? ' selected' : '' }}>Whole firm</option>
+        {% for b in branches %}<option value="{{ b.id }}"{{ branchSel == b.id ? ' selected' : '' }}>{{ b.name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    {% if counters|length %}
+    <select name="counter" class="wp-select" title="Billing counter" aria-label="Billing counter" hx-post="/workplace" hx-trigger="change" hx-include="closest .workplace" hx-swap="none">
+        <option value=""{{ counterSel == '' ? ' selected' : '' }}>No counter</option>
+        {% for c in counters %}<option value="{{ c.id }}"{{ counterSel == c.id ? ' selected' : '' }}>{{ c.name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+</div>

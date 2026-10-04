@@ -31,5 +31,5 @@ const schema = new mongoose.Schema(
     },
     { collection: 'app_old_metal', timestamps: true }
 );
-schema.plugin(require('../utils/branchScope').branchPlugin);
+schema.plugin(require('../utils/branchScope').branchPlugin, { counter: true }); // bills / money at a counter carry it
 module.exports = mongoose.models.AppOldMetal || mongoose.model('AppOldMetal', schema);

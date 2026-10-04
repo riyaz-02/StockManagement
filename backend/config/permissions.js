@@ -129,7 +129,7 @@ const GROUPS = [
             { key: 'directory.createStaff', label: 'Add staff profiles' },
             { key: 'directory.edit', label: 'Edit customers, suppliers and karigars' },
             { key: 'directory.editStaff', label: 'Edit staff profiles' },
-            { key: 'directory.manageBranches', label: 'Add and manage branches / shops' },
+            { key: 'directory.manageBranches', label: 'Add and manage branches, their counters / shops' },
         ],
     },
     {

@@ -328,7 +328,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_t('4-digit passcode', '৪ সংখ্যার পাসকোড'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
-                      Text(_pinSet ? _t('On: asked every time the app opens', 'চালু: অ্যাপ খোলার সময় প্রতিবার চাইবে') : _t('Off: the app opens straight away', 'বন্ধ: অ্যাপ সরাসরি খুলবে'), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text(_pinSet ? _t('Asked every time the app opens', 'অ্যাপ খোলার সময় প্রতিবার চাইবে') : _t('Not set yet', 'এখনও দেওয়া হয়নি'), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                     ]),
                   ),
                 ]),
@@ -336,7 +336,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   alignment: Alignment.centerRight,
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     TextButton(onPressed: _setPasscode, child: Text(_pinSet ? _t('Change', 'বদলান') : _t('Set passcode', 'পাসকোড দিন'))),
-                    if (_pinSet) TextButton(onPressed: _removePasscode, child: Text(_t('Remove', 'সরান'), style: const TextStyle(color: Colors.red))),
                   ]),
                 ),
                 if (_fpState != FingerprintState.unsupported) ...[

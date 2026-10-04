@@ -12,6 +12,7 @@
         {{ ui.field('E-mail (optional)', 'email', v.email|default(''), {type: 'email'}) }}
         <label class="field"><span>Role</span><select name="role">{% for k, label in roles %}<option value="{{ k }}"{{ k == v.role|default('staff') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select></label>
         <label class="field"><span>Branch</span><select name="branchId">{% for b in branches %}<option value="{{ b._id }}"{{ b._id == v.branchId|default('main') ? ' selected' : '' }}>{{ b.name }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Counter</span><select name="counterId" data-counter-select><option value="">No counter</option>{% for b in branches %}{% for c in b.counters %}<option value="{{ c.id }}" data-branch="{{ b._id }}"{{ c.id == v.counterId|default('') ? ' selected' : '' }}>{{ c.name }} ({{ b.name }})</option>{% endfor %}{% endfor %}</select></label>
     </div>
     <div class="modal-actions">
         <button type="button" class="btn" data-close-modal>{{ t('common.cancel') }}</button>

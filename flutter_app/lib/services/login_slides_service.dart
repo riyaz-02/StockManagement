@@ -5,8 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_constants.dart';
 
 class LoginSlide {
-  const LoginSlide({required this.imageUrl, this.captionEn = '', this.captionBn = ''});
+  const LoginSlide({required this.imageUrl, this.captionEn = '', this.captionBn = '', this.width = 0, this.height = 0});
   final String imageUrl, captionEn, captionBn;
+
+  /// The size of the picture in pixels (0 = unknown): the screen needs its shape to fade its edges exactly.
+  final double width, height;
 
   String caption(bool bn) => (bn && captionBn.isNotEmpty) ? captionBn : captionEn;
 
@@ -14,8 +17,10 @@ class LoginSlide {
         imageUrl: (j['imageUrl'] ?? '').toString(),
         captionEn: (j['captionEn'] ?? '').toString(),
         captionBn: (j['captionBn'] ?? '').toString(),
+        width: (j['width'] is num) ? (j['width'] as num).toDouble() : 0,
+        height: (j['height'] is num) ? (j['height'] as num).toDouble() : 0,
       );
-  Map<String, dynamic> toJson() => {'imageUrl': imageUrl, 'captionEn': captionEn, 'captionBn': captionBn};
+  Map<String, dynamic> toJson() => {'imageUrl': imageUrl, 'captionEn': captionEn, 'captionBn': captionBn, 'width': width, 'height': height};
 }
 
 /// The pictures of the sign-in screen (uploaded on the website: Admin Control > Login screen). They are needed before anyone

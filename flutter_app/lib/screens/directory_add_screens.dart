@@ -32,6 +32,9 @@ void _toast(BuildContext context, String msg, {bool error = false}) {
 ///    another person's edit is never silently overwritten.
 ///
 /// Returns true when the record was saved.
+/// What the server answered to the last successful save (the new record), for a caller that wants to use it (billing).
+Map<String, dynamic>? _lastSentData;
+
 Future<bool> _send(BuildContext context,
     {required String kind, String? editPath, required Map<String, dynamic> body}) async {
   final api = ApiService();
@@ -76,7 +79,10 @@ Future<bool> _send(BuildContext context,
     res = await go({...body, 'force': true});
   }
 
-  if (res['success'] == true) return true;
+  if (res['success'] == true) {
+    _lastSentData = res['data'] is Map ? Map<String, dynamic>.from(res['data'] as Map) : null;
+    return true;
+  }
   if (context.mounted) {
     _toast(context, (res['message'] ?? 'Could not save').toString(), error: true);
   }
@@ -881,8 +887,31 @@ class _ContactRow {
   final TextEditingController ctrl;
 }
 
+/// One "special date" of a customer (the website's Important Dates): an occasion and a day.
+class _DateRow {
+  _DateRow(String occasion, [this.date]) : ctrl = TextEditingController(text: occasion);
+  final TextEditingController ctrl;
+  DateTime? date;
+}
+
+/// A day from the server's ISO date, kept as that calendar day (no time-zone shift).
+DateTime? _dayOf(dynamic v) {
+  final t = _str(v);
+  if (t.length < 10) return null;
+  final d = DateTime.tryParse(t.substring(0, 10));
+  return d;
+}
+
+const _occasions = ['Birthday', 'Marriage Anniversary', 'Engagement', 'Work Anniversary', 'Other'];
+
 class AddCustomerScreen extends StatefulWidget {
-  const AddCustomerScreen({super.key, this.existing});
+  const AddCustomerScreen({super.key, this.existing, this.prefillName = '', this.prefillNumber = ''});
+
+  /// A customer just added from this form (after it popped `true`): the record the server saved, else null.
+  static Map<String, dynamic>? get lastCreated => _lastSentData;
+
+  /// What the person already typed elsewhere (billing's search box): put in the name / first number.
+  final String prefillName, prefillNumber;
 
   /// The saved record (legacy fields + `profile`) when editing.
   final Map<String, dynamic>? existing;
@@ -910,9 +939,9 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
   String _type = 'Retail';
   String _gender = 'Male';
   bool _genderTouched = false;
-  DateTime? _dob;
-  DateTime? _anniversary;
-  bool _notify = true;
+  final List<_DateRow> _dates = [];
+  String _notify = 'all'; // all | offers | invitations | none (the website's four choices)
+  bool _more = false; // the less used details are folded away when adding
 
   // Live duplicate detection while a number is typed
   Timer? _lookupTimer;
@@ -933,9 +962,18 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
     super.initState();
     c('country').text = 'India';
     if (isEdit) {
+      _more = true;
       _prefill(widget.existing!);
     } else {
       loadBranchDefaults();
+      if (widget.prefillName.trim().isNotEmpty) {
+        c('name').text = widget.prefillName.trim();
+        _scheduleTranslate();
+      }
+      if (DV.normalizePhone(widget.prefillNumber).length >= 5) {
+        _rows.first.ctrl.text = DV.normalizePhone(widget.prefillNumber);
+        _onNumberChanged(_rows.first);
+      }
     }
   }
 
@@ -944,6 +982,9 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
     _lookupTimer?.cancel();
     _refTimer?.cancel();
     _translateTimer?.cancel();
+    for (final x in _dates) {
+      x.ctrl.dispose();
+    }
     for (final x in _c.values) {
       x.dispose();
     }
@@ -989,12 +1030,17 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
     _type = _types.contains(p['customerType']) ? p['customerType'] : 'Retail';
     _gender = _genders.contains(p['gender']) && _str(p['gender']).isNotEmpty ? p['gender'] : 'Not set';
     _genderTouched = true;
-    _dob = _dateOf(p['dob']);
-    _anniversary = _dateOf(p['anniversary']) ??
-        ((d['anniversaries'] is List && (d['anniversaries'] as List).isNotEmpty)
-            ? _dateOf((d['anniversaries'] as List).first['date'])
-            : null);
-    _notify = _str(d['notification_type']) != 'none';
+    // the special dates the website keeps in `anniversaries`; a birth date / anniversary kept only in the app profile joins them
+    _dates.clear();
+    for (final a in (d['anniversaries'] is List ? d['anniversaries'] as List : const [])) {
+      _dates.add(_DateRow(_str((a as Map)['occasion']), _dayOf(a['date'])));
+    }
+    bool has(RegExp re) => _dates.any((x) => re.hasMatch(x.ctrl.text));
+    if (_dayOf(p['dob']) != null && !has(RegExp('birth', caseSensitive: false))) _dates.add(_DateRow('Birthday', _dayOf(p['dob'])));
+    if (_dayOf(p['anniversary']) != null && !has(RegExp('^(?!.*(work|job|business)).*(marriage|wedding|anniversary)', caseSensitive: false))) {
+      _dates.add(_DateRow('Marriage Anniversary', _dayOf(p['anniversary'])));
+    }
+    _notify = const ['all', 'offers', 'invitations', 'none'].contains(_str(d['notification_type'])) ? _str(d['notification_type']) : 'all';
     loadOpening(p['opening']);
 
     // phone numbers: the app profile has the full list; older customers only
@@ -1209,6 +1255,46 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
         ],
       );
 
+  // Special dates: birthday, marriage anniversary, engagement ... as many as needed (the website's Important Dates).
+  Widget _dateRow(int i, Color k) {
+    final r = _dates[i];
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+        flex: 5,
+        child: _Tf('Occasion', r.ctrl, k,
+            titleCase: true,
+            suffix: PopupMenuButton<String>(
+              tooltip: 'Pick an occasion',
+              icon: const Icon(Icons.arrow_drop_down),
+              onSelected: (v) => setState(() => r.ctrl.text = v == 'Other' ? '' : v),
+              itemBuilder: (_) => [for (final o in _occasions) PopupMenuItem(value: o, child: Text(o))],
+            )),
+      ),
+      const SizedBox(width: 8),
+      Expanded(flex: 5, child: _DateField('Date', r.date, (d) => setState(() => r.date = d), k)),
+      IconButton(
+        tooltip: 'Remove',
+        visualDensity: VisualDensity.compact,
+        icon: const Icon(Icons.close, size: 18),
+        onPressed: () => setState(() => _dates.removeAt(i).ctrl.dispose()),
+      ),
+    ]);
+  }
+
+  Widget _datesBlock(Color k) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (var i = 0; i < _dates.length; i++) Padding(padding: const EdgeInsets.only(bottom: 8), child: _dateRow(i, k)),
+        if (_dates.length < 12)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: _sectionColor('Customer', k)),
+              onPressed: () => setState(() => _dates.add(_DateRow(_dates.isEmpty ? 'Birthday' : ''))),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add a special date (birthday, anniversary ...)'),
+            ),
+          ),
+      ]);
+
   // ── referred by ───────────────────────────────────────────────────────────
   void _onReferralChanged(String v) {
     _refTimer?.cancel();
@@ -1313,8 +1399,11 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
       'customerType': _type,
       'fatherName': t('father'),
       'gender': _gender == 'Not set' ? '' : _gender,
-      'dob': _dob?.toIso8601String(),
-      'anniversary': _anniversary?.toIso8601String(),
+      'importantDates': [
+        for (final x in _dates)
+          if (x.ctrl.text.trim().isNotEmpty || x.date != null)
+            {'occasion': x.ctrl.text.trim(), 'date': x.date == null ? '' : DateFormat('yyyy-MM-dd').format(x.date!)},
+      ],
       'city': t('city'),
       'state': t('state'),
       'country': t('country'),
@@ -1326,10 +1415,25 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
       'aadharNo': t('aadhar'),
       'taxNo': t('tax'),
       'notes': t('notes'),
-      'notificationType': _notify ? 'all' : 'none',
+      'notificationType': _notify,
       'opening': openingJson(),
     };
   }
+
+  // What the customer wants to hear about: the website's four choices.
+  Widget _notifyChips(Color k) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Padding(padding: EdgeInsets.only(bottom: 4), child: Text('Messages', style: TextStyle(fontSize: 12.5, color: Colors.black54))),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          for (final o in const [['all', 'All'], ['offers', 'Offers'], ['invitations', 'Invitations'], ['none', 'None']])
+            ChoiceChip(
+              label: Text(o[1]),
+              selected: _notify == o[0],
+              selectedColor: k.withOpacity(0.15),
+              labelStyle: TextStyle(fontWeight: _notify == o[0] ? FontWeight.w700 : FontWeight.w500, color: _notify == o[0] ? k : Colors.black87),
+              onSelected: (_) => setState(() => _notify = o[0]),
+            ),
+        ]),
+      ]);
 
   @override
   Widget build(BuildContext context) {
@@ -1344,10 +1448,11 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
           editPath: isEdit ? 'customers/${widget.existing!['_id']}' : null,
           updatedAt: widget.existing?['updated_at']),
       children: [
+        // the first things a shop asks for, in the order they are asked: number(s), name, address, messages
+        _Section('Contact numbers', Icons.phone_outlined, k, [
+          _F(_contactsBlock(k), span: 99),
+        ]),
         _Section('Customer', Icons.person_outline, k, [
-          _F(branchField(k), span: 2),
-          _F(_Drop('Membership', _membership, _memberships, (v) => setState(() => _membership = v), k)),
-          _F(_Drop('Customer type', _type, _types, (v) => setState(() => _type = v), k)),
           _F(
               _Tf('Name *', c('name'), k,
                   titleCase: true,
@@ -1360,74 +1465,68 @@ class _AddCustomerScreenState extends State<AddCustomerScreen>
                       if (g != null && g != _gender) setState(() => _gender = g);
                     }
                   }),
-              span: 2),
-          _F(_Tf('Name in Bengali (auto)', c('bengali'), k, suffix: _retranslateButton('name'))),
-          _F(_Tf('Nickname', c('nickname'), k, titleCase: true, onChanged: (_) => _scheduleTranslate())),
-          _F(_Tf('Nickname in Bengali (auto)', c('nicknameBn'), k, suffix: _retranslateButton('nickname'))),
-          _F(_Drop('Gender', _gender, genders, (v) => setState(() {
-                _gender = v;
-                _genderTouched = true;
-              }), k)),
-          _F(_DateField('Date of birth', _dob, (d) => setState(() => _dob = d), k, showAge: true)),
-          _F(_DateField('Anniversary', _anniversary, (d) => setState(() => _anniversary = d), k)),
-          _F(_Tf('S/O · D/O · W/O', c('father'), k, titleCase: true)),
-          _F(_Tf('Email', c('email'), k, keyboard: TextInputType.emailAddress, validator: DV.email)),
-        ]),
-        _Section('Contact numbers', Icons.phone_outlined, k, [
-          _F(_contactsBlock(k), span: 99),
-        ]),
-        _Section('Referral', Icons.share_outlined, k, [
+              span: 99),
+          _F(_Tf('Name in Bengali (fills itself)', c('bengali'), k, suffix: _retranslateButton('name')), span: 99),
+          _F(_Tf('Address', c('address'), k, lines: 2, titleCase: true, onChanged: (_) => _scheduleTranslate()), span: 99),
+          _F(_Tf('Address in Bengali (fills itself)', c('addressBn'), k, lines: 2, suffix: _retranslateButton('address')), span: 99),
+          _F(_notifyChips(k), span: 99),
+          _F(_datesBlock(k), span: 99),
           _F(_referralBlock(k), span: 99),
         ]),
-        _Section('Address', Icons.location_on_outlined, k, [
-          _F(_Tf('Address', c('address'), k, lines: 2, onChanged: (_) => _scheduleTranslate()), span: 99),
-          _F(_Tf('Address in Bengali (auto)', c('addressBn'), k,
-                  lines: 2, suffix: _retranslateButton('address')),
-              span: 99),
-          _F(_Tf('Pincode', c('pincode'), k,
-              keyboard: TextInputType.number,
-              digits: true,
-              maxLength: 6,
-              validator: DV.pincode,
-              onChanged: (v) => pincodeAutofill(v.trim()))),
-          _F(_Tf('City', c('city'), k)),
-          _F(_Tf('State', c('state'), k)),
-          _F(_Tf('Country', c('country'), k)),
-        ]),
-        _Section('Business & tax', Icons.business_center_outlined, k, [
-          _F(_Tf('Business / shop name', c('business'), k), span: 2),
-          _F(_Tf('GST no.', c('gst'), k,
-              caps: true,
-              maxLength: 15,
-              validator: DV.gst,
-              onChanged: (_) => _gstAutofill(c('gst'), c('pan'), c('state')))),
-          _F(_Tf('PAN no.', c('pan'), k, caps: true, maxLength: 10, validator: DV.pan)),
-          _F(_Tf('Aadhaar no.', c('aadhar'), k,
-              keyboard: TextInputType.number, digits: true, maxLength: 12, validator: DV.aadhaar)),
-          _F(_Tf('Tax no.', c('tax'), k)),
-        ]),
-        openingSection(k),
-        _Section('Other', Icons.notes_outlined, k, [
-          _F(_Tf('Notes', c('notes'), k, lines: 2), span: 99),
-          _F(
-            InkWell(
-              onTap: () => setState(() => _notify = !_notify),
-              child: Row(children: [
-                SizedBox(
-                  height: 28,
-                  child: Switch(
-                      value: _notify,
-                      activeColor: _sectionColor('Other', k),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onChanged: (v) => setState(() => _notify = v)),
-                ),
-                const SizedBox(width: 6),
-                const Text('Send offers & notifications', style: TextStyle(fontSize: 13)),
-              ]),
+        if (!_more)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _more = true),
+                icon: const Icon(Icons.expand_more),
+                label: const Text('More details (email, birthday, GST, opening balance ...)'),
+              ),
             ),
-            span: 99,
-          ),
-        ]),
+          )
+        else ...[
+          _Section('More about the customer', Icons.badge_outlined, k, [
+            _F(branchField(k), span: 2),
+            _F(_Drop('Membership', _membership, _memberships, (v) => setState(() => _membership = v), k)),
+            _F(_Drop('Customer type', _type, _types, (v) => setState(() => _type = v), k)),
+            _F(_Tf('Nickname', c('nickname'), k, titleCase: true, onChanged: (_) => _scheduleTranslate())),
+            _F(_Tf('Nickname in Bengali (fills itself)', c('nicknameBn'), k, suffix: _retranslateButton('nickname'))),
+            _F(_Drop('Gender', _gender, genders, (v) => setState(() {
+                  _gender = v;
+                  _genderTouched = true;
+                }), k)),
+            _F(_Tf('S/O · D/O · W/O', c('father'), k, titleCase: true)),
+            _F(_Tf('Email', c('email'), k, keyboard: TextInputType.emailAddress, validator: DV.email)),
+          ]),
+          _Section('Address details', Icons.location_on_outlined, k, [
+            _F(_Tf('Pincode', c('pincode'), k,
+                keyboard: TextInputType.number,
+                digits: true,
+                maxLength: 6,
+                validator: DV.pincode,
+                onChanged: (v) => pincodeAutofill(v.trim()))),
+            _F(_Tf('City', c('city'), k)),
+            _F(_Tf('State', c('state'), k)),
+            _F(_Tf('Country', c('country'), k)),
+          ]),
+          _Section('Business & tax', Icons.business_center_outlined, k, [
+            _F(_Tf('Business / shop name', c('business'), k), span: 2),
+            _F(_Tf('GST no.', c('gst'), k,
+                caps: true,
+                maxLength: 15,
+                validator: DV.gst,
+                onChanged: (_) => _gstAutofill(c('gst'), c('pan'), c('state')))),
+            _F(_Tf('PAN no.', c('pan'), k, caps: true, maxLength: 10, validator: DV.pan)),
+            _F(_Tf('Aadhaar no.', c('aadhar'), k,
+                keyboard: TextInputType.number, digits: true, maxLength: 12, validator: DV.aadhaar)),
+            _F(_Tf('Tax no.', c('tax'), k)),
+          ]),
+          openingSection(k),
+          _Section('Other', Icons.notes_outlined, k, [
+            _F(_Tf('Notes', c('notes'), k, lines: 2), span: 99),
+          ]),
+        ],
       ],
     );
   }

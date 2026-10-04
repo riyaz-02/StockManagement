@@ -192,6 +192,25 @@ const CUSTOMER_LIST_FIELDS =
     'customer_name customer_name_bengali address whatsapp_no mobile_no mobile_no_3 mobile_no_4 email nickname gender notification_type created_at created_by_name sl_no';
 const LEGACY_PHONE_FIELDS = ['whatsapp_no', 'mobile_no', 'mobile_no_3', 'mobile_no_4'];
 
+// What a customer wants to hear about (the website's own four choices): everything, offers only, invitations only, nothing.
+const NOTIFY_TYPES = ['all', 'offers', 'invitations', 'none'];
+const notifyOf = (v) => (NOTIFY_TYPES.includes(str(v)) ? str(v) : 'all');
+
+/**
+ * The Bengali name / address, when the client sent none: made here (best effort, never holding the save up for more than ~2.5 s), so a
+ * customer added from any screen has it, the way the website's form fills it in. A Bengali text the person typed is never replaced.
+ */
+async function bengaliFor(b) {
+    const out = { name: str(b.nameBengali), address: str(b.addressBengali) };
+    const want = [['name', str(b.name), 'name'], ['address', str(b.address), 'address']].filter(([k, text]) => !out[k] && text.length >= 2);
+    if (!want.length) return out;
+    await Promise.race([
+        Promise.all(want.map(async ([k, text, kind]) => { try { out[k] = (await Lookups.toBengali(text, kind)) || ''; } catch (_) { /* stays empty */ } })),
+        new Promise((r) => setTimeout(r, 2500)),
+    ]);
+    return out;
+}
+
 // Fields compared for the audit trail
 const CUSTOMER_LEGACY_AUDIT = ['customer_name', 'customer_name_bengali', 'address', 'whatsapp_no', 'mobile_no', 'mobile_no_3', 'mobile_no_4', 'email', 'nickname', 'reference_customer_id', 'notification_type'];
 const CUSTOMER_PROFILE_AUDIT = ['membershipStatus', 'customerType', 'nicknameBn', 'addressBn', 'fatherName', 'gender', 'dob', 'anniversary', 'contacts', 'city', 'state', 'country', 'pincode', 'referredBy', 'businessName', 'gstNo', 'panNo', 'aadharNo', 'taxNo', 'notes', 'opening'];
@@ -286,6 +305,7 @@ exports.lookupCustomers = async (req, res, next) => {
                 name: c.customer_name || c.customer_name_bengali || '(No name)',
                 nameBn: c.customer_name_bengali || '',
                 code: p?.customerCode || null,
+                serialNo: c.sl_no || null,
                 phones,
                 matchedNumber: isPhoneQuery ? phones.find((n) => n.includes(digits)) || null : null,
                 exact: isPhoneQuery && digits.length === 10 && phones.includes(digits),
@@ -336,6 +356,46 @@ function parseContacts(b) {
         .filter((c) => c.number);
 }
 
+// "Important dates" (the website's `anniversaries`): any number of { occasion, date } - birthday, marriage anniversary,
+// engagement, work anniversary, or anything else. undefined = the client did not send the list (what is saved stays);
+// [] = clear it.
+const MAX_DATES = 12;
+function importantDatesOf(b) {
+    if (!Array.isArray(b.importantDates)) return { list: undefined };
+    const list = [];
+    for (const row of b.importantDates) {
+        const occasion = str(row && row.occasion);
+        const raw = str(row && row.date).slice(0, 10);
+        if (!occasion && !raw) continue;                         // an empty row is just dropped
+        if (!occasion || !raw) return { error: 'Each important date needs both an occasion and a date' };
+        const d = new Date(raw + 'T00:00:00.000Z');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(d.getTime()) || d.getUTCFullYear() < 1900 || d.getUTCFullYear() > 2100) return { error: `"${raw}" is not a valid date` };
+        if (occasion.length > 40) return { error: 'The occasion is too long (40 letters at most)' };
+        if (!list.some((x) => x.occasion.toLowerCase() === occasion.toLowerCase() && x.date.getTime() === d.getTime())) list.push({ occasion, date: d });
+    }
+    if (list.length > MAX_DATES) return { error: `At most ${MAX_DATES} important dates` };
+    return { list };
+}
+const isBirthday = (o) => /birth/i.test(o);
+const isMarriage = (o) => /marriage|wedding|anniversary/i.test(o) && !/work|job|business/i.test(o);
+
+/** The list to store: the one sent, else (older clients) what the single birth date / anniversary fields say. */
+function datesForSave(p, b) {
+    if (p.importantDates !== undefined) return p.importantDates;
+    const out = [];
+    if (b.dob) out.push({ occasion: 'Birthday', date: new Date(b.dob) });
+    if (p.anniversary) out.push({ occasion: 'Marriage Anniversary', date: p.anniversary });
+    return out.length ? out : undefined;
+}
+
+// The stored list for a partial edit; the profile's single birth date / anniversary (older app versions) join it when the list lacks them.
+function datesBase(cur, pr, day) {
+    const list = (cur.anniversaries || []).map((a) => ({ occasion: a.occasion, date: day(a.date) }));
+    if (pr.dob && !list.some((x) => isBirthday(x.occasion))) list.push({ occasion: 'Birthday', date: day(pr.dob) });
+    if (pr.anniversary && !list.some((x) => isMarriage(x.occasion))) list.push({ occasion: 'Marriage Anniversary', date: day(pr.anniversary) });
+    return list;
+}
+
 // Validate + normalise a customer payload (shared by create and update).
 function parseCustomer(b) {
     const name = str(b.name);
@@ -356,10 +416,12 @@ function parseCustomer(b) {
     }
     const bad = V.validateCommon(b);
     if (bad) return { error: bad };
+    const dates = importantDatesOf(b);
+    if (dates.error) return { error: dates.error };
 
     return {
         data: {
-            name, contacts,
+            name, contacts, importantDates: dates.list,
             gender: ['Male', 'Female', 'Other'].includes(b.gender) ? b.gender : '',
             membershipStatus: b.membershipStatus === 'VIP' ? 'VIP' : 'Regular',
             anniversary: b.anniversary ? new Date(b.anniversary) : null,
@@ -413,8 +475,9 @@ function customerProfileFields(b, parsed, referral) {
         membershipStatus: parsed.membershipStatus, customerType: str(b.customerType),
         nicknameBn: str(b.nicknameBengali), addressBn: str(b.addressBengali),
         fatherName: str(b.fatherName), gender: parsed.gender,
-        dob: b.dob ? new Date(b.dob) : undefined,
-        anniversary: parsed.anniversary || undefined,
+        // the single birth date / anniversary follow the list of important dates when the client sends it
+        dob: parsed.importantDates ? ((parsed.importantDates.find((x) => isBirthday(x.occasion)) || {}).date || null) : (b.dob ? new Date(b.dob) : undefined),
+        anniversary: parsed.importantDates ? ((parsed.importantDates.find((x) => isMarriage(x.occasion)) || {}).date || null) : (parsed.anniversary || undefined),
         contacts: parsed.contacts,
         city: str(b.city), state: str(b.state),
         country: str(b.country) || 'India', pincode: str(b.pincode),
@@ -446,6 +509,7 @@ exports.createCustomer = async (req, res, next) => {
 
         const referral = await resolveReferral(b);
         if (referral.error) return fail(res, 400, referral.error);
+        const bn = await bengaliFor(b);
 
         const now = new Date();
         const me = whoAmI(req);
@@ -453,9 +517,9 @@ exports.createCustomer = async (req, res, next) => {
 
         const doc = await Customer.create({
             customer_name: p.name,
-            customer_name_bengali: str(b.nameBengali),
+            customer_name_bengali: bn.name,
             address: str(b.address),
-            address_bengali: '',
+            address_bengali: bn.address,
             whatsapp_no: p.contacts[0].number,
             mobile_no: p.contacts[1] ? p.contacts[1].number : '',
             mobile_no_3: p.contacts[2] ? p.contacts[2].number : undefined,
@@ -463,8 +527,8 @@ exports.createCustomer = async (req, res, next) => {
             email: str(b.email) || undefined,
             nickname: str(b.nickname) || undefined,
             reference_customer_id: referral.referenceId || undefined,
-            anniversaries: p.anniversary ? [{ occasion: 'Marriage Anniversary', date: p.anniversary }] : undefined,
-            notification_type: b.notificationType === 'none' ? 'none' : 'all',
+            anniversaries: datesForSave(p, b),
+            notification_type: notifyOf(b.notificationType),
             created_by: me.id,
             created_by_name: me.name,
             created_at: now,
@@ -476,8 +540,8 @@ exports.createCustomer = async (req, res, next) => {
             customerId: doc._id,
             customerCode: await newCustomerCode(),
             ...branch,
-            ...customerProfileFields(b, p, referral),
-            source: 'app',
+            ...customerProfileFields({ ...b, addressBengali: bn.address }, p, referral),
+            source: str(req.headers['x-client']).toLowerCase() === 'portal' ? 'portal' : 'app',
             createdBy: me.id, createdByName: me.name,
         });
         res.status(201).json({ success: true, data: { ...doc.toObject(), profile: profile.toObject() } });
@@ -503,8 +567,12 @@ exports.updateCustomer = async (req, res, next) => {
         if (parsed.error) return fail(res, 400, parsed.error);
         const { data: p } = parsed;
 
-        if (b.force !== true) {
-            const dupe = await findCustomerDuplicate(p.contacts, before._id);
+        // only a number this customer did not already have can clash (an existing duplicate must not block editing something else)
+        const hadProfile = await models.customerProfile().findOne({ customerId: before._id }).select('contacts').lean();
+        const had = new Set([...LEGACY_PHONE_FIELDS.map((f) => before[f]), ...((hadProfile && hadProfile.contacts) || []).map((c) => c.number)].filter(Boolean));
+        const added = p.contacts.filter((c) => !had.has(c.number));
+        if (b.force !== true && added.length) {
+            const dupe = await findCustomerDuplicate(added, before._id);
             if (dupe) {
                 return fail(res, 409, `Another customer already uses one of these numbers: ${dupe.customer_name || 'unnamed'}`, {
                     duplicate: { id: dupe._id, name: dupe.customer_name },
@@ -520,9 +588,10 @@ exports.updateCustomer = async (req, res, next) => {
             customer_name: p.name,
             customer_name_bengali: str(b.nameBengali),
             address: str(b.address),
+            address_bengali: str(b.addressBengali),
             whatsapp_no: p.contacts[0].number,
             mobile_no: p.contacts[1] ? p.contacts[1].number : '',
-            notification_type: b.notificationType === 'none' ? 'none' : 'all',
+            notification_type: notifyOf(b.notificationType),
             updated_at: now, updated_by: me.id, updated_by_name: me.name,
         };
         const $unset = {};
@@ -535,8 +604,11 @@ exports.updateCustomer = async (req, res, next) => {
             reference_customer_id: referral.referenceId,
         };
         for (const [k, v] of Object.entries(optional)) { if (v) $set[k] = v; else $unset[k] = ''; }
-        // Legacy `anniversaries` can hold several occasions: never overwrite an existing list.
-        if (!(before.anniversaries && before.anniversaries.length) && p.anniversary) {
+        // The list the client sent replaces the saved one (an empty list clears it). From a client that sends only the single
+        // anniversary field, an existing list is never overwritten.
+        if (p.importantDates !== undefined) {
+            $set.anniversaries = p.importantDates;
+        } else if (!(before.anniversaries && before.anniversaries.length) && p.anniversary) {
             $set.anniversaries = [{ occasion: 'Marriage Anniversary', date: p.anniversary }];
         }
         await Customer.updateOne({ _id: before._id }, { $set, ...(Object.keys($unset).length ? { $unset } : {}) });
@@ -585,7 +657,8 @@ exports.patchCustomer = async (req, res, next) => {
             name: cur.customer_name, nameBengali: cur.customer_name_bengali, address: cur.address, email: cur.email, nickname: cur.nickname,
             notificationType: cur.notification_type,
             contacts: (pr.contacts && pr.contacts.length ? pr.contacts : legacy).map((c) => ({ number: c.number, label: c.label })),
-            gender: pr.gender, membershipStatus: pr.membershipStatus, customerType: pr.customerType, nicknameBengali: pr.nicknameBn, addressBengali: pr.addressBn,
+            gender: pr.gender, membershipStatus: pr.membershipStatus, customerType: pr.customerType, nicknameBengali: pr.nicknameBn, addressBengali: pr.addressBn || cur.address_bengali,
+            importantDates: datesBase(cur, pr, day),
             fatherName: pr.fatherName, dob: day(pr.dob), anniversary: day(pr.anniversary), city: pr.city, state: pr.state, country: pr.country, pincode: pr.pincode,
             businessName: pr.businessName, gstNo: pr.gstNo, panNo: pr.panNo, aadharNo: pr.aadharNo, taxNo: pr.taxNo, notes: pr.notes, opening: pr.opening,
             referredById: pr.referredBy && pr.referredBy.customerId ? String(pr.referredBy.customerId) : undefined,

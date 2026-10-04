@@ -11,15 +11,16 @@ use Portal\Config;
  */
 final class ApiClient
 {
-    public function __construct(private ?string $token = null, private string $branch = '')
+    public function __construct(private ?string $token = null, private string $branch = '', private string $counter = '')
     {
     }
 
-    public function withToken(?string $token, string $branch = ''): self
+    public function withToken(?string $token, string $branch = '', string $counter = ''): self
     {
         $c = clone $this;
         $c->token = $token;
         $c->branch = $branch;
+        $c->counter = $counter;
         return $c;
     }
 
@@ -222,6 +223,11 @@ final class ApiClient
         if ($this->branch !== '') {
             $headers[] = 'X-Branch: ' . $this->branch;
         }
+        if ($this->counter !== '') {
+            $headers[] = 'X-Counter: ' . $this->counter;
+        }
+        // so the API can record which program made a bill (the app or this website)
+        $headers[] = 'X-Client: portal';
         // tell the API which visitor this is (its login limiter counts per person, not per website address); it trusts this only with the shared secret
         $secret = Config::get('PORTAL_SHARED_KEY');
         if ($secret !== '' && !empty($_SERVER['REMOTE_ADDR'])) {

@@ -33,5 +33,5 @@ const schema = new mongoose.Schema(
     },
     { collection: 'app_credit_notes', timestamps: true }
 );
-schema.plugin(require('../utils/branchScope').branchPlugin);
+schema.plugin(require('../utils/branchScope').branchPlugin, { counter: true }); // bills / money at a counter carry it
 module.exports = mongoose.models.AppCreditNote || mongoose.model('AppCreditNote', schema);

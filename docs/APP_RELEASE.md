@@ -3,7 +3,7 @@
 The app is never sent to anyone by hand. You build it once, upload it on the website, press Publish, and every phone installs it from inside the app.
 
 ## Every release (about 10 minutes)
-1. **Raise the build number** in `flutter_app/pubspec.yaml`: `version: 1.5.0+5` -> `1.5.1+6`. The number after `+` MUST go up every time (phones compare only that number). The upload is refused if it is not higher than what phones already have.
+1. **Raise the build number** in `flutter_app/pubspec.yaml`: `version: 1.5.0+5` -> `1.5.1+8`. The number after `+` MUST go up every time (phones compare only that number). The upload is refused if it is not higher than what phones already have.
 2. **Build it signed with the shop's key** (the file `android/key.properties` + the `.jks` next to it; keep both safe and backed up: an update signed with another key cannot be installed over the old app, people would have to uninstall first and lose their login):
    ```
    cd flutter_app

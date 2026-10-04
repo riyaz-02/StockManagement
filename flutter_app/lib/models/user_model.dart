@@ -11,6 +11,10 @@ class User {
   final String branchId;
   final String branchName;
 
+  /// The billing counter this user normally works at ('' = none); it belongs to [branchId].
+  final String counterId;
+  final String counterName;
+
   User({
     required this.id,
     required this.name,
@@ -21,6 +25,8 @@ class User {
     required this.createdAt,
     this.branchId = 'main',
     this.branchName = 'Main branch',
+    this.counterId = '',
+    this.counterName = '',
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -33,6 +39,8 @@ class User {
       profileImage: json['profileImage'],
       branchId: json['branchId'] ?? 'main',
       branchName: json['branchName'] ?? 'Main branch',
+      counterId: (json['counterId'] ?? '').toString(),
+      counterName: (json['counterName'] ?? '').toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -48,6 +56,8 @@ class User {
       'mobile': mobile,
       'branchId': branchId,
       'branchName': branchName,
+      'counterId': counterId,
+      'counterName': counterName,
       if (profileImage != null) 'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
     };

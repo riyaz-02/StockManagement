@@ -66,5 +66,5 @@ bookingSchema.index({ itemId: 1, status: 1 });
 bookingSchema.index({ mobile: 1 });
 bookingSchema.index({ bookingDate: -1 });
 
-bookingSchema.plugin(require('../utils/branchScope').branchPlugin);
+bookingSchema.plugin(require('../utils/branchScope').branchPlugin, { counter: true }); // bills / money at a counter carry it
 module.exports = mongoose.model('Booking', bookingSchema);

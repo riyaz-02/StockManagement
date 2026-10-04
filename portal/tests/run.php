@@ -39,11 +39,11 @@ check('empty / null go home', WakeController::safeNext('') === '/' && WakeContro
 
 echo "\nWords (English first, missing keys fall back)\n";
 I18n::load('en');
-check('a known key', I18n::t('login.button') === 'Sign in');
+check('a known key', I18n::t('login.button') === 'Login');
 check('variables are filled', I18n::t('login.wait', ['min' => 5]) === 'Too many wrong tries. Please wait 5 minute(s) and try again.');
 check('an unknown key shows the key, never an error', I18n::t('no.such.key') === 'no.such.key');
 I18n::load('xx');
-check('a language with no file falls back to English', I18n::t('login.button') === 'Sign in');
+check('a language with no file falls back to English', I18n::t('login.button') === 'Login');
 I18n::load('en');
 $enKeys = array_keys(require dirname(__DIR__) . '/lang/en.php');
 check('every menu item has a name in the words file', (function () use ($enKeys) {

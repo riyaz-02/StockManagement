@@ -9,7 +9,7 @@
         <h1>{{ inv.customerName }}
             {% if cancelled %}<span class="pill pill-grey">Cancelled</span>{% elseif inv.dueAmount > 0 %}<span class="pill pill-amber">Due {{ inv.dueAmount|inr }}</span>{% else %}<span class="pill pill-green">Paid</span>{% endif %}
         </h1>
-        <p class="muted">Bill {{ inv.invoiceNumber }} · {{ inv.invoiceDate|dmy }}{% if inv.customerMobile %} · {{ inv.customerMobile }}{% endif %}{% if inv.branchName %} · {{ inv.branchName }}{% endif %}{% if inv.createdBy %} · by {{ inv.createdBy }}{% endif %}</p>
+        <p class="muted">Bill {{ inv.invoiceNumber }} · {{ inv.invoiceDate|dmy }}{% if inv.customerMobile %} · {{ inv.customerMobile }}{% endif %}{% if inv.branchName %} · {{ inv.branchName }}{% endif %}{% if inv.counterName %} · {{ inv.counterName }}{% endif %}{% if inv.createdBy %} · by {{ inv.createdBy }}{% if inv.createdByRole %} ({{ inv.createdByRole }}){% endif %}{% endif %}{% if inv.client %} · made in the {{ inv.client == 'portal' ? 'website' : 'app' }}{% if inv.appVersion %} {{ inv.appVersion }}{% endif %}{% endif %}</p>
     </div>
     <div class="actions">
         <a class="btn" href="/billing/{{ inv._id }}/print" target="_blank" rel="noopener">{{ icon('receipt', 17) }} Print</a>
@@ -75,7 +75,7 @@
     <section class="panel">
         <div class="panel-head"><h2>Payments</h2></div>
         <div class="panel-body kv">
-            {% for p in inv.paymentHistory %}<div class="kv-row"><span>{{ p.date|dmy }} · {{ p.mode }}{% if p.reference %} · {{ p.reference }}{% endif %}{% if p.receivedBy %} · {{ p.receivedBy }}{% endif %}</span><strong class="pos">{{ p.amount|inr }}</strong></div>{% else %}<div class="muted">No payment yet.</div>{% endfor %}
+            {% for p in inv.paymentHistory %}<div class="kv-row"><span>{{ p.date|dmy }} · {{ p.mode }}{% if p.reference %} · {{ p.reference }}{% endif %}{% if p.counterName %} · {{ p.counterName }}{% endif %}{% if p.receivedBy %} · {{ p.receivedBy }}{% endif %}</span><strong class="pos">{{ p.amount|inr }}</strong></div>{% else %}<div class="muted">No payment yet.</div>{% endfor %}
         </div>
     </section>
     {% if inv.oldMetal|length %}

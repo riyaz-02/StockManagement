@@ -12,6 +12,7 @@ import '../utils/bilingual.dart';
 import '../utils/billing_calc.dart';
 import '../utils/directory_validators.dart';
 import '../widgets/bill_ui.dart';
+import 'directory_add_screens.dart';
 import 'invoice_item_sheet.dart';
 import 'old_metal_screen.dart';
 
@@ -139,6 +140,34 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       r.amount.dispose();
     }
     super.dispose();
+  }
+
+  /// Which billing counter this bill (and the payments on it) is filed under: one of the counters of this branch.
+  Future<void> _pickCounter() async {
+    final counters = ((_meta['counters'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    if (counters.isEmpty) return;
+    final cur = _s((_meta['counter'] as Map?)?['counterId']);
+    final pick = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 4), child: Align(alignment: Alignment.centerLeft, child: Text('Bill at which counter?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)))),
+          for (final c in counters)
+            ListTile(
+              leading: Icon(_s(c['id']) == cur ? Icons.radio_button_checked : Icons.radio_button_off, color: const Color(0xFFE94560)),
+              title: Text(_s(c['name'])),
+              subtitle: _s(c['code']).isEmpty ? null : Text(_s(c['code'])),
+              onTap: () => Navigator.pop(ctx, c),
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (pick == null || !mounted) return;
+    await Provider.of<AuthProvider>(context, listen: false).setActiveCounter(_s(pick['id']), _s(pick['name']));
+    if (!mounted) return;
+    setState(() => _meta = {..._meta, 'counter': {'counterId': _s(pick['id']), 'counterName': _s(pick['name']), 'counterCode': _s(pick['code'])}});
   }
 
   Future<void> _loadMeta() async {
@@ -445,6 +474,29 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     return true;
   }
 
+  /// The full customer form (numbers, Bengali, duplicates ...), then bill the customer that was just saved.
+  Future<void> _addCustomerForm() async {
+    final typed = _search.text.trim();
+    final isNumber = RegExp(r'^[\d\s+()-]+$').hasMatch(typed);
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AddCustomerScreen(prefillName: isNumber ? '' : typed, prefillNumber: isNumber ? typed : '')),
+    );
+    final d = AddCustomerScreen.lastCreated;
+    if (saved != true || d == null || !mounted) return;
+    final profile = d['profile'] is Map ? Map<String, dynamic>.from(d['profile'] as Map) : <String, dynamic>{};
+    final contacts = (profile['contacts'] as List?) ?? const [];
+    await _pickCustomer({
+      'id': _s(d['_id']),
+      'name': _s(d['customer_name']),
+      'nameBn': _s(d['customer_name_bengali']),
+      'code': profile['customerCode'],
+      'phones': [for (final c in contacts) _s((c as Map)['number'])],
+    });
+    _search.clear();
+    _results = [];
+  }
+
   Future<bool> _createCustomerNow(String name, String mobile) async {
     try {
       final res = await _api.createDirectoryRecord('customers', {
@@ -640,6 +692,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       final t = _totals();
       final body = <String, dynamic>{
         'requestId': _requestId,
+        if (_s((_meta['counter'] as Map?)?['counterId']).isNotEmpty) 'counterId': _s((_meta['counter'] as Map?)?['counterId']),
         if (!_walkIn) 'customerId': _s(_customer!['id']) else ...{'customerName': _name.text.trim(), 'customerMobile': DV.normalizePhone(_mobile.text)},
         'customerAddress': _address.text.trim(),
         if (_pan.text.trim().isNotEmpty) 'customerPan': _pan.text.trim().toUpperCase(),
@@ -705,7 +758,25 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('New GST Invoice', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             if (_meta['nextInvoiceNumber'] != null)
-              Text('No. ${_meta['nextInvoiceNumber']} · ${_s((_meta['branch'] as Map?)?['branchName'])}', style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w500)),
+              InkWell(
+                onTap: (_meta['counters'] as List?)?.isNotEmpty == true ? _pickCounter : null,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('No. ${_meta['nextInvoiceNumber']} · ${_s((_meta['branch'] as Map?)?['branchName'])}', style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w500)),
+                  if ((_meta['counters'] as List?)?.isNotEmpty == true) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                      decoration: BoxDecoration(color: const Color(0xFFFDE8EC), borderRadius: BorderRadius.circular(8)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.point_of_sale_rounded, size: 11, color: Color(0xFFE94560)),
+                        const SizedBox(width: 3),
+                        Text(_s((_meta['counter'] as Map?)?['counterName']).isEmpty ? 'Pick counter' : _s((_meta['counter'] as Map?)?['counterName']), style: const TextStyle(fontSize: 11, color: Color(0xFFE94560), fontWeight: FontWeight.w700)),
+                        const Icon(Icons.arrow_drop_down, size: 14, color: Color(0xFFE94560)),
+                      ]),
+                    ),
+                  ],
+                ]),
+              ),
           ]),
         ),
         body: _loading
@@ -956,10 +1027,15 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             ]),
           ),
         ),
+      if (context.read<AuthProvider>().can('directory.create'))
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: TextButton.icon(onPressed: _addCustomerForm, icon: const Icon(Icons.person_add_alt_1_outlined, size: 18), label: const Text('New customer')),
+        ),
       if (_results.isEmpty && _search.text.trim().length >= 2)
         Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: TextButton.icon(onPressed: () => setState(() => _existing = false), icon: const Icon(Icons.person_add_alt_outlined, size: 18), label: const Text('Not found: bill a new buyer')),
+          padding: const EdgeInsets.only(top: 2),
+          child: TextButton.icon(onPressed: () => setState(() => _existing = false), icon: const Icon(Icons.person_outline, size: 18), label: const Text('Not found: bill a new buyer (walk-in)')),
         ),
     ];
   }

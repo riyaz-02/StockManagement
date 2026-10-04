@@ -135,6 +135,12 @@ const branchMatch = (id) => (id === 'main' ? { $or: [{ branch_id: 'main' }, { br
 
 // req.branchScope is set by `protect`: restrict = null (whole firm) or the branches this request may see; branchId = the
 // branch new records are filed under (the caller's own, or the one an admin switched to with X-Branch).
+// The counter (till) in force for this request (utils/counters.js), who made the record and with which program: kept on every
+// bill and payment so sales and money can be followed per branch, counter, person and app (or the website's portal) later.
+const myCounter = (req) => (req.branchScope && req.branchScope.counter) || null;
+const counterStamp = (req, counter) => { const c = counter === undefined ? myCounter(req) : counter; return { counter_id: c ? c.counterId : '', counter_name: c ? c.counterName : '', counter_code: c ? c.counterCode : '' }; };
+const clientOf = (req) => (str(req.headers['x-client']).toLowerCase() === 'portal' ? 'portal' : 'app');
+const originStamp = (req) => ({ created_by_role: str(req.user.role), client: clientOf(req), app_version: str(req.headers['x-app-version']).slice(0, 20) });
 const myBranch = (req) => (req.branchScope && req.branchScope.branchId) || req.user.branchId || 'main';
 async function scope(req) {
     const and = [];
@@ -144,6 +150,7 @@ async function scope(req) {
     } else {
         and.push({ $or: restrict.map(branchMatch) });
     }
+    if (str(req.query.counter)) and.push({ counter_id: str(req.query.counter) });
     return and;
 }
 async function canSee(req, doc) {
@@ -166,6 +173,9 @@ exports.meta = async (req, res, next) => {
                 defaultPlace: sup.defaultPlace,
                 states: GstStates.STATES,
                 branch,
+                // the live counters of this branch and the one in force (X-Counter, else the person's own)
+                counters: (await require('../models/BranchCounter').find({ branchId: branch.branchId, isActive: { $ne: false } }).sort({ name: 1 }).lean()).map((c) => ({ id: String(c._id), name: c.name, code: c.code || '' })),
+                counter: myCounter(req),
                 nextInvoiceNumber: await peekNumber(branch.branchId),
                 goldRate: todayRate.gold > 0 ? todayRate.gold : (last[0] ? Number(last[0].gold_rate) || 0 : 0),        // today's rate (Home) first, else the last bill's
                 silverRate: todayRate.silver > 0 ? todayRate.silver : (last[0] ? Number(last[0].silver_rate) || 0 : 0),
@@ -483,6 +493,12 @@ exports.createInvoice = async (req, res, next) => {
             }
             claimedOrder = true;
         }
+        // the counter of this bill: the one named in the request (it must be a live counter of this branch), else the one in force
+        let counter = myCounter(req);
+        if (str(b.counterId)) {
+            counter = await require('../utils/counters').pick(branch.branchId, str(b.counterId));
+            if (!counter) return await release(b, res, 400, 'That counter is not available at this branch');
+        }
         const number = await allocateNumber(branch.branchId);
         const who = me(req);
         const now = new Date();
@@ -533,7 +549,7 @@ exports.createInvoice = async (req, res, next) => {
                 description: 'Payment at the time of invoice creation',
                 payment_date: Calc.todayIST(now), payment_time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(now),
                 created_at: now, created_by: null, files: [],
-                request_id: `${b.requestId}:${i}`, created_by_name: who.name, created_by_app_id: who.id, source: 'app',
+                request_id: `${b.requestId}:${i}`, created_by_name: who.name, created_by_app_id: who.id, source: clientOf(req), ...counterStamp(req, counter),
             })),
             ...(orderDoc ? { order_number: orderDoc.number, order_advance: advTotal } : {}),
             ...(omDocs.length ? { old_metal: omDocs.map((x) => ({ id: String(x._id), metal: x.metalType, purity: x.purity, net: x.net, fine: x.fine, rate: x.rate, amount: x.amount, customer: x.customerName })), old_metal_amount: omTotal } : {}),
@@ -541,8 +557,9 @@ exports.createInvoice = async (req, res, next) => {
             ...(cust.customer_code ? { customer_code: cust.customer_code } : {}),
             walk_in: cust.walk_in,
             branch_id: branch.branchId, branch_name: branch.branchName,
-            created_by_name: who.name, created_by_app_id: who.id,
-            request_id: b.requestId, calc_rule: calc.rule, source: 'app',
+            ...counterStamp(req, counter),
+            created_by_name: who.name, created_by_app_id: who.id, ...originStamp(req),
+            request_id: b.requestId, calc_rule: calc.rule, source: clientOf(req),
             gst_type: calc.gstType, supply_state_code: sup.stateCode, seller_gstin: sup.seller.gstin,
             // discount is taken off BEFORE GST (lines above are already net of it); the website's own `discount` stays 0
             discount_mode: calc.discountMode, discount_given: calc.discountGiven, discount_before_gst: calc.discountBeforeGst,
@@ -634,7 +651,7 @@ exports.addPayment = async (req, res, next) => {
         const entry = {
             amount, payment_mode: mode, transaction_reference: str(b.reference), description: str(b.description) || 'Payment update',
             payment_date: today, payment_time: time, created_at: now, created_by: null, files: [],
-            request_id: b.requestId, created_by_name: who.name, created_by_app_id: who.id, source: 'app',
+            request_id: b.requestId, created_by_name: who.name, created_by_app_id: who.id, source: clientOf(req), ...counterStamp(req),
         };
         const num = (f) => ({ $convert: { input: f, to: 'double', onError: 0, onNull: 0 } });
 
@@ -648,7 +665,7 @@ exports.addPayment = async (req, res, next) => {
             [{ $set: {
                 paid_amount: { $round: [{ $add: [num('$paid_amount'), amount] }, 2] },
                 pay_no: { $add: [{ $convert: { input: '$pay_no', to: 'int', onError: 0, onNull: 0 } }, 1] },
-                last_payment_date: today, last_payment_time: time, updated_at: now,
+                last_payment_date: today, last_payment_time: time, updated_at: now, updated_by_name: who.name, updated_by_app_id: who.id,
                 payment_history: { $concatArrays: [{ $ifNull: ['$payment_history', []] }, [entry]] },
             } }, { $set: {
                 due_advance: { $round: [{ $subtract: [num('$paid_amount'), num('$total_payable_amount')] }, 2] },

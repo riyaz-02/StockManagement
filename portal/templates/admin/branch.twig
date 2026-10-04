@@ -1,0 +1,114 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}{{ br.name }}{% endblock %}
+{% block heading %}{{ br.name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ br.name }} {% if br.isMain %}<span class="pill pill-indigo">Built in</span>{% elseif br.isActive %}<span class="pill pill-green">Open</span>{% else %}<span class="pill pill-grey">Off</span>{% endif %}</h1>
+    <p class="muted"><a href="/admin/branches">&larr; All branches</a></p></div>
+</div>
+
+{% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+{% if not br.isMain %}
+<form method="post" action="/admin/branches/{{ br.id }}" class="panel">
+    {{ csrf_field() }}
+    <div class="panel-head"><h2>Details</h2></div>
+    <div class="panel-body">
+        <div class="form-grid">
+            {{ ui.field('Branch name', 'name', v.name|default(br.name), {required: true}) }}
+            {{ ui.field('Letters in front of its bill numbers', 'invoicePrefix', v.invoicePrefix|default(br.invoicePrefix), {hint: 'Cannot be changed once a bill is made at this branch.'}) }}
+            {{ ui.field('GSTIN', 'gstin', v.gstin|default(br.gstin), {placeholder: '19ABCDE1234F1Z5'}) }}
+            {{ ui.field('Short code', 'code', v.code|default(br.code), {}) }}
+            {{ ui.field('City', 'city', v.city|default(br.city), {}) }}
+            {{ ui.field('State', 'state', v.state|default(br.state), {}) }}
+            {{ ui.field('Phone', 'phone', v.phone|default(br.phone), {}) }}
+            {{ ui.field('Address', 'address', v.address|default(br.address), {span: true}) }}
+            <label class="check span-2"><input type="checkbox" name="isActive" value="1"{{ br.isActive ? ' checked' : '' }}> <span>This branch is open (untick to close it for new work; it needs no staff first. Nothing is deleted)</span></label>
+        </div>
+    </div>
+    <div class="panel-foot"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-head"><h2>Billing counters</h2></div>
+    {% if cError %}<div class="notice notice-error" role="alert" style="margin: 12px 16px 0">{{ cError }}</div>{% endif %}
+    {% if br.counters|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Counter</th><th>Code</th><th>Note</th><th>On</th><th></th></tr></thead>
+        <tbody>
+        {% for c in br.counters %}
+            <tr>
+                <td colspan="5">
+                    <form method="post" action="/admin/branches/{{ br.id }}/counters/{{ c.id }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <input type="text" name="name" value="{{ c.name }}" aria-label="Counter name" maxlength="40" required>
+                        <input type="text" name="code" value="{{ c.code }}" aria-label="Code" maxlength="10" style="width: 80px" placeholder="Code">
+                        <input type="text" name="note" value="{{ c.note }}" aria-label="Note" maxlength="120" style="width: 200px" placeholder="Note">
+                        <label class="check"><input type="checkbox" name="isActive" value="1"{{ c.isActive ? ' checked' : '' }}> <span>On</span></label>
+                        <button class="btn" type="submit">Save</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="t-empty">No counters yet. Without one, bills are saved with no counter.</div>{% endif %}
+    <form method="post" action="/admin/branches/{{ br.id }}/counters" class="panel-body">
+        {{ csrf_field() }}
+        <div class="inline-form">
+            <input type="text" name="name" value="{{ v.name|default('') }}" placeholder="New counter, e.g. Counter 1" aria-label="New counter name" maxlength="40" required>
+            <input type="text" name="code" placeholder="Code" aria-label="Code" maxlength="10" style="width: 80px">
+            <input type="text" name="note" placeholder="Note (optional)" aria-label="Note" maxlength="120" style="width: 200px">
+            <button class="btn btn-primary" type="submit">Add counter</button>
+        </div>
+        <p class="muted small">A counter is a till or desk (Counter 1, Gold desk ...). Each person can be given one; everything they bill, receive or estimate is then saved with it, so you can follow sales and money per counter.</p>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Staff at this branch</h2></div>
+    {% if br.staff|length %}
+    <div class="table-wrap"><table class="t">
+        <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Counter</th></tr></thead>
+        <tbody>
+        {% for p in br.staff %}
+            <tr>
+                <td><a class="row-link" href="/admin/staff/{{ p.id }}">{{ p.name }}</a> {% if not p.isActive %}<span class="pill pill-grey">Login off</span>{% endif %}</td>
+                <td>{{ p.mobile ?: '–' }}</td>
+                <td>{{ p.role|capitalize }}</td>
+                <td>
+                    <form method="post" action="/admin/branches/{{ br.id }}/staff/{{ p.id }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <select name="counterId" aria-label="Counter of {{ p.name }}">
+                            <option value="">No counter</option>
+                            {% for c in br.counters %}{% if c.isActive %}<option value="{{ c.id }}"{{ p.counterId == c.id ? ' selected' : '' }}>{{ c.name }}</option>{% endif %}{% endfor %}
+                        </select>
+                        <button class="btn" type="submit">Save</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="t-empty">Nobody works here yet.</div>{% endif %}
+    {% if others|length and br.isActive %}
+    <div class="panel-body">
+        <form method="post" action="/admin/branches/{{ br.id }}/staff" class="inline-form">
+            {{ csrf_field() }}
+            <select name="uid" aria-label="Person to move here" required>
+                <option value="">Move a person here ...</option>
+                {% for u in others %}<option value="{{ u._id }}">{{ u.name }} ({{ u.branchName|default('Main branch') }})</option>{% endfor %}
+            </select>
+            <select name="counterId" aria-label="Counter">
+                <option value="">No counter</option>
+                {% for c in br.counters %}{% if c.isActive %}<option value="{{ c.id }}">{{ c.name }}</option>{% endif %}{% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Move here</button>
+        </form>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

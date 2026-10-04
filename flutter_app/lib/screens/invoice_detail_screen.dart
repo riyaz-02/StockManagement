@@ -241,7 +241,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           if (_s(inv['placeOfSupply']).isNotEmpty) Text('Supply: ${_s(inv['placeOfSupply']).replaceFirst(RegExp(r'^\d+-'), '')} · ${igst ? 'IGST' : 'CGST+SGST'}', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
           if (_s(inv['customerAddress']).isNotEmpty) Text(_s(inv['customerAddress']), style: const TextStyle(fontSize: 12.5, color: Colors.black87)),
           const SizedBox(height: 6),
-          Text('${date == null ? '' : DateFormat('dd MMM yyyy, hh:mm a').format(date)}  ·  ${_s(inv['branchName'])}  ·  by ${_s(inv['createdBy'])}', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+          Text('${date == null ? '' : DateFormat('dd MMM yyyy, hh:mm a').format(date)}  ·  ${_s(inv['branchName'])}${_s(inv['counterName']).isEmpty ? '' : '  ·  ${_s(inv['counterName'])}'}  ·  by ${_s(inv['createdBy'])}', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
         ]),
       ),
       BillCard(

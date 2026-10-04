@@ -299,7 +299,7 @@ class _BillingScreenState extends State<BillingScreen> with LiveRefresh<BillingS
                     Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
                     if (r['walkIn'] == true) ...[const SizedBox(width: 5), StatusPill('Walk-in', Colors.orange.shade800)],
                   ]),
-                  Text('${date == null ? '' : DateFormat('dd MMM yyyy').format(date)}${_s(r['branchName']).isEmpty ? '' : ' · ${_s(r['branchName'])}'}', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                  Text('${date == null ? '' : DateFormat('dd MMM yyyy').format(date)}${_s(r['branchName']).isEmpty ? '' : ' · ${_s(r['branchName'])}'}${_s(r['counterName']).isEmpty ? '' : ' · ${_s(r['counterName'])}'}', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
                 ]),
               ),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [

@@ -41,6 +41,7 @@ final class Nav
         ]],
         ['section' => 'Admin Control', 'admin' => true, 'items' => [
             ['key' => 'staff', 'label' => 'Staff & roles', 'icon' => 'shield', 'href' => '/admin/staff', 'perm' => 'users.manage', 'ready' => true, 'color' => '#2563EB'],
+            ['key' => 'branches', 'label' => 'Branches & counters', 'icon' => 'store', 'href' => '/admin/branches', 'perm' => 'directory.manageBranches', 'ready' => true, 'color' => '#0E7490'],
             ['key' => 'updates', 'label' => 'App updates', 'icon' => 'phone', 'href' => '/admin/updates', 'perm' => 'appUpdate.manage', 'ready' => true, 'color' => '#4F46E5'],
             ['key' => 'loginscreen', 'label' => 'Login screen', 'icon' => 'image', 'href' => '/admin/login-screen', 'perm' => 'appAssets.manage', 'ready' => true, 'color' => '#9333EA'],
             ['key' => 'notify', 'label' => 'Notifications', 'icon' => 'bell', 'href' => '/admin/notifications', 'perm' => 'notifications.send', 'ready' => true, 'color' => '#D97706'],

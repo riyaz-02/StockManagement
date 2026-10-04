@@ -47,6 +47,7 @@
                                hx-get="/lookup/customers" hx-trigger="input changed delay:250ms" hx-target="next .picker-list" hx-swap="innerHTML" @input="typed" @keydown.escape="hide">
                     </label>
                     <div class="picker-list" x-show="open" x-cloak @click="pick"></div>
+                    {% if can('directory.create') %}<button type="button" class="link-btn picker-new" hx-get="/directory/customers/new" hx-target="#modal-body">+ New customer</button>{% endif %}
                 </div>
                 {{ _self.f('Mobile', 'customerMobile', v.customerMobile|default(''), 'tel', 'inputmode="numeric" maxlength="14" placeholder="10 digits"', 's2') }}
                 {% if is_bill %}

@@ -5,9 +5,9 @@
 {% block content %}
 <div class="page-head">
     <div><h1>Customers &amp; suppliers</h1><p class="muted">Everyone you deal with. Open a customer to see what they owe and their bills.</p></div>
-    <div class="actions">{% if can('directory.create') %}<a class="btn btn-primary" href="/directory/customers/new">{{ icon('plus', 17) }} New customer</a>{% endif %}</div>
+    <div class="actions">{% if can('directory.create') %}<button class="btn btn-primary" type="button" hx-get="/directory/customers/new" hx-target="#modal-body">{{ icon('plus', 17) }} New customer</button>{% endif %}</div>
 </div>
-<div class="live-block" hx-get="/directory/list" hx-trigger="load" hx-swap="innerHTML">
+<div class="live-block" hx-get="/directory/list" hx-trigger="load, customer-saved from:body" hx-swap="innerHTML">
     <div class="loading"><span class="spinner"></span></div>
 </div>
 {% endblock %}

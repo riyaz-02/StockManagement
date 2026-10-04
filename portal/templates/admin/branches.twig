@@ -1,0 +1,46 @@
+{% extends 'app.twig' %}
+{% import 'ui.twig' as ui %}
+{% block title %}Branches &amp; counters{% endblock %}
+{% block heading %}Branches &amp; counters{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h1>Branches &amp; counters</h1><p class="muted">Every shop of the firm, the billing counters inside it, and who works where. Bills, stock and money made from now on are filed under the branch and counter of the person who made them. Nothing already saved is changed.</p></div></div>
+
+{% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+<section class="panel">
+    <div class="panel-head"><h2>Branches</h2></div>
+    <div class="bc-grid">
+        {% for b in branches %}
+        <a class="bc-card" href="/admin/branches/{{ b.id }}">
+            <h3>{{ b.name }} {% if b.isMain %}<span class="pill pill-indigo">Built in</span>{% elseif not b.isActive %}<span class="pill pill-grey">Off</span>{% endif %}</h3>
+            <div class="muted small">{{ b.city ?: '' }}{{ b.city and b.state ? ', ' : '' }}{{ b.state ?: '' }}{% if not b.city and not b.state %}{{ b.isMain ? 'The shop all earlier records belong to' : 'No city yet' }}{% endif %}</div>
+            <div class="chips-row">
+                <span class="pill pill-teal">{{ b.counterCount }} counter{{ b.counterCount == 1 ? '' : 's' }}</span>
+                <span class="pill pill-blue">{{ b.staffCount }} staff</span>
+                {% if b.invoicePrefix %}<span class="pill pill-grey">Bills {{ b.invoicePrefix }}-</span>{% endif %}
+                {% if b.gstin %}<span class="pill pill-grey">GSTIN {{ b.gstin }}</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<form method="post" action="/admin/branches" class="panel">
+    {{ csrf_field() }}
+    <div class="panel-head"><h2>Open a new branch</h2></div>
+    <div class="panel-body">
+        <div class="form-grid">
+            {{ ui.field('Branch name', 'name', v.name|default(''), {required: true, placeholder: 'e.g. Bagbazar'}) }}
+            {{ ui.field('Letters in front of its bill numbers', 'invoicePrefix', v.invoicePrefix|default(''), {placeholder: 'e.g. BGB', hint: '1 to 6 letters or digits: BGB-0001, BGB-0002 ... Cannot be changed once a bill is made.'}) }}
+            {{ ui.field('GSTIN (if it has its own)', 'gstin', v.gstin|default(''), {placeholder: '19ABCDE1234F1Z5', hint: 'Leave empty to bill under the firm\'s GSTIN.'}) }}
+            {{ ui.field('Short code', 'code', v.code|default(''), {placeholder: 'e.g. 02'}) }}
+            {{ ui.field('City', 'city', v.city|default(''), {}) }}
+            {{ ui.field('State', 'state', v.state|default(''), {placeholder: 'West Bengal', hint: 'Decides the GST place of supply for walk-in bills.'}) }}
+            {{ ui.field('Phone', 'phone', v.phone|default(''), {}) }}
+            {{ ui.field('Address', 'address', v.address|default(''), {span: true}) }}
+        </div>
+    </div>
+    <div class="panel-foot"><button class="btn btn-primary" type="submit">Open branch</button></div>
+</form>
+{% endblock %}

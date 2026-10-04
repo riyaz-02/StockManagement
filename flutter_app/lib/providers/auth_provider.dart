@@ -61,9 +61,28 @@ class AuthProvider with ChangeNotifier {
   bool get canSwitchBranch => can('branches.viewAll') || can('billing.viewAllBranches');
 
   String _branchName = '';
+  String _counterName = '';
 
   /// Name of the branch switched to, or '' for the whole firm.
   String get activeBranchName => _branchName;
+
+  /// The billing counter in force: the one picked on this phone, else the person's own ('' = none).
+  String get counterName => _counterName;
+  String get counterId => ApiService.activeCounter.isNotEmpty ? ApiService.activeCounter : (_user?.counterId ?? '');
+
+  /// Work at one counter of the branch ('' = the person's own). Everything made afterwards is filed under it.
+  Future<void> setActiveCounter(String id, String name) async {
+    ApiService.activeCounter = id;
+    _counterName = id.isEmpty ? (_user?.counterName ?? '') : name;
+    await _storage.saveCounter(id, id.isEmpty ? '' : name);
+    notifyListeners();
+  }
+
+  Future<void> _restoreCounter() async {
+    final (id, name) = await _storage.getCounter();
+    ApiService.activeCounter = id;
+    _counterName = id.isEmpty ? (_user?.counterName ?? '') : name;
+  }
 
   /// Work as one branch ('' = whole firm). Screens opened afterwards load that branch's stock and invoices; new records
   /// (invoices, items) are filed under it.
@@ -71,6 +90,7 @@ class AuthProvider with ChangeNotifier {
     ApiService.activeBranch = id;
     _branchName = id.isEmpty ? '' : name;
     await _storage.saveBranch(id, _branchName);
+    await setActiveCounter('', ''); // a counter belongs to one branch
     notifyListeners();
   }
 
@@ -120,6 +140,7 @@ class AuthProvider with ChangeNotifier {
           await Future.wait([
             if (!_user!.hasFullAccess) _fetchPermissions(),
             _restoreBranch(),
+            _restoreCounter(),
           ]);
           _locked = await _lockApplies();
         }
@@ -148,6 +169,8 @@ class AuthProvider with ChangeNotifier {
         _token = response['data']['token'];
         _user = User.fromJson(response['data']['user']);
         _locked = false;
+        ApiService.activeCounter = '';
+        _counterName = _user!.counterName;
         // a passcode belongs to one person: signing in as somebody else must not keep the previous person's
         if (await _lock.hasPin() && (await _lock.owner()) != _user!.id) await _lock.removePin();
 
@@ -181,7 +204,9 @@ class AuthProvider with ChangeNotifier {
     _permissions = {};
     ApiService.activeBranch = '';
     ApiService.activeGstin = '';
+    ApiService.activeCounter = '';
     _branchName = '';
+    _counterName = '';
     _syncLive();
     _locked = false;
     await _storage.clearAll();
@@ -251,6 +276,10 @@ class AuthProvider with ChangeNotifier {
           mobile: _user!.mobile,
           profileImage: _user!.profileImage,
           createdAt: _user!.createdAt,
+          branchId: _user!.branchId,
+          branchName: _user!.branchName,
+          counterId: _user!.counterId,
+          counterName: _user!.counterName,
         );
         await _storage.saveUser(_user!.toJson());
         notifyListeners();

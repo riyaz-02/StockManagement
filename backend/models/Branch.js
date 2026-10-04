@@ -23,6 +23,8 @@ const branchSchema = new mongoose.Schema(
         isActive: { type: Boolean, default: true },
         createdBy: String,
         createdByName: String,
+        updatedBy: String,
+        updatedByName: String,
     },
     { collection: 'app_branches', versionKey: false, timestamps: true }
 );
