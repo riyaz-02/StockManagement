@@ -87,7 +87,6 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
   // the website logs everyone in from one address: it passes the visitor's address with a shared secret (see utils/clientIp.js)
   keyGenerator: (req) => require('./utils/clientIp').trustedClientIp(req),
-  validate: { keyGeneratorIpFallback: false },
 });
 
 // ======================
